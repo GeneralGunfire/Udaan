@@ -26,3 +26,8 @@ export function openInVSCode(dir: string): Promise<void> {
 export function onTaskEvent(handler: (event: ClaudeCodeTaskEvent) => void): Promise<UnlistenFn> {
   return listen<ClaudeCodeTaskEvent>(TASK_EVENT, (e) => handler(e.payload))
 }
+
+/** Runs `claude --version` on the backend (with a timeout) to confirm the CLI is actually installed and resolvable. */
+export function checkCli(): Promise<{ ok: boolean; version?: string; error?: string }> {
+  return invoke('claude_code_check_cli')
+}

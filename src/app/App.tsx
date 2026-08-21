@@ -14,6 +14,7 @@ import { SessionsView } from '@/features/sessions/SessionsView'
 import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
 import { AccountView } from '@/features/account/AccountView'
 import { IntegrationsView } from '@/features/integrations-status/IntegrationsView'
+import { SystemHealthView } from '@/features/system-health/SystemHealthView'
 import { ChevronRightIcon } from '@/shared/icons'
 import type { CategoryId } from './categories'
 
@@ -30,6 +31,7 @@ export type View =
   | { kind: 'model-dashboard' }
   | { kind: 'account' }
   | { kind: 'integrations' }
+  | { kind: 'system-health' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -68,6 +70,10 @@ export default function App() {
       setView({ kind: 'integrations' })
       return
     }
+    if (id === 'system-health') {
+      setView({ kind: 'system-health' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -84,6 +90,7 @@ export default function App() {
     if (view.kind === 'model-dashboard') return <ModelDashboardView />
     if (view.kind === 'account') return <AccountView />
     if (view.kind === 'integrations') return <IntegrationsView />
+    if (view.kind === 'system-health') return <SystemHealthView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -132,7 +139,9 @@ export default function App() {
                             ? 'account'
                             : view.kind === 'integrations'
                               ? 'integrations'
-                              : null
+                              : view.kind === 'system-health'
+                                ? 'system-health'
+                                : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}

@@ -1,5 +1,6 @@
 mod claude_code;
 mod local_model;
+mod system_health;
 
 use tauri::Manager;
 
@@ -11,8 +12,10 @@ pub fn run() {
       claude_code::claude_code_list_tasks,
       claude_code::claude_code_get_task,
       claude_code::claude_code_open_in_vscode,
+      claude_code::claude_code_check_cli,
       local_model::local_model_transcribe,
       local_model::local_model_transcribe_bytes,
+      system_health::system_health_stats,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
