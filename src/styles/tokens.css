@@ -13,20 +13,23 @@
   --color-bg-base: #0b0f16;
   --color-bg-elevated: #11161f;
 
-  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ---- */
-  --color-glass-bg: rgb(20 26 36 / 55%);
-  --color-glass-bg-hover: rgb(30 40 54 / 68%);
-  --color-glass-border: rgb(255 255 255 / 8%);
-  --color-glass-highlight: rgb(255 255 255 / 6%);
+  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ----
+     Opaque enough to guarantee text contrast over any wallpaper — blur
+     alone doesn't; a busy/bright image still bleeds through a surface
+     under ~70% opacity and washes out low-contrast text sitting on it. */
+  --color-glass-bg: rgb(13 17 24 / 82%);
+  --color-glass-bg-hover: rgb(22 29 40 / 88%);
+  --color-glass-border: rgb(255 255 255 / 10%);
+  --color-glass-highlight: rgb(255 255 255 / 5%);
   --color-glass-inner-shadow: rgb(0 0 0 / 18%);
 
   /* ---- Color: text ---- */
-  --color-text-primary: rgb(255 255 255 / 94%);
-  --color-text-secondary: rgb(255 255 255 / 62%);
-  --color-text-tertiary: rgb(255 255 255 / 38%);
+  --color-text-primary: rgb(255 255 255 / 96%);
+  --color-text-secondary: rgb(255 255 255 / 74%);
+  --color-text-tertiary: rgb(255 255 255 / 58%);
 
   /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
-  --color-chrome-bg: rgb(14 18 26 / 62%);
+  --color-chrome-bg: rgb(11 14 20 / 80%);
 
   /* ---- Color: accent per category (School / Work / Creativity / General) ---- */
   --color-accent-school: #6ea8fe;
@@ -48,19 +51,19 @@
   --color-bg-elevated: #ffffff;
 
   /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ---- */
-  --color-glass-bg: rgb(255 255 255 / 55%);
-  --color-glass-bg-hover: rgb(255 255 255 / 75%);
-  --color-glass-border: rgb(24 95 165 / 12%);
-  --color-glass-highlight: rgb(255 255 255 / 70%);
+  --color-glass-bg: rgb(255 255 255 / 82%);
+  --color-glass-bg-hover: rgb(255 255 255 / 92%);
+  --color-glass-border: rgb(24 95 165 / 14%);
+  --color-glass-highlight: rgb(255 255 255 / 75%);
   --color-glass-inner-shadow: rgb(24 60 95 / 8%);
 
   /* ---- Color: text ---- */
-  --color-text-primary: rgb(15 23 35 / 92%);
-  --color-text-secondary: rgb(15 23 35 / 62%);
-  --color-text-tertiary: rgb(15 23 35 / 40%);
+  --color-text-primary: rgb(15 23 35 / 94%);
+  --color-text-secondary: rgb(15 23 35 / 72%);
+  --color-text-tertiary: rgb(15 23 35 / 54%);
 
   /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
-  --color-chrome-bg: rgb(255 255 255 / 55%);
+  --color-chrome-bg: rgb(255 255 255 / 82%);
 
   /* ---- Color: accent per category (deepened for contrast on light bg) ---- */
   --color-accent-school: #1f6fd8;
