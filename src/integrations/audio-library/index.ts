@@ -1,2 +1,2 @@
-export { pickLibraryFolder, scanAudioFolder, readAudioFileBytes } from './client'
+export { pickLibraryFolder, pickLibraryFiles, scanAudioFolder, readAudioFileBytes } from './client'
 export type { AudioTrack } from './types'

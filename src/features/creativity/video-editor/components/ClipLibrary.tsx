@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import type { AssetEntry } from '@/integrations/asset-library'
-import { FolderIcon, SearchIcon, LayersIcon } from '@/shared/icons'
+import { SearchIcon, LayersIcon } from '@/shared/icons'
+import { AddSourceButtons } from '@/shared/components/AddSourceButtons'
 
 interface ClipLibraryProps {
   folderPath: string | null
   assets: AssetEntry[]
   loading: boolean
   onPickFolder: () => void
+  onPickFiles: (multiple: boolean) => void
   onAddClip: (asset: AssetEntry) => void
 }
 
@@ -16,7 +18,14 @@ function formatBytes(bytes: number): string {
 }
 
 /** Clip library — pulls from the same local asset library as the Image Editor, filtered to video files. */
-export function ClipLibrary({ folderPath, assets, loading, onPickFolder, onAddClip }: ClipLibraryProps) {
+export function ClipLibrary({
+  folderPath,
+  assets,
+  loading,
+  onPickFolder,
+  onPickFiles,
+  onAddClip,
+}: ClipLibraryProps) {
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
@@ -32,14 +41,7 @@ export function ClipLibrary({ folderPath, assets, loading, onPickFolder, onAddCl
           <LayersIcon width={14} height={14} className="text-accent-creativity shrink-0" />
           <h2 className="text-text-primary text-[12.5px] font-semibold">Clips</h2>
         </div>
-        <button
-          type="button"
-          onClick={onPickFolder}
-          className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-        >
-          <FolderIcon width={11} height={11} />
-          {folderPath ? 'Change' : 'Pick folder'}
-        </button>
+        <AddSourceButtons hasFolder={!!folderPath} onPickFolder={onPickFolder} onPickFiles={onPickFiles} />
       </div>
 
       {folderPath ? (
@@ -48,7 +50,8 @@ export function ClipLibrary({ folderPath, assets, loading, onPickFolder, onAddCl
         </p>
       ) : (
         <p className="text-text-tertiary mb-2 text-[10.5px] leading-relaxed">
-          Pick a folder of local video files (mp4/mov/webm/mkv/avi) to build your clip library.
+          Add local video files (mp4/mov/webm/mkv/avi) individually, as a multi-select, or a whole
+          folder.
         </p>
       )}
 

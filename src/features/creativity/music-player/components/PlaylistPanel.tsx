@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { AudioTrack } from '@/integrations/audio-library'
-import { FolderIcon, SearchIcon, WaveformIcon } from '@/shared/icons'
+import { SearchIcon, WaveformIcon } from '@/shared/icons'
+import { AddSourceButtons } from '@/shared/components/AddSourceButtons'
 
 interface PlaylistPanelProps {
   folderPath: string | null
@@ -9,6 +10,7 @@ interface PlaylistPanelProps {
   currentIndex: number | null
   isPlaying: boolean
   onPickFolder: () => void
+  onPickFiles: (multiple: boolean) => void
   onSelectTrack: (index: number) => void
 }
 
@@ -25,6 +27,7 @@ export function PlaylistPanel({
   currentIndex,
   isPlaying,
   onPickFolder,
+  onPickFiles,
   onSelectTrack,
 }: PlaylistPanelProps) {
   const [query, setQuery] = useState('')
@@ -44,14 +47,7 @@ export function PlaylistPanel({
           <WaveformIcon width={14} height={14} className="text-accent-creativity shrink-0" />
           <h2 className="text-text-primary text-[12.5px] font-semibold">Playlist</h2>
         </div>
-        <button
-          type="button"
-          onClick={onPickFolder}
-          className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-        >
-          <FolderIcon width={11} height={11} />
-          {folderPath ? 'Change' : 'Pick folder'}
-        </button>
+        <AddSourceButtons hasFolder={!!folderPath} onPickFolder={onPickFolder} onPickFiles={onPickFiles} />
       </div>
 
       {folderPath ? (
@@ -60,7 +56,8 @@ export function PlaylistPanel({
         </p>
       ) : (
         <p className="text-text-tertiary mb-2 text-[10.5px] leading-relaxed">
-          Pick a folder of local audio files (mp3/wav/ogg/flac/m4a/aac) to build your playlist.
+          Add local audio files (mp3/wav/ogg/flac/m4a/aac) individually, as a multi-select, or a
+          whole folder.
         </p>
       )}
 

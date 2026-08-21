@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { AssetEntry } from '@/integrations/asset-library'
-import { FolderIcon, SearchIcon, ImageIcon } from '@/shared/icons'
+import { SearchIcon, ImageIcon } from '@/shared/icons'
+import { AddSourceButtons } from '@/shared/components/AddSourceButtons'
 
 interface AssetBrowserProps {
   folderPath: string | null
@@ -8,6 +9,7 @@ interface AssetBrowserProps {
   loading: boolean
   selectedPaths: Set<string>
   onPickFolder: () => void
+  onPickFiles: (multiple: boolean) => void
   onOpenAsset: (asset: AssetEntry) => void
   onToggleSelect: (path: string) => void
 }
@@ -24,6 +26,7 @@ export function AssetBrowser({
   loading,
   selectedPaths,
   onPickFolder,
+  onPickFiles,
   onOpenAsset,
   onToggleSelect,
 }: AssetBrowserProps) {
@@ -42,14 +45,7 @@ export function AssetBrowser({
           <ImageIcon width={14} height={14} className="text-accent-creativity shrink-0" />
           <h2 className="text-text-primary text-[12.5px] font-semibold">Assets</h2>
         </div>
-        <button
-          type="button"
-          onClick={onPickFolder}
-          className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-        >
-          <FolderIcon width={11} height={11} />
-          {folderPath ? 'Change' : 'Pick folder'}
-        </button>
+        <AddSourceButtons hasFolder={!!folderPath} onPickFolder={onPickFolder} onPickFiles={onPickFiles} />
       </div>
 
       {folderPath ? (
@@ -58,7 +54,8 @@ export function AssetBrowser({
         </p>
       ) : (
         <p className="text-text-tertiary mb-2 text-[10.5px] leading-relaxed">
-          Pick a folder of local images (png/jpg/gif/webp/bmp) to build your asset library.
+          Add local images (png/jpg/gif/webp/bmp) individually, as a multi-select, or a whole
+          folder.
         </p>
       )}
 

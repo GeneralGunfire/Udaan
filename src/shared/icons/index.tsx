@@ -496,3 +496,24 @@ export function FileTextIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function SyncIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 10a6 6 0 0 1 10.2-4.2L16 7.5" />
+      <path d="M16 4v3.5h-3.5" />
+      <path d="M16 10a6 6 0 0 1-10.2 4.2L4 12.5" />
+      <path d="M4 16v-3.5h3.5" />
+    </svg>
+  )
+}
+
+export function KeyboardIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="5" width="15" height="10" rx="1.5" />
+      <path d="M5.5 8h.01M8.5 8h.01M11.5 8h.01M14.5 8h.01M5.5 11h.01M14.5 11h.01" strokeWidth="2.2" />
+      <path d="M8 11.2h4" strokeWidth="2.2" />
+    </svg>
+  )
+}

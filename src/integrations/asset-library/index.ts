@@ -1,5 +1,6 @@
 export {
   pickAssetFolder,
+  pickAssetFiles,
   pickSavePath,
   scanAssetFolder,
   readAssetFileBytes,

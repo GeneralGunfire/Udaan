@@ -82,6 +82,7 @@ export function ImageEditorView() {
           loading={library.loading}
           selectedPaths={selectedPaths}
           onPickFolder={library.pickFolder}
+          onPickFiles={library.pickFiles}
           onOpenAsset={handleOpenAsset}
           onToggleSelect={toggleSelect}
         />

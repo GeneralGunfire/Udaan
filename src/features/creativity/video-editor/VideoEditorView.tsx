@@ -40,6 +40,7 @@ export function VideoEditorView() {
           assets={library.assets}
           loading={library.loading}
           onPickFolder={library.pickFolder}
+          onPickFiles={library.pickFiles}
           onAddClip={(asset) => state.addClip(asset)}
         />
 

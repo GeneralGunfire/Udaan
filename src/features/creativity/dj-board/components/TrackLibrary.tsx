@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import type { AudioTrack } from '@/integrations/audio-library'
-import { FolderIcon, SearchIcon, WaveformIcon } from '@/shared/icons'
+import { SearchIcon, WaveformIcon } from '@/shared/icons'
+import { AddSourceButtons } from '@/shared/components/AddSourceButtons'
 
 interface TrackLibraryProps {
   folderPath: string | null
   tracks: AudioTrack[]
   loading: boolean
   onPickFolder: () => void
+  onPickFiles: (multiple: boolean) => void
   onDragTrackStart: (track: AudioTrack) => void
   onLoadToDeck: (deck: 'A' | 'B', track: AudioTrack) => void
 }
@@ -22,6 +24,7 @@ export function TrackLibrary({
   tracks,
   loading,
   onPickFolder,
+  onPickFiles,
   onDragTrackStart,
   onLoadToDeck,
 }: TrackLibraryProps) {
@@ -40,14 +43,7 @@ export function TrackLibrary({
           <WaveformIcon width={14} height={14} className="text-accent-creativity shrink-0" />
           <h2 className="text-text-primary text-[12.5px] font-semibold">Library</h2>
         </div>
-        <button
-          type="button"
-          onClick={onPickFolder}
-          className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-        >
-          <FolderIcon width={11} height={11} />
-          {folderPath ? 'Change' : 'Pick folder'}
-        </button>
+        <AddSourceButtons hasFolder={!!folderPath} onPickFolder={onPickFolder} onPickFiles={onPickFiles} />
       </div>
 
       {folderPath ? (
@@ -56,7 +52,8 @@ export function TrackLibrary({
         </p>
       ) : (
         <p className="text-text-tertiary mb-2 text-[10.5px] leading-relaxed">
-          Pick a folder of local audio files (mp3/wav/ogg/flac/m4a/aac) to build your library.
+          Add local audio files (mp3/wav/ogg/flac/m4a/aac) individually, as a multi-select, or a
+          whole folder.
         </p>
       )}
 

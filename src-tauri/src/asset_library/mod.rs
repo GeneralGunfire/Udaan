@@ -77,3 +77,34 @@ pub fn asset_library_read_file(file_path: String) -> Result<Vec<u8>, String> {
 pub fn asset_library_write_file(file_path: String, data: Vec<u8>) -> Result<(), String> {
   std::fs::write(&file_path, data).map_err(|e| e.to_string())
 }
+
+/// Stats a list of individually-picked files (single- or multi-file
+/// dialog selection) into the same AssetEntry shape the folder scan
+/// produces. Skips paths that aren't files or aren't image/video —
+/// same "other" filtering as the folder scan, so mixed selections
+/// silently drop unsupported files rather than erroring.
+#[tauri::command]
+pub fn asset_library_stat_files(paths: Vec<String>) -> Result<Vec<AssetEntry>, String> {
+  let mut entries = Vec::new();
+  for p in paths {
+    let path = Path::new(&p);
+    if !path.is_file() {
+      continue;
+    }
+    let kind = classify(path);
+    if kind == "other" {
+      continue;
+    }
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    entries.push(AssetEntry {
+      path: path.to_string_lossy().to_string(),
+      file_name: path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default(),
+      size_bytes: metadata.len(),
+      kind: kind.to_string(),
+    });
+  }
+  Ok(entries)
+}

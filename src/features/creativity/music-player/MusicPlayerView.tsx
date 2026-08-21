@@ -37,6 +37,7 @@ export function MusicPlayerView() {
           currentIndex={player.currentIndex}
           isPlaying={player.isPlaying}
           onPickFolder={library.pickFolder}
+          onPickFiles={library.pickFiles}
           onSelectTrack={player.selectTrack}
         />
 

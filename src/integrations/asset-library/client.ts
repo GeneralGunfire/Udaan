@@ -14,11 +14,36 @@ function toAssetKind(kind: string): AssetKind {
   return kind === 'image' || kind === 'video' ? kind : 'other'
 }
 
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi']
+
 /** Opens the native folder picker and returns the chosen path, or null if cancelled. */
 export async function pickAssetFolder(): Promise<string | null> {
   const result = await open({ directory: true, multiple: false })
   if (typeof result === 'string') return result
   return null
+}
+
+/**
+ * Opens the native file picker for one or more individual image/video
+ * files (not a whole folder). Returns assets with real filesystem
+ * metadata via `asset_library_stat_files`, same shape as a folder scan.
+ */
+export async function pickAssetFiles(multiple: boolean): Promise<AssetEntry[]> {
+  const result = await open({
+    multiple,
+    filters: [{ name: 'Media', extensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS] }],
+  })
+  if (!result) return []
+  const paths = Array.isArray(result) ? result : [result]
+  if (paths.length === 0) return []
+  const raw = await invoke<RawAssetEntry[]>('asset_library_stat_files', { paths })
+  return raw.map((entry) => ({
+    path: entry.path,
+    fileName: entry.file_name,
+    sizeBytes: entry.size_bytes,
+    kind: toAssetKind(entry.kind),
+  }))
 }
 
 /** Opens the native save dialog for exporting a file, returns the chosen path or null if cancelled. */

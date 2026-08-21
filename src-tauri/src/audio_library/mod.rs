@@ -57,3 +57,29 @@ pub fn audio_library_scan_folder(folder_path: String) -> Result<Vec<AudioTrackEn
 pub fn audio_library_read_file(file_path: String) -> Result<Vec<u8>, String> {
   std::fs::read(&file_path).map_err(|e| e.to_string())
 }
+
+/// Stats a list of individually-picked files (single- or multi-file
+/// dialog selection) into the same AudioTrackEntry shape the folder scan
+/// produces, so the frontend can treat "picked a folder" and "picked one
+/// or more files" uniformly. Skips paths that aren't files or aren't a
+/// supported audio extension rather than erroring the whole batch.
+#[tauri::command]
+pub fn audio_library_stat_files(paths: Vec<String>) -> Result<Vec<AudioTrackEntry>, String> {
+  let mut entries = Vec::new();
+  for p in paths {
+    let path = Path::new(&p);
+    if !path.is_file() || !is_audio_file(path) {
+      continue;
+    }
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    entries.push(AudioTrackEntry {
+      path: path.to_string_lossy().to_string(),
+      file_name: path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default(),
+      size_bytes: metadata.len(),
+    });
+  }
+  Ok(entries)
+}

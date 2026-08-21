@@ -1,45 +1,82 @@
 import { useCallback, useEffect, useState } from 'react'
-import { pickLibraryFolder, scanAudioFolder, type AudioTrack } from '@/integrations/audio-library'
+import {
+  pickLibraryFolder,
+  pickLibraryFiles,
+  scanAudioFolder,
+  type AudioTrack,
+} from '@/integrations/audio-library'
 
-const STORAGE_KEY = 'udaan.music-player.library-folder'
+const FOLDER_STORAGE_KEY = 'udaan.music-player.library-folder'
+const TRACKS_STORAGE_KEY = 'udaan.music-player.tracks'
+
+function loadStoredTracks(): AudioTrack[] {
+  try {
+    const raw = localStorage.getItem(TRACKS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function dedupeByPath(tracks: AudioTrack[]): AudioTrack[] {
+  const seen = new Map<string, AudioTrack>()
+  for (const t of tracks) seen.set(t.path, t)
+  return Array.from(seen.values())
+}
 
 /**
- * Local music library backed by a user-chosen folder — same real
- * filesystem scan as the DJ Board's track library (reuses
- * integrations/audio-library). No hardcoded track list, no catalog
- * reconstruction from any external source: whatever audio files are
- * actually in the chosen folder is the entire library.
+ * Local music library — a persistent, growing list of tracks, added to
+ * by folder scan or individual/multi-file pick (reuses
+ * integrations/audio-library, same as the DJ Board). No hardcoded track
+ * list, no catalog reconstruction from any external source.
  */
 export function usePlaylistLibrary() {
   const [folderPath, setFolderPath] = useState<string | null>(() =>
-    localStorage.getItem(STORAGE_KEY),
+    localStorage.getItem(FOLDER_STORAGE_KEY),
   )
-  const [tracks, setTracks] = useState<AudioTrack[]>([])
+  const [tracks, setTracks] = useState<AudioTrack[]>(() => loadStoredTracks())
   const [loading, setLoading] = useState(false)
 
-  const rescan = useCallback(async (path: string) => {
-    setLoading(true)
-    try {
-      const found = await scanAudioFolder(path)
-      setTracks(found)
-    } catch (err) {
-      console.error('Failed to scan music folder', err)
-      setTracks([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    if (folderPath) rescan(folderPath)
-  }, [folderPath, rescan])
+    localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(tracks))
+  }, [tracks])
+
+  const addTracks = useCallback((found: AudioTrack[]) => {
+    setTracks((prev) => dedupeByPath([...prev, ...found]))
+  }, [])
 
   const pickFolder = useCallback(async () => {
     const chosen = await pickLibraryFolder()
     if (!chosen) return
-    localStorage.setItem(STORAGE_KEY, chosen)
+    localStorage.setItem(FOLDER_STORAGE_KEY, chosen)
     setFolderPath(chosen)
-  }, [])
+    setLoading(true)
+    try {
+      const found = await scanAudioFolder(chosen)
+      addTracks(found)
+    } catch (err) {
+      console.error('Failed to scan music folder', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [addTracks])
 
-  return { folderPath, tracks, loading, pickFolder }
+  const pickFiles = useCallback(
+    async (multiple: boolean) => {
+      setLoading(true)
+      try {
+        const found = await pickLibraryFiles(multiple)
+        addTracks(found)
+      } catch (err) {
+        console.error('Failed to pick music file(s)', err)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [addTracks],
+  )
+
+  return { folderPath, tracks, loading, pickFolder, pickFiles }
 }

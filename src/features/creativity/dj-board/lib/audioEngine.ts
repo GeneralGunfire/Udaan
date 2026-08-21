@@ -52,9 +52,12 @@ function getAudioContext(): AudioContext {
 
 /**
  * One deck's real audio graph:
- *   source -> lowShelf -> mid(peaking) -> highShelf -> bassBoost(lowshelf) -> gain -> deckOut
+ *   source -> lowShelf -> mid(peaking) -> highShelf -> bassBoost(lowshelf) -> filter(HP/LP sweep) -> gain -> analyser -> deckOut
  * `deckOut` is exposed so the crossfader (owned by the mixer, not the deck)
  * can patch each deck's output into the correct crossfade gain stage.
+ * The filter and analyser are new nodes added alongside the existing,
+ * verified-working EQ/bass/gain chain — that chain's own nodes and logic
+ * are untouched.
  */
 export class DeckAudioEngine {
   readonly context: AudioContext
@@ -64,12 +67,18 @@ export class DeckAudioEngine {
   private readonly midPeak: BiquadFilterNode
   private readonly highShelf: BiquadFilterNode
   private readonly bassBoost: BiquadFilterNode
+  /** HP/LP sweep filter — separate control from the 3-band EQ, real DSP. */
+  private readonly sweepFilter: BiquadFilterNode
   private readonly gainNode: GainNode
+  /** Real-time level metering for the peak meter UI — read via getPeakLevel(), no audio-path effect. */
+  private readonly analyser: AnalyserNode
+  private readonly analyserData: Uint8Array<ArrayBuffer>
   readonly output: GainNode
 
   private startedAtContextTime = 0
   private startedAtOffset = 0
   private playing = false
+  private playbackRate = 1
 
   constructor() {
     this.context = getAudioContext()
@@ -92,14 +101,26 @@ export class DeckAudioEngine {
     this.bassBoost.frequency.value = 100
     this.bassBoost.gain.value = 0
 
+    /** Neutral at center (allpass-like: fully open); sweeps to lowpass below center, highpass above. */
+    this.sweepFilter = this.context.createBiquadFilter()
+    this.sweepFilter.type = 'allpass'
+    this.sweepFilter.frequency.value = 20000
+    this.sweepFilter.Q.value = 0.7
+
     this.gainNode = this.context.createGain()
+    this.analyser = this.context.createAnalyser()
+    this.analyser.fftSize = 256
+    this.analyser.smoothingTimeConstant = 0.6
+    this.analyserData = new Uint8Array(this.analyser.frequencyBinCount)
     this.output = this.context.createGain()
 
     this.lowShelf.connect(this.midPeak)
     this.midPeak.connect(this.highShelf)
     this.highShelf.connect(this.bassBoost)
-    this.bassBoost.connect(this.gainNode)
-    this.gainNode.connect(this.output)
+    this.bassBoost.connect(this.sweepFilter)
+    this.sweepFilter.connect(this.gainNode)
+    this.gainNode.connect(this.analyser)
+    this.analyser.connect(this.output)
   }
 
   async loadBuffer(bytes: Uint8Array): Promise<number> {
@@ -119,6 +140,7 @@ export class DeckAudioEngine {
     const offset = fromSeconds ?? this.currentTime()
     const src = this.context.createBufferSource()
     src.buffer = this.buffer
+    src.playbackRate.value = this.playbackRate
     src.connect(this.lowShelf)
     src.start(0, Math.max(0, offset))
 
@@ -167,7 +189,7 @@ export class DeckAudioEngine {
 
   currentTime(): number {
     if (!this.playing) return this.startedAtOffset
-    return this.startedAtOffset + (this.context.currentTime - this.startedAtContextTime)
+    return this.startedAtOffset + (this.context.currentTime - this.startedAtContextTime) * this.playbackRate
   }
 
   duration(): number {
@@ -193,6 +215,64 @@ export class DeckAudioEngine {
     this.gainNode.gain.value = Math.max(0, Math.min(1, v))
   }
 
+  /**
+   * Real HP/LP sweep filter, separate from the 3-band EQ. position: -1 =
+   * full lowpass sweep (cuts highs, classic "filter down" breakdown
+   * effect), 0 = fully open (allpass, no effect), 1 = full highpass sweep
+   * (cuts lows, "filter up" build effect) — the standard DJ filter-knob
+   * behavior.
+   */
+  setFilter(position: number) {
+    const clamped = Math.max(-1, Math.min(1, position))
+    if (Math.abs(clamped) < 0.02) {
+      this.sweepFilter.type = 'allpass'
+      this.sweepFilter.frequency.value = 20000
+      return
+    }
+    if (clamped < 0) {
+      this.sweepFilter.type = 'lowpass'
+      // -1..0 maps to 200Hz..20000Hz (exponential sweep feels more natural than linear)
+      const t = 1 + clamped // 0..1
+      this.sweepFilter.frequency.value = 200 * Math.pow(100, t)
+    } else {
+      this.sweepFilter.type = 'highpass'
+      // 0..1 maps to 20Hz..8000Hz
+      this.sweepFilter.frequency.value = 20 * Math.pow(400, clamped)
+    }
+  }
+
+  /**
+   * Real playback-rate change for Sync — this DOES shift pitch (unlike a
+   * proper time-stretch), same tradeoff already documented for the Tempo
+   * fader in useDjBoard.ts. Re-triggers the source at the current
+   * position so the rate change takes effect immediately without a
+   * seek-induced glitch.
+   */
+  setPlaybackRate(rate: number) {
+    const clamped = Math.max(0.5, Math.min(2, rate))
+    if (clamped === this.playbackRate) return
+    const wasPlaying = this.playing
+    const position = this.currentTime()
+    this.playbackRate = clamped
+    if (wasPlaying) this.play(position)
+    else this.startedAtOffset = position
+  }
+
+  getPlaybackRate(): number {
+    return this.playbackRate
+  }
+
+  /** 0-1 real-time peak level from the analyser node, for the peak meter UI. */
+  getPeakLevel(): number {
+    this.analyser.getByteTimeDomainData(this.analyserData)
+    let peak = 0
+    for (let i = 0; i < this.analyserData.length; i++) {
+      const v = Math.abs(this.analyserData[i] - 128) / 128
+      if (v > peak) peak = v
+    }
+    return peak
+  }
+
   dispose() {
     this.stop()
     this.output.disconnect()
@@ -203,20 +283,31 @@ export class DeckAudioEngine {
  * Mixer: owns the crossfader and patches both decks' outputs to master.
  * Equal-power crossfade curve (real DSP, cheap: two Math.cos/sin lookups).
  */
+export type CrossfaderCurve = 'smooth' | 'sharp'
+
 export class MixerEngine {
   readonly context: AudioContext
   private readonly deckAGain: GainNode
   private readonly deckBGain: GainNode
   readonly master: GainNode
+  private readonly masterAnalyser: AnalyserNode
+  private readonly masterAnalyserData: Uint8Array<ArrayBuffer>
+  private curve: CrossfaderCurve = 'smooth'
+  private lastCrossfadePosition = 0
 
   constructor() {
     this.context = getAudioContext()
     this.deckAGain = this.context.createGain()
     this.deckBGain = this.context.createGain()
     this.master = this.context.createGain()
+    this.masterAnalyser = this.context.createAnalyser()
+    this.masterAnalyser.fftSize = 256
+    this.masterAnalyser.smoothingTimeConstant = 0.6
+    this.masterAnalyserData = new Uint8Array(this.masterAnalyser.frequencyBinCount)
     this.deckAGain.connect(this.master)
     this.deckBGain.connect(this.master)
-    this.master.connect(this.context.destination)
+    this.master.connect(this.masterAnalyser)
+    this.masterAnalyser.connect(this.context.destination)
     this.setCrossfade(0)
   }
 
@@ -228,16 +319,40 @@ export class MixerEngine {
     deckOutput.connect(this.deckBGain)
   }
 
-  /** position: -1 = full deck A, 0 = center, 1 = full deck B. Equal-power law. */
+  /** position: -1 = full deck A, 0 = center, 1 = full deck B. Equal-power law — unchanged, verified working. */
   setCrossfade(position: number) {
     const clamped = Math.max(-1, Math.min(1, position))
+    this.lastCrossfadePosition = clamped
+    if (this.curve === 'sharp') {
+      // Sharp-cut: near-instant switch around center, small deadzone to avoid a hard click at exactly 0.
+      this.deckAGain.gain.value = clamped <= 0.05 ? 1 : 0
+      this.deckBGain.gain.value = clamped >= -0.05 ? 1 : 0
+      return
+    }
     const angle = ((clamped + 1) / 2) * (Math.PI / 2)
     this.deckAGain.gain.value = Math.cos(angle)
     this.deckBGain.gain.value = Math.sin(angle)
   }
 
+  /** Sharp-cut vs. smooth-blend crossfader response — re-applies the current position under the new curve. */
+  setCrossfaderCurve(curve: CrossfaderCurve) {
+    this.curve = curve
+    this.setCrossfade(this.lastCrossfadePosition)
+  }
+
   setMasterVolume(v: number) {
     this.master.gain.value = Math.max(0, Math.min(1.5, v))
+  }
+
+  /** 0-1 real-time peak level from the master analyser, for the master peak meter UI. */
+  getPeakLevel(): number {
+    this.masterAnalyser.getByteTimeDomainData(this.masterAnalyserData)
+    let peak = 0
+    for (let i = 0; i < this.masterAnalyserData.length; i++) {
+      const v = Math.abs(this.masterAnalyserData[i] - 128) / 128
+      if (v > peak) peak = v
+    }
+    return peak
   }
 
   async resume() {
