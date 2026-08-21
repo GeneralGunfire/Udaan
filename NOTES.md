@@ -5,6 +5,193 @@ unfinished during autonomous feature work. Newest entries at the bottom of
 each dated section; new sessions get a new dated section — never overwrite
 prior entries.
 
+## 2026-08-21 (session 2) — DJ Board, Image Editor, School Knowledge Base,
+Video Editor foundation
+
+### Concurrent session on the same repo
+
+Partway through Section 1, `git status` and file contents changed under me
+multiple times with no command from me, and the reflog showed a `reset:
+moving to HEAD` I didn't run — 13 separate `claude.exe` processes were
+running. Stopped and asked; user confirmed this is expected (parallel
+sessions on purpose). Worked around it defensively for the rest of the
+session: always re-`Read` a file immediately before editing it rather than
+trusting an earlier read, and where `Cargo.toml` / `capabilities/
+default.json` / `src-tauri/src/lib.rs` had my edits and the other
+session's edits genuinely interleaved in the same small hunks (not
+separable at the file level), committed them together rather than trying
+to hand-split a working file into two broken ones. Everything the other
+session touched that I didn't need (splash screen, `main.tsx`, general-chat
+polish, WallpaperPicker tweaks, `local_model`/whisper changes, `webview_
+permissions.rs` mic-capture code) was left completely alone across every
+commit — never staged, never edited, never reverted.
+
+### Declined: downloading the user's YouTube Music library
+
+Partway through Section 1 the user pasted their ~319-song YouTube Music
+"Liked" library and asked me to source real audio files for it — first via
+"find a way," then explicitly "get the songs from somewhere else" after I
+declined. Refused both times: downloading commercially-released music you
+don't own a copy of is copyright infringement regardless of source or
+whether the app is public, and the task's own brief explicitly ruled out
+"any download/fetch-from-web functionality of any kind" for this feature.
+Did not build a downloader in any form, disguised or otherwise. Offered
+(and the user accepted, declining the wishlist-panel option) to keep the
+DJ Board to a real local-folder scanner only — it plays whatever audio
+files the user legitimately has, nothing more.
+
+### 1. DJ Board
+
+Real Web Audio graph per deck: `AudioBufferSourceNode` playback, 3-band EQ
+(low/mid/high shelving + peaking `BiquadFilterNode`s), a dedicated bass
+control (separate low-shelf centered at 100Hz), per-deck gain, and an
+equal-power crossfader in a `MixerEngine`. All genuine DSP, not mocked —
+these are cheap native Web Audio nodes, no reason to fake them.
+
+Effects rack (reverb/delay/filter/flanger) is explicitly mock: UI + state
+only, no audio node graph, clearly labeled "Mock DSP" in the panel itself
+and TODO'd in `lib/audioEngine.ts`. Per the task brief, the real DSP
+choice needs the user's direct input given hardware constraints — convo-
+lution reverb and feedback delay lines are meaningfully more expensive
+than the EQ chain, so it wasn't my call to make silently.
+
+Tempo/pitch (the horizontal tempo fader) is also mock — real time-stretch
+needs a phase vocoder or WSOLA; naive `playbackRate` would shift pitch too,
+which real DJ software avoids. TODO'd in `useDjBoard.ts`.
+
+Track source: local folder only, via new Tauri `dialog` + `fs` plugins
+(`src-tauri/src/audio_library/mod.rs` — non-recursive scan, by design, so
+the library stays predictable). No bundled/sample audio shipped — there
+was no existing `public/music/` folder or any audio files anywhere in the
+repo to point at, so this is a from-scratch local browser, not a wire-up
+of pre-existing content.
+
+**Rust dependency snag, fixed**: adding `tauri-plugin-dialog`/`tauri-
+plugin-fs` initially broke the build with an unrelated pre-existing file
+(`webview_permissions.rs`, from the concurrent session) failing to
+compile against a duplicate `windows` crate version. Traced it, confirmed
+it wasn't my code at fault, and the concurrent session fixed its own file
+before I needed to touch it further — final state compiles clean.
+
+**Not tested interactively**: no real browser/WebView available in this
+environment to click through the UI. Verified instead via: clean `tsc -b`,
+clean `pnpm build`, clean `cargo check --lib`, and the Vite dev server
+serving the app shell over HTTP without errors. The tap-tempo BPM wiring
+had a real bug (computed BPM was written to a fresh per-render object and
+never reached the callback) — caught and fixed before committing, but
+that's exactly the kind of thing a live click-through would have caught
+faster. Flagging so the user knows to smoke-test the actual controls
+before relying on this.
+
+### 2. Image Editor
+
+Real Canvas 2D pipeline in `lib/imageOps.ts`: crop and resize via
+`drawImage`, brightness/contrast/saturation via genuine per-pixel math
+over `ImageData` (not a CSS-filter preview trick — the exported file
+actually reflects the adjustment). Verified the pixel math standalone
+(brightness push-to-white/black, luminance-preserving desaturation,
+contrast pivot around 128) against known values before committing.
+
+No prior-session asset library existed to reuse (task said "use the asset
+library if it exists" — it didn't), so built a shared one from scratch
+(`src-tauri/src/asset_library/`, `src/integrations/asset-library/`) that
+both this and the Video Editor's clip library now use. Same non-recursive
+single-folder scan pattern as the DJ Board's audio library, plus a
+`write_file` command for real export via the native save dialog.
+
+Batch operations (`lib/batchOps.ts`) apply the same adjustment/resize
+settings across every checked image in the Assets panel, writing to a
+separate output folder with a configurable filename suffix — never
+overwrites the originals.
+
+Tested against the repo's real `screenshot.png` (468KB): confirmed it
+reads via the Rust `asset_library_read_file` command path and the pixel-
+adjustment formulas produce correct output for known inputs. Did not
+manually click-test crop-by-drag or the save dialog for the same reason
+as the DJ Board (no live browser in this environment) — recommend a
+real smoke test of the crop-drag interaction and the save dialog before
+relying on it.
+
+### 3. School Knowledge Base + Study Generator
+
+Three original markdown reference docs under `src/features/school/
+knowledge-base/` (tone guide by grade band, structure templates per
+document type, a writing-style guide banning generic AI-patterned
+phrasing) — all written fresh for this task, not derived from or copied
+from any external source. `lib/promptBuilder.ts` concatenates all three
+into every Study Generator call via Vite `?raw` imports; verified the
+grounded prompt is ~130x longer than a bare prompt and demonstrably
+contains the specific guidance text (elementary sentence-length rules,
+the transitional-phrase ban list), so every generation call is genuinely
+grounded, not just nominally pointed at the files.
+
+Backend choice: defaults to Claude Code (headless, same `submitTask`/
+event-stream pattern as General Chat) rather than the local Ollama model.
+Judgment call — `qwen2.5:1.5b` is sized for short, fast replies per its
+own doc comment in `integrations/local-model/client.ts`; long-form
+academic writing that's actually good needs more capability than that.
+Local model is kept as an explicit, user-selectable "faster, lower
+quality" option rather than removed, since it's still genuinely useful
+for quick drafts.
+
+**Deferred, not guessed at**: the task also asked for "a local fonts/
+templates library for academic documents... freely-licensed sources
+only." Did not build this — picking specific font files or document
+templates and asserting their license is clean is exactly the kind of
+claim that needs verification I can't responsibly fake (checking an
+actual license file, not just assuming a name like "Open Sans" is safe).
+Flagging as skipped rather than shipping something with an unverified
+licensing claim baked into a personal app.
+
+**Not tested**: no way to actually invoke Claude Code or Ollama from
+inside this environment to see real generated output. Verified the
+prompt-construction logic (what's provably different with vs. without the
+knowledge base) rather than the generation itself. Recommend the user run
+one real generation before trusting the output quality.
+
+### 4. Video Editor foundation
+
+UI shell only, exactly as scoped — timeline (mock 60s-per-clip durations,
+draggable playhead, click-to-select/remove), preview pane (static
+placeholder frame, no real decode), clip library (reuses the Image
+Editor's asset library, filtered to video extensions), export panel
+(format/resolution selects, Export button permanently disabled with a
+tooltip explaining why). Every point where real processing plugs in is
+TODO'd and points back here.
+
+**Needs the user's direct input before it can be finished**: real video
+decode/encode (almost certainly an ffmpeg sidecar process invoked from
+Rust, given this machine's hardware constraints mentioned in the task
+brief) was explicitly out of scope this session and needs a deliberate
+engine choice, not a guess.
+
+### Rust build state
+
+`cargo check --lib` is clean as of the last commit in this session (one
+pre-existing, unrelated dead-code warning in `claude_code/store.rs`, not
+touched this session). New Tauri plugins added: `tauri-plugin-dialog`,
+`tauri-plugin-fs` (both v2), used by the DJ Board's audio library and the
+shared asset library. Capabilities updated (`dialog:allow-open`, `dialog:
+allow-save`, `fs:default`).
+
+### Nothing else was skipped as unsafe
+
+No destructive operations, no data loss risk, nothing outside `c:\Udaan`.
+Every checkpoint commit used explicit `git add <specific files>` to keep
+the concurrent session's unrelated work out, per the standing rule —
+except where Rust config files had both sessions' edits genuinely
+interleaved (see "Concurrent session" above), which were committed as-is
+since splitting them would have left one or both broken.
+
+### Summary of commits this session
+
+1. `Add DJ Board: real dual-deck Web Audio engine, mock effects rack`
+2. `Add Image Editor: real canvas crop/resize/adjustments + batch export`
+3. `Add School knowledge base + wire it into Study Generator prompts`
+4. `Add Video Editor foundation: UI shell only, no real processing`
+
+See `git log --oneline` for hashes.
+
 ## 2026-08-21 — General-category feature build (Model Dashboard, Account,
 Integrations, System Health, Notifications) + audit fixups
 
