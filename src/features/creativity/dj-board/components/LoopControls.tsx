@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import type { LoopState } from '../lib/types'
 
 interface LoopControlsProps {
@@ -15,32 +16,41 @@ export function LoopControls({ loop, accent, onSetBeats, onToggle }: LoopControl
     <div className="flex items-center gap-1.5">
       <div className="flex overflow-hidden rounded-md">
         {BEAT_OPTIONS.map((beats) => (
-          <button
+          <motion.button
             key={beats}
             type="button"
             onClick={() => onSetBeats(beats)}
-            className="h-7 w-7 text-[10px] font-semibold transition-colors duration-100"
-            style={{
-              background: loop.beats === beats ? accent : 'var(--color-glass-bg-hover)',
-              color: loop.beats === beats ? '#fff' : 'var(--color-text-tertiary)',
-            }}
+            animate={{ background: loop.beats === beats ? accent : 'var(--color-glass-bg-hover)' }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+            className="h-7 w-7 text-[10px] font-semibold"
+            style={{ color: loop.beats === beats ? '#fff' : 'var(--color-text-tertiary)' }}
           >
             {beats}
-          </button>
+          </motion.button>
         ))}
       </div>
-      <button
+      <motion.button
         type="button"
         onClick={onToggle}
         title={loop.active ? 'Exit loop' : `Loop ${loop.beats} beats from here`}
-        className="h-7 flex-1 rounded-md text-[10px] font-semibold tracking-wide uppercase transition-colors duration-100"
-        style={{
+        animate={{
           background: loop.active ? accent : 'var(--color-glass-bg-hover)',
-          color: loop.active ? '#fff' : 'var(--color-text-secondary)',
+          scale: loop.active ? [1, 1.03, 1] : 1,
         }}
+        transition={
+          loop.active
+            ? { scale: { repeat: Infinity, duration: 1.1, ease: 'easeInOut' }, background: { type: 'spring', stiffness: 400, damping: 30 } }
+            : { type: 'spring', stiffness: 400, damping: 30 }
+        }
+        whileHover={{ scale: 1.04 }}
+        whileTap={{ scale: 0.96 }}
+        className="h-7 flex-1 rounded-md text-[10px] font-semibold tracking-wide uppercase"
+        style={{ color: loop.active ? '#fff' : 'var(--color-text-secondary)' }}
       >
         {loop.active ? 'Loop On' : 'Loop'}
-      </button>
+      </motion.button>
     </div>
   )
 }

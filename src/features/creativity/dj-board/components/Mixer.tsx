@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { Fader } from './Fader'
 import { PeakMeter } from './PeakMeter'
 import type { CrossfaderCurve } from '../lib/audioEngine'
@@ -58,30 +59,32 @@ export function Mixer({
           orientation="horizontal"
         />
         <div className="flex w-full overflow-hidden rounded-md">
-          <button
+          <motion.button
             type="button"
             onClick={() => onCrossfaderCurve('smooth')}
             title="Smooth-blend crossfader response"
-            className="h-6 flex-1 text-[9.5px] font-medium tracking-wide uppercase transition-colors duration-100"
-            style={{
-              background: crossfaderCurve === 'smooth' ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)',
-              color: crossfaderCurve === 'smooth' ? '#fff' : 'var(--color-text-tertiary)',
-            }}
+            animate={{ background: crossfaderCurve === 'smooth' ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)' }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+            className="h-6 flex-1 text-[9.5px] font-medium tracking-wide uppercase"
+            style={{ color: crossfaderCurve === 'smooth' ? '#fff' : 'var(--color-text-tertiary)' }}
           >
             Smooth
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
             onClick={() => onCrossfaderCurve('sharp')}
             title="Sharp-cut crossfader response"
-            className="h-6 flex-1 text-[9.5px] font-medium tracking-wide uppercase transition-colors duration-100"
-            style={{
-              background: crossfaderCurve === 'sharp' ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)',
-              color: crossfaderCurve === 'sharp' ? '#fff' : 'var(--color-text-tertiary)',
-            }}
+            animate={{ background: crossfaderCurve === 'sharp' ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)' }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+            className="h-6 flex-1 text-[9.5px] font-medium tracking-wide uppercase"
+            style={{ color: crossfaderCurve === 'sharp' ? '#fff' : 'var(--color-text-tertiary)' }}
           >
             Sharp
-          </button>
+          </motion.button>
         </div>
       </div>
     </div>

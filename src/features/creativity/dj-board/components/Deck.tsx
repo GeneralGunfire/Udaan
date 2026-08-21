@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { AudioTrack } from '@/integrations/audio-library'
 import type { CuePoint, DeckId, DeckState } from '../lib/types'
 import { formatTime } from '../hooks/useDjBoard'
@@ -131,9 +132,12 @@ export function Deck({
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className="glass-surface flex flex-col gap-2.5 rounded-xl p-3 transition-shadow duration-150"
+      className="glass-surface flex flex-col gap-2.5 rounded-xl p-3"
       style={{
-        boxShadow: dragOver ? `0 0 0 2px ${accent} inset` : `0 0 0 1px color-mix(in srgb, ${accent} 25%, transparent) inset`,
+        boxShadow: dragOver
+          ? `0 0 0 2px ${accent} inset, var(--shadow-panel)`
+          : `0 0 0 1px color-mix(in srgb, ${accent} 25%, transparent) inset`,
+        transition: 'box-shadow 200ms var(--ease-standard)',
       }}
     >
       {/* Header: identity + track + BPM */}
@@ -155,15 +159,18 @@ export function Deck({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <motion.button
             type="button"
             onClick={onSync}
             disabled={!state.bpm}
             title="Sync tempo to the other deck's BPM"
-            className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-100 disabled:opacity-30"
+            whileHover={state.bpm ? { scale: 1.1, rotate: 15 } : undefined}
+            whileTap={state.bpm ? { scale: 0.9 } : undefined}
+            transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+            className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-150 disabled:opacity-30"
           >
             <SyncIcon width={13} height={13} />
-          </button>
+          </motion.button>
           <div className="text-right">
             <p className="text-text-primary text-[16px] leading-none font-semibold tabular-nums">
               {state.bpm ?? '--'}
@@ -198,26 +205,44 @@ export function Deck({
       {/* 2. Transport cluster — play, freeform cue, hot cues, loop. Bordered, clearly grouped. */}
       <div className="border-glass-border flex flex-col gap-2 rounded-lg border p-2.5" style={{ borderColor: `color-mix(in srgb, ${accent} 30%, var(--color-glass-border))` }}>
         <div className="flex items-center justify-center gap-4">
-          <button
+          <motion.button
             type="button"
             onClick={onTogglePlay}
             disabled={!state.track}
             aria-label={state.isPlaying ? 'Pause' : 'Play'}
-            className="flex h-14 w-14 items-center justify-center rounded-full text-white transition-transform duration-100 hover:scale-105 active:scale-95 disabled:opacity-40"
+            whileHover={state.track ? { scale: 1.08 } : undefined}
+            whileTap={state.track ? { scale: 0.92 } : undefined}
+            animate={state.isPlaying ? { boxShadow: `0 0 0 6px color-mix(in srgb, ${accent} 18%, transparent)` } : { boxShadow: '0 0 0 0px transparent' }}
+            transition={{ type: 'spring', stiffness: 450, damping: 26 }}
+            className="flex h-14 w-14 items-center justify-center rounded-full text-white disabled:opacity-40"
             style={{ background: accent }}
           >
-            {state.isPlaying ? <PauseIcon width={22} height={22} /> : <PlayIcon width={22} height={22} />}
-          </button>
-          <button
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={state.isPlaying ? 'pause' : 'play'}
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="flex"
+              >
+                {state.isPlaying ? <PauseIcon width={22} height={22} /> : <PlayIcon width={22} height={22} />}
+              </motion.span>
+            </AnimatePresence>
+          </motion.button>
+          <motion.button
             type="button"
             onClick={onAddCue}
             disabled={!state.track}
             aria-label="Add freeform cue point"
             title="Add freeform cue point at current position"
-            className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-100 disabled:opacity-40"
+            whileHover={state.track ? { scale: 1.1 } : undefined}
+            whileTap={state.track ? { scale: 0.9, rotate: 90 } : undefined}
+            transition={{ type: 'spring', stiffness: 500, damping: 26 }}
+            className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-150 disabled:opacity-40"
           >
             <PlusIcon width={18} height={18} />
-          </button>
+          </motion.button>
         </div>
 
         {state.cuePoints.length > 0 && (

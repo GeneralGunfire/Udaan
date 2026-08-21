@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import type { HotCueSlot } from '../lib/types'
 
 interface HotCuesProps {
@@ -15,7 +16,7 @@ export function HotCues({ hotCues, accent, onTrigger, onSet, onClear }: HotCuesP
       {hotCues.map((seconds, i) => {
         const isSet = seconds !== null
         return (
-          <button
+          <motion.button
             key={i}
             type="button"
             onClick={(e) => {
@@ -31,14 +32,16 @@ export function HotCues({ hotCues, accent, onTrigger, onSet, onClear }: HotCuesP
                 ? `Hot cue ${i + 1} — click to jump, shift-click to clear`
                 : `Set hot cue ${i + 1} at current position`
             }
-            className="flex h-9 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold transition-transform duration-100 active:scale-95"
-            style={{
-              background: isSet ? accent : 'var(--color-glass-bg-hover)',
-              color: isSet ? '#fff' : 'var(--color-text-tertiary)',
-            }}
+            initial={false}
+            animate={{ scale: 1, background: isSet ? accent : 'var(--color-glass-bg-hover)' }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 26 }}
+            className="flex h-9 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold"
+            style={{ color: isSet ? '#fff' : 'var(--color-text-tertiary)' }}
           >
             {i + 1}
-          </button>
+          </motion.button>
         )
       })}
     </div>
