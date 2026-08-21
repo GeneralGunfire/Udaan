@@ -132,9 +132,9 @@ export function ScheduleView() {
               const events = getEventsForDate(dateISO)
               const filtered =
                 filter === 'planned'
-                  ? events
+                  ? events.filter((e) => !e.unplanned)
                   : filter === 'unplanned'
-                    ? []
+                    ? events.filter((e) => e.unplanned)
                     : events
               const isToday = dateISO === today
               const dayLabel = new Date(

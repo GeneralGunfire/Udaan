@@ -6,7 +6,10 @@ export function WorkView() {
     <GlassPanel>
       <h1 className="text-lg font-medium">Work</h1>
       <p className="text-text-secondary mt-1 text-sm">
-        Task queue, projects, and orchestration tools will live here.
+        Work-specific tools (projects, proposals, client tracking) will live
+        here. For queued Claude Code runs, see Task Queue under General in
+        the sidebar — that's a cross-cutting tool shared by every category,
+        not something Work builds its own copy of.
       </p>
     </GlassPanel>
   )

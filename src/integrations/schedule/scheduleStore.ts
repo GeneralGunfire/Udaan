@@ -19,6 +19,12 @@ export interface ScheduleEvent {
   category: EventCategory
   location?: string
   notes?: string
+  /**
+   * True for a loosely-held placeholder on the calendar (e.g. "sometime
+   * this day, no fixed time/details yet") as opposed to a firmly planned
+   * event. Defaults to false/absent — most events are planned.
+   */
+  unplanned?: boolean
 }
 
 export interface TodoItem {
@@ -92,6 +98,20 @@ export const SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: 'Reading Summary Due',
     date: '2026-08-27',
     category: 'school',
+  },
+  {
+    id: 'evt-7',
+    title: 'Catch up on emails',
+    date: '2026-08-21',
+    category: 'work',
+    unplanned: true,
+  },
+  {
+    id: 'evt-8',
+    title: 'Sketch new set ideas',
+    date: '2026-08-22',
+    category: 'creativity',
+    unplanned: true,
   },
 ]
 
