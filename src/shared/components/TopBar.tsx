@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Wordmark } from './Wordmark'
 import {
@@ -8,6 +8,9 @@ import {
   WindowCloseIcon,
 } from '@/shared/icons'
 import { WallpaperPicker } from './WallpaperPicker'
+import { useGlobalSearch } from '@/features/global-search/hooks/useGlobalSearch'
+import { SearchResultsDropdown } from '@/features/global-search/components/SearchResultsDropdown'
+import type { SearchResult } from '@/features/global-search/lib/types'
 
 /**
  * Lazily resolves the Tauri window handle. Only ever called from click
@@ -36,9 +39,37 @@ async function withAppWindow(
  * tauri.conf.json), so this row owns window drag, minimize, maximize, and
  * close via `data-tauri-drag-region` + the Tauri window API.
  */
-export function TopBar() {
+interface TopBarProps {
+  /** Called when the user picks a global search result — TopBar has no view/navigation state of its own. */
+  onNavigateToSearchResult?: (result: SearchResult) => void
+}
+
+export function TopBar({ onNavigateToSearchResult }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const { results, loading } = useGlobalSearch(searchOpen ? searchValue : '')
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  function closeSearch() {
+    setSearchOpen(false)
+    setSearchValue('')
+  }
+
+  useEffect(() => {
+    if (!searchOpen) return
+    function onPointerDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        closeSearch()
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [searchOpen])
+
+  function handleSelect(result: SearchResult) {
+    onNavigateToSearchResult?.(result)
+    closeSearch()
+  }
 
   return (
     <header className="relative z-20 flex shrink-0 items-center justify-between gap-3">
@@ -55,44 +86,61 @@ export function TopBar() {
       <div data-tauri-drag-region className="h-11 flex-1" />
 
       {/* Search pill — expands inline when active */}
-      <motion.div
-        animate={{ width: searchOpen ? 220 : 44 }}
-        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-        className="glass-surface flex h-11 shrink-0 items-center overflow-hidden rounded-full backdrop-blur-2xl"
-        style={{ boxShadow: 'var(--shadow-composer)' }}
-      >
-        <motion.button
-          type="button"
-          aria-label="Search"
-          onClick={() => setSearchOpen((o) => !o)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className="text-text-secondary hover:text-text-primary flex h-11 w-11 shrink-0 items-center justify-center transition-colors duration-150"
+      <div ref={containerRef} className="relative shrink-0">
+        <motion.div
+          animate={{ width: searchOpen ? 220 : 44 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+          className="glass-surface flex h-11 items-center overflow-hidden rounded-full backdrop-blur-2xl"
+          style={{ boxShadow: 'var(--shadow-composer)' }}
         >
-          <SearchIcon width={14} height={14} />
-        </motion.button>
+          <motion.button
+            type="button"
+            aria-label="Search"
+            onClick={() => setSearchOpen((o) => !o)}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="text-text-secondary hover:text-text-primary flex h-11 w-11 shrink-0 items-center justify-center transition-colors duration-150"
+          >
+            <SearchIcon width={14} height={14} />
+          </motion.button>
+          <AnimatePresence>
+            {searchOpen && (
+              <motion.input
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                autoFocus
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') closeSearch()
+                }}
+                placeholder="Search everything…"
+                className="text-text-primary placeholder:text-text-tertiary min-w-0 flex-1 bg-transparent pr-4 text-[12.5px] outline-none"
+              />
+            )}
+          </AnimatePresence>
+        </motion.div>
+
         <AnimatePresence>
-          {searchOpen && (
-            <motion.input
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              autoFocus
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setSearchOpen(false)
-                  setSearchValue('')
-                }
-              }}
-              placeholder="Search…"
-              className="text-text-primary placeholder:text-text-tertiary min-w-0 flex-1 bg-transparent pr-4 text-[12.5px] outline-none"
-            />
+          {searchOpen && searchValue.trim() && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            >
+              <SearchResultsDropdown
+                results={results}
+                loading={loading}
+                query={searchValue}
+                onSelect={handleSelect}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
 
       {/* Utility pill — wallpaper picker */}
       <div
