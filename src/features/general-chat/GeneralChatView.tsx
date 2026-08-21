@@ -24,7 +24,7 @@ export function GeneralChatView() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-        className="relative mb-3 h-16 w-16 object-contain"
+        className="relative mb-4 h-14 w-14 object-contain"
         style={{
           filter:
             'drop-shadow(0 4px 28px rgb(55 180 200 / 55%)) drop-shadow(0 2px 12px rgb(0 0 0 / 70%))',
@@ -32,24 +32,24 @@ export function GeneralChatView() {
       />
 
       <h2
-        className="font-display relative mb-1.5 text-center text-[17px] font-bold tracking-[0.28em] text-white"
+        className="font-display relative mb-3 text-center text-[11px] font-semibold tracking-[0.32em] text-white/60 uppercase"
         style={{
-          textShadow: '0 2px 18px rgb(0 0 0 / 80%), 0 1px 4px rgb(0 0 0 / 95%)',
+          textShadow: '0 1px 10px rgb(0 0 0 / 80%)',
         }}
       >
-        UDAAN
+        Udaan
       </h2>
 
       <h1
-        className="font-display relative mb-2 text-center text-[26px] leading-tight font-semibold text-balance text-white"
+        className="font-display relative mb-3 text-center text-[34px] leading-[1.15] font-bold text-balance text-white"
         style={{
-          textShadow: '0 2px 20px rgb(0 0 0 / 75%), 0 1px 3px rgb(0 0 0 / 90%)',
+          textShadow: '0 2px 24px rgb(0 0 0 / 80%), 0 1px 3px rgb(0 0 0 / 95%)',
         }}
       >
         Your ideas, set in motion
       </h1>
       <p
-        className="relative mb-6 max-w-md text-center text-[12px] leading-relaxed text-white/70"
+        className="relative mb-8 max-w-md text-center text-[13.5px] leading-relaxed text-white/75"
         style={{ textShadow: '0 1px 12px rgb(0 0 0 / 70%)' }}
       >
         One workstation for School, Work, Creativity, and everything else —

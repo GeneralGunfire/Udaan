@@ -71,7 +71,7 @@ export function Composer() {
               className="flex max-h-96 flex-col gap-2.5 overflow-y-auto p-4"
             >
               {messages.length === 0 ? (
-                <div className="text-text-tertiary py-6 text-center text-[12px]">
+                <div className="text-text-tertiary py-6 text-center text-[13px]">
                   No messages yet.
                 </div>
               ) : (
@@ -105,7 +105,7 @@ export function Composer() {
             }
             disabled={mic.transcribing}
             rows={2}
-            className="text-text-primary placeholder:text-text-tertiary min-h-9 w-full resize-none bg-transparent text-[13px] outline-none disabled:opacity-50"
+            className="text-text-primary placeholder:text-text-tertiary min-h-9 w-full resize-none bg-transparent text-[14px] leading-snug outline-none disabled:opacity-50"
           />
           <div className="mt-2.5 flex items-center justify-between">
             <div className="glass-surface flex items-center gap-0.5 rounded-full p-0.5">
@@ -118,7 +118,7 @@ export function Composer() {
                     onClick={() => setActiveMode(mode.id)}
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                    className="relative rounded-full px-2.5 py-1 text-[10.5px] font-medium"
+                    className="relative rounded-full px-3 py-1.5 text-[11.5px] font-semibold"
                   >
                     {isActive && (
                       <motion.div
@@ -132,7 +132,7 @@ export function Composer() {
                       />
                     )}
                     <span
-                      className={`relative ${isActive ? 'text-text-primary' : 'text-text-tertiary'}`}
+                      className={`relative transition-colors duration-150 ${isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
                     >
                       {mode.label}
                     </span>
