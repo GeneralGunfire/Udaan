@@ -2,6 +2,7 @@ import { useState, type SVGProps } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CATEGORIES, type CategoryId } from '@/app/categories'
 import { PLACEHOLDER_BADGES } from '@/app/placeholderData'
+import { useUnreadNotificationCount } from '@/features/notifications/hooks/useNotifications'
 import {
   CalendarIcon,
   GaugeIcon,
@@ -63,6 +64,7 @@ export function Sidebar({
   const [expandedCategory, setExpandedCategory] = useState<CategoryId | null>(
     null,
   )
+  const unreadNotifications = useUnreadNotificationCount()
 
   function toggleCategory(id: CategoryId) {
     setExpandedCategory((prev) => (prev === id ? null : id))
@@ -132,7 +134,9 @@ export function Sidebar({
                   onSelectPlaceholder('notification', 'Notification')
                 }
               >
-                <CountBadge value={PLACEHOLDER_BADGES.notifications} />
+                {unreadNotifications > 0 && (
+                  <CountBadge value={String(unreadNotifications)} />
+                )}
               </SidebarRow>
 
               {/* Channels — each independently expandable */}
