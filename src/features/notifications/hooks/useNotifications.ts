@@ -3,6 +3,8 @@ import {
   getNotifications,
   getUnreadCount,
   markAllRead,
+  markRead,
+  clearAll,
   subscribe,
   type Notification,
 } from '../lib/notificationStore'
@@ -15,7 +17,7 @@ export function useNotifications() {
     return subscribe(() => setNotifications(getNotifications()))
   }, [])
 
-  return { notifications, markAllRead }
+  return { notifications, markAllRead, markRead, clearAll }
 }
 
 /** Lighter-weight hook for just the unread count — what the Sidebar badge needs. */

@@ -1,6 +1,5 @@
-import { useEffect } from 'react'
 import { GlassPanel } from '@/shared/components/GlassPanel'
-import { BellIcon } from '@/shared/icons'
+import { BellIcon, TrashIcon } from '@/shared/icons'
 import { useNotifications } from './hooks/useNotifications'
 
 function formatTimestamp(iso: string): string {
@@ -14,45 +13,78 @@ function formatTimestamp(iso: string): string {
 }
 
 /**
- * Real notifications generated from Claude Code task completions — no
- * sample/fabricated entries. Opening this view marks everything read,
- * clearing the sidebar badge.
+ * Real notification center. Sources today: Claude Code task completions/failures, and any
+ * feature that calls `pushNotification()` (e.g. Automations) — both land in the same log via
+ * `src/features/notifications/lib/notificationStore.ts`, so future features push into this
+ * one system instead of building their own. Unread state is per-item now rather than
+ * "opening the view marks everything read", so mark-as-read is a real user action.
  */
 export function NotificationsView() {
-  const { notifications, markAllRead } = useNotifications()
-
-  useEffect(() => {
-    markAllRead()
-  }, [])
+  const { notifications, markAllRead, markRead, clearAll } = useNotifications()
+  const hasUnread = notifications.some((n) => !n.read)
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-4 overflow-y-auto py-4">
-      <div className="flex items-center gap-2">
-        <BellIcon width={16} height={16} className="text-brand-teal" />
-        <h1 className="font-display text-text-primary text-[16px] font-semibold">
-          Notifications
-        </h1>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <BellIcon width={16} height={16} className="text-brand-teal" />
+          <h1 className="font-display text-text-primary text-[16px] font-semibold">
+            Notifications
+          </h1>
+        </div>
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-3">
+            {hasUnread && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-text-tertiary hover:text-text-primary text-[11.5px] transition-colors duration-150"
+              >
+                Mark all read
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-text-tertiary hover:text-red-400 flex items-center gap-1 text-[11.5px] transition-colors duration-150"
+            >
+              <TrashIcon width={12} height={12} />
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {notifications.length === 0 ? (
         <GlassPanel>
           <p className="text-text-secondary text-[12.5px]">
-            No notifications yet. You'll see one here whenever a Claude Code task finishes —
-            successfully or not.
+            No notifications yet. You'll see one here whenever a Claude Code task finishes, or
+            when another feature (like Automations) pushes one in.
           </p>
         </GlassPanel>
       ) : (
         <div className="flex flex-col gap-2">
           {notifications.map((n) => (
-            <GlassPanel key={n.id} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-text-primary truncate text-[12.5px] font-medium">
-                  {n.prompt}
-                </p>
+            <GlassPanel
+              key={n.id}
+              className={`flex items-start justify-between gap-3 ${!n.read ? 'border border-brand-teal/30' : ''}`}
+            >
+              <button
+                type="button"
+                onClick={() => markRead(n.id)}
+                disabled={n.read}
+                className="min-w-0 flex-1 text-left disabled:cursor-default"
+              >
+                <div className="flex items-center gap-1.5">
+                  {!n.read && <span className="bg-brand-teal h-1.5 w-1.5 shrink-0 rounded-full" />}
+                  <p className="text-text-primary truncate text-[12.5px] font-medium">
+                    {n.prompt}
+                  </p>
+                </div>
                 <p className="text-text-tertiary mt-0.5 text-[11px]">
                   {formatTimestamp(n.createdAt)}
                 </p>
-              </div>
+              </button>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
                   n.status === 'done'

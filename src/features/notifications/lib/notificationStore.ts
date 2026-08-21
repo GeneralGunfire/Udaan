@@ -93,6 +93,21 @@ export function markAllRead() {
   notify()
 }
 
+/** Marks a single notification read, leaving the rest of the log untouched. */
+export function markRead(id: string) {
+  const target = notifications.find((n) => n.id === id)
+  if (!target || target.read) return
+  notifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
+  notify()
+}
+
+/** Removes every notification from the log. */
+export function clearAll() {
+  if (notifications.length === 0) return
+  notifications = []
+  notify()
+}
+
 /**
  * Generic push, for any source other than Claude Code task events — used
  * by Rule-Based Automations (src/features/automations) so triggered
