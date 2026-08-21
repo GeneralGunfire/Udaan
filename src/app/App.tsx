@@ -10,6 +10,7 @@ import { WorkView } from '@/features/work/WorkView'
 import { CreativityView } from '@/features/creativity/CreativityView'
 import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
 import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorView'
+import { StudyGeneratorView } from '@/features/school/study-generator/StudyGeneratorView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -38,6 +39,7 @@ export type View =
   | { kind: 'notifications' }
   | { kind: 'dj-board' }
   | { kind: 'image-editor' }
+  | { kind: 'study-generator' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -92,6 +94,10 @@ export default function App() {
       setView({ kind: 'image-editor' })
       return
     }
+    if (id === 'school-study-generator') {
+      setView({ kind: 'study-generator' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -112,6 +118,7 @@ export default function App() {
     if (view.kind === 'notifications') return <NotificationsView />
     if (view.kind === 'dj-board') return <DjBoardView />
     if (view.kind === 'image-editor') return <ImageEditorView />
+    if (view.kind === 'study-generator') return <StudyGeneratorView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -168,7 +175,9 @@ export default function App() {
                                     ? 'creativity-dj-mixer'
                                     : view.kind === 'image-editor'
                                       ? 'creativity-image-editor'
-                                      : null
+                                      : view.kind === 'study-generator'
+                                        ? 'school-study-generator'
+                                        : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}
