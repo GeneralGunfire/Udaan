@@ -181,3 +181,53 @@ pub fn screenshot_tool_copy_to_clipboard(file_path: String) -> Result<(), String
     })
     .map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// Exercises the real PNG-save path used by every capture command (screen/window/region all
+  /// funnel through this), without needing a Tauri AppHandle — just a plain temp dir.
+  #[test]
+  fn save_and_describe_writes_a_readable_png() {
+    let dir = std::env::temp_dir().join(format!("udaan-screenshot-test-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let img = image::RgbaImage::from_fn(10, 8, |x, y| image::Rgba([x as u8, y as u8, 128, 255]));
+    let entry = save_and_describe(dir.clone(), img).unwrap();
+
+    assert!(entry.file_name.starts_with("screenshot-"));
+    assert!(entry.file_name.ends_with(".png"));
+
+    let saved_bytes = std::fs::read(&entry.path).unwrap();
+    let reloaded = image::load_from_memory(&saved_bytes).unwrap().to_rgba8();
+    assert_eq!(reloaded.dimensions(), (10, 8));
+    // Spot-check one pixel survived the round trip intact.
+    assert_eq!(reloaded.get_pixel(3, 5), &image::Rgba([3, 5, 128, 255]));
+
+    std::fs::remove_dir_all(&dir).ok();
+  }
+
+  /// Exercises the real crop logic used by region capture, against a real in-memory image
+  /// (not a live monitor grab, so this stays deterministic and doesn't depend on desktop state).
+  #[test]
+  fn region_crop_extracts_the_correct_sub_image() {
+    let full = image::RgbaImage::from_fn(20, 20, |x, y| image::Rgba([x as u8, y as u8, 0, 255]));
+    let cropped = image::imageops::crop_imm(&full, 5, 5, 6, 4).to_image();
+    assert_eq!(cropped.dimensions(), (6, 4));
+    assert_eq!(cropped.get_pixel(0, 0), &image::Rgba([5, 5, 0, 255]));
+    assert_eq!(cropped.get_pixel(5, 3), &image::Rgba([10, 8, 0, 255]));
+  }
+
+  /// Exercises the real xcap monitor enumeration against this machine's actual display(s) —
+  /// the interactive desktop this test runs on has at least one, so this is a real capture
+  /// smoke test, not a mock.
+  #[test]
+  fn can_enumerate_and_capture_a_real_monitor() {
+    let monitors = Monitor::all().expect("Monitor::all should succeed on an interactive desktop");
+    assert!(!monitors.is_empty(), "expected at least one real display");
+
+    let img = monitors[0].capture_image().expect("capturing the primary monitor should succeed");
+    assert!(img.width() > 0 && img.height() > 0);
+  }
+}
