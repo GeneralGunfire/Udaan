@@ -11,6 +11,7 @@ import { CreativityView } from '@/features/creativity/CreativityView'
 import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
 import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorView'
 import { StudyGeneratorView } from '@/features/school/study-generator/StudyGeneratorView'
+import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -40,6 +41,7 @@ export type View =
   | { kind: 'dj-board' }
   | { kind: 'image-editor' }
   | { kind: 'study-generator' }
+  | { kind: 'video-editor' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -98,6 +100,10 @@ export default function App() {
       setView({ kind: 'study-generator' })
       return
     }
+    if (id === 'creativity-video-editor') {
+      setView({ kind: 'video-editor' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -119,6 +125,7 @@ export default function App() {
     if (view.kind === 'dj-board') return <DjBoardView />
     if (view.kind === 'image-editor') return <ImageEditorView />
     if (view.kind === 'study-generator') return <StudyGeneratorView />
+    if (view.kind === 'video-editor') return <VideoEditorView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -177,7 +184,9 @@ export default function App() {
                                       ? 'creativity-image-editor'
                                       : view.kind === 'study-generator'
                                         ? 'school-study-generator'
-                                        : null
+                                        : view.kind === 'video-editor'
+                                          ? 'creativity-video-editor'
+                                          : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}

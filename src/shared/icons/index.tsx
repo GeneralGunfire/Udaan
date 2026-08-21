@@ -418,3 +418,31 @@ export function DiscIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function FilmIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="4" width="15" height="12" rx="1.5" />
+      <path d="M2.5 7.5h15M2.5 12.5h15M6.5 4v3.5M6.5 12.5V16M13.5 4v3.5M13.5 12.5V16" />
+    </svg>
+  )
+}
+
+export function ScissorsIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="5.5" cy="6" r="2" />
+      <circle cx="5.5" cy="14" r="2" />
+      <path d="M7 7.3L16 15M7 12.7L16 5" />
+    </svg>
+  )
+}
+
+export function DownloadIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 3v10M6 9.5L10 13.5L14 9.5" />
+      <path d="M4 15.5h12" />
+    </svg>
+  )
+}
