@@ -1,0 +1,135 @@
+/**
+ * Design tokens — glassmorphic, Udaan brand. Dark is the default/primary
+ * mode; light is a real theme, not an afterthought — both are first-class.
+ * Single source of truth for color, spacing, radius, blur, and typography.
+ * The ambient smoke background is a full-bleed DOM layer (see
+ * shared/components/AmbientBackground.tsx) and swaps per theme; these
+ * tokens define the glass surfaces that float on top of it.
+ */
+
+:root,
+[data-theme='dark'] {
+  /* ---- Color: base surface (the floating app panel, not the window) ---- */
+  --color-bg-base: #0b0f16;
+  --color-bg-elevated: #11161f;
+
+  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ---- */
+  --color-glass-bg: rgb(20 26 36 / 55%);
+  --color-glass-bg-hover: rgb(30 40 54 / 68%);
+  --color-glass-border: rgb(255 255 255 / 8%);
+  --color-glass-highlight: rgb(255 255 255 / 6%);
+  --color-glass-inner-shadow: rgb(0 0 0 / 18%);
+
+  /* ---- Color: text ---- */
+  --color-text-primary: rgb(255 255 255 / 94%);
+  --color-text-secondary: rgb(255 255 255 / 62%);
+  --color-text-tertiary: rgb(255 255 255 / 38%);
+
+  /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
+  --color-chrome-bg: rgb(14 18 26 / 62%);
+
+  /* ---- Color: accent per category (School / Work / Creativity / General) ---- */
+  --color-accent-school: #6ea8fe;
+  --color-accent-work: #7ee2b8;
+  --color-accent-creativity: #d9a8ff;
+  --color-accent-general: #7fe0d0;
+
+  /* ---- Elevation (shadow) ---- */
+  --shadow-panel: 0 24px 64px rgb(0 0 0 / 45%);
+  --shadow-sidebar: 4px 0 32px rgb(0 0 0 / 35%);
+  --shadow-composer: 0 16px 48px rgb(6 20 30 / 55%);
+
+  --ambient-base: #020304;
+}
+
+[data-theme='light'] {
+  /* ---- Color: base surface ---- */
+  --color-bg-base: #eef2f6;
+  --color-bg-elevated: #ffffff;
+
+  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ---- */
+  --color-glass-bg: rgb(255 255 255 / 55%);
+  --color-glass-bg-hover: rgb(255 255 255 / 75%);
+  --color-glass-border: rgb(24 95 165 / 12%);
+  --color-glass-highlight: rgb(255 255 255 / 70%);
+  --color-glass-inner-shadow: rgb(24 60 95 / 8%);
+
+  /* ---- Color: text ---- */
+  --color-text-primary: rgb(15 23 35 / 92%);
+  --color-text-secondary: rgb(15 23 35 / 62%);
+  --color-text-tertiary: rgb(15 23 35 / 40%);
+
+  /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
+  --color-chrome-bg: rgb(255 255 255 / 55%);
+
+  /* ---- Color: accent per category (deepened for contrast on light bg) ---- */
+  --color-accent-school: #1f6fd8;
+  --color-accent-work: #1f9d6c;
+  --color-accent-creativity: #a458d8;
+  --color-accent-general: #1e9e8c;
+
+  /* ---- Elevation (shadow) ---- */
+  --shadow-panel: 0 24px 64px rgb(30 60 90 / 16%);
+  --shadow-sidebar: 4px 0 32px rgb(30 60 90 / 12%);
+  --shadow-composer: 0 16px 40px rgb(30 60 90 / 14%);
+
+  --ambient-base: #e4e9ef;
+}
+
+:root {
+  /* ---- Color: Udaan brand ramp (deep navy -> blue -> cyan -> light teal) ---- */
+  --color-brand-navy: #0b1e3a;
+  --color-brand-blue: #185fa5;
+  --color-brand-cyan: #37b4c8;
+  --color-brand-teal: #7fe0d0;
+  --gradient-brand: linear-gradient(
+    135deg,
+    var(--color-brand-blue) 0%,
+    var(--color-brand-cyan) 55%,
+    var(--color-brand-teal) 100%
+  );
+
+  /* ---- Color: semantic ---- */
+  --color-danger: #ff6b6b;
+  --color-warning: #ffb454;
+  --color-success: #6bdc9c;
+
+  /* ---- Blur (glassmorphism) ---- */
+  --blur-panel: 28px;
+  --blur-sidebar: 32px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ---- Typography ---- */
+  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 36px;
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}

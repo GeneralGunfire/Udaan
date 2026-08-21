@@ -1,0 +1,173 @@
+|-- .claude
+    |-- scheduled_tasks.lock
+|-- .github
+    |-- workflows
+        |-- ci.yml
+|-- .gitignore
+|-- .honest-look.png
+|-- .oxlintrc.json
+|-- .prettierignore
+|-- .prettierrc.json
+|-- .vsinstall-help.err.log
+|-- .vsinstall-help.log
+|-- ChatGPT Image Aug 20, 2026, 06_49_02 PM.png
+|-- index.html
+|-- package.json
+|-- pnpm-lock.yaml
+|-- pnpm-workspace.yaml
+|-- public
+    |-- favicon.svg
+    |-- icons.svg
+|-- README.md
+|-- scratch-chat-shot.cjs
+|-- screenshot.png
+|-- src
+    |-- app
+        |-- App.tsx
+        |-- categories.ts
+        |-- placeholderData.ts
+        |-- ThemeProvider.tsx
+        |-- WallpaperProvider.tsx
+        |-- wallpapers.ts
+    |-- assets
+        |-- ambient-smoke-bg-light.jpeg
+        |-- ambient-smoke-bg.png
+        |-- fonts
+            |-- Montserrat-Variable.ttf
+            |-- Poppins-Bold.ttf
+            |-- Poppins-Medium.ttf
+            |-- Poppins-SemiBold.ttf
+            |-- Poppins.ttf
+        |-- udaan-logo-full.jpg
+        |-- udaan-mark-old-backup.png
+        |-- udaan-mark-old-backup2.png
+        |-- udaan-mark.png
+        |-- vite.svg
+        |-- wallpapers
+            |-- cobalt-bloom.jpg
+            |-- dawn-lake-cool.jpg
+            |-- dawn-lake-warm.jpg
+            |-- graphite-swirl.jpg
+            |-- indigo-wave.jpg
+            |-- midnight-coil.jpg
+            |-- navy-petals.jpg
+            |-- windows-blue.jpg
+    |-- features
+        |-- calendar
+            |-- CalendarView.tsx
+        |-- creativity
+            |-- CreativityView.tsx
+        |-- general-chat
+            |-- components
+                |-- ChatMessage.tsx
+                |-- Composer.tsx
+                |-- modes.ts
+                |-- ModeSessionPanel.tsx
+            |-- GeneralChatView.tsx
+            |-- hooks
+                |-- useGeneralChat.ts
+                |-- useMicTranscription.ts
+            |-- lib
+                |-- router.ts
+        |-- schedule
+            |-- components
+                |-- WeatherWidget.tsx
+            |-- ScheduleView.tsx
+        |-- school
+            |-- SchoolView.tsx
+        |-- sessions
+            |-- components
+                |-- NewTaskForm.tsx
+                |-- TaskList.tsx
+                |-- TaskOutputTab.tsx
+                |-- TaskStatusBadge.tsx
+            |-- hooks
+                |-- useClaudeCodeTasks.ts
+            |-- SessionsView.tsx
+        |-- work
+            |-- WorkView.tsx
+    |-- integrations
+        |-- claude-code
+            |-- client.ts
+            |-- index.ts
+            |-- parseStreamLine.ts
+            |-- types.ts
+        |-- local-model
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- README.md
+        |-- schedule
+            |-- scheduleStore.ts
+        |-- weather
+            |-- weatherClient.ts
+    |-- main.tsx
+    |-- shared
+        |-- components
+            |-- AmbientBackground.tsx
+            |-- GlassPanel.tsx
+            |-- PlaceholderView.tsx
+            |-- Sidebar.tsx
+            |-- TopBar.tsx
+            |-- WallpaperPicker.tsx
+            |-- Wordmark.tsx
+        |-- hooks
+            |-- useTheme.ts
+            |-- useWallpaper.ts
+        |-- icons
+            |-- index.tsx
+        |-- lib
+    |-- styles
+        |-- fonts.css
+        |-- theme.css
+        |-- tokens.css
+|-- src-tauri
+    |-- .gitignore
+    |-- build.rs
+    |-- capabilities
+        |-- default.json
+    |-- Cargo.lock
+    |-- Cargo.toml
+    |-- gen
+        |-- schemas
+            |-- acl-manifests.json
+            |-- capabilities.json
+            |-- desktop-schema.json
+            |-- windows-schema.json
+    |-- icons
+        |-- 128x128.png
+        |-- 128x128@2x.png
+        |-- 32x32.png
+        |-- icon.icns
+        |-- icon.ico
+        |-- icon.png
+        |-- Square107x107Logo.png
+        |-- Square142x142Logo.png
+        |-- Square150x150Logo.png
+        |-- Square284x284Logo.png
+        |-- Square30x30Logo.png
+        |-- Square310x310Logo.png
+        |-- Square44x44Logo.png
+        |-- Square71x71Logo.png
+        |-- Square89x89Logo.png
+        |-- StoreLogo.png
+    |-- src
+        |-- claude_code
+            |-- exe.rs
+            |-- mod.rs
+            |-- runner.rs
+            |-- store.rs
+            |-- vscode.rs
+        |-- lib.rs
+        |-- local_model
+            |-- mod.rs
+            |-- transcribe.py
+            |-- transcribe.rs
+        |-- main.rs
+    |-- tauri.conf.json
+|-- test-results
+    |-- .last-run.json
+|-- tsconfig.app.json
+|-- tsconfig.json
+|-- tsconfig.node.json
+|-- vite.config.ts
