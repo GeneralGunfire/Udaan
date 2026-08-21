@@ -8,6 +8,7 @@ import { PlaceholderView } from '@/shared/components/PlaceholderView'
 import { SchoolView } from '@/features/school/SchoolView'
 import { WorkView } from '@/features/work/WorkView'
 import { CreativityView } from '@/features/creativity/CreativityView'
+import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -34,6 +35,7 @@ export type View =
   | { kind: 'integrations' }
   | { kind: 'system-health' }
   | { kind: 'notifications' }
+  | { kind: 'dj-board' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -80,6 +82,10 @@ export default function App() {
       setView({ kind: 'notifications' })
       return
     }
+    if (id === 'creativity-dj-mixer') {
+      setView({ kind: 'dj-board' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -98,6 +104,7 @@ export default function App() {
     if (view.kind === 'integrations') return <IntegrationsView />
     if (view.kind === 'system-health') return <SystemHealthView />
     if (view.kind === 'notifications') return <NotificationsView />
+    if (view.kind === 'dj-board') return <DjBoardView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -150,7 +157,9 @@ export default function App() {
                                 ? 'system-health'
                                 : view.kind === 'notifications'
                                   ? 'notification'
-                                  : null
+                                  : view.kind === 'dj-board'
+                                    ? 'creativity-dj-mixer'
+                                    : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}

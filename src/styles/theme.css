@@ -88,6 +88,63 @@
   }
 }
 
+@layer components {
+  /* DJ Board channel faders — native range input restyled as hardware
+     fader track/thumb. Vertical variant relies on writing-mode (set inline
+     by Fader.tsx) rather than -webkit-appearance: slider-vertical, since
+     that property is non-standard and inconsistently supported. */
+  .dj-fader-vertical,
+  .dj-fader-horizontal {
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .dj-fader-vertical {
+    width: 6px;
+    height: 120px;
+  }
+
+  .dj-fader-horizontal {
+    height: 6px;
+  }
+
+  .dj-fader-vertical::-webkit-slider-runnable-track,
+  .dj-fader-horizontal::-webkit-slider-runnable-track {
+    background: var(--color-glass-bg-hover);
+    border-radius: var(--radius-full);
+    height: 6px;
+  }
+
+  .dj-fader-vertical::-moz-range-track,
+  .dj-fader-horizontal::-moz-range-track {
+    background: var(--color-glass-bg-hover);
+    border-radius: var(--radius-full);
+    height: 6px;
+  }
+
+  .dj-fader-vertical::-webkit-slider-thumb,
+  .dj-fader-horizontal::-webkit-slider-thumb {
+    appearance: none;
+    width: 22px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--gradient-brand);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+    margin-top: -3px;
+  }
+
+  .dj-fader-vertical::-moz-range-thumb,
+  .dj-fader-horizontal::-moz-range-thumb {
+    width: 22px;
+    height: 12px;
+    border-radius: 3px;
+    border: none;
+    background: var(--gradient-brand);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+  }
+}
+
 @layer base {
   /* Custom scrollbar — thin, glass-toned track/thumb instead of the OS
      default, applied globally so every scrollable panel matches. */

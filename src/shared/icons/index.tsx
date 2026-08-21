@@ -365,3 +365,56 @@ export function PlusIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6.5 4.5v11l9-5.5z" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function PauseIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="6" y="4.5" width="3" height="11" rx="1" fill="currentColor" stroke="none" />
+      <rect x="11" y="4.5" width="3" height="11" rx="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function EjectIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 4l5.5 7h-11z" />
+      <rect x="4.5" y="13.5" width="11" height="2" rx="0.6" />
+    </svg>
+  )
+}
+
+export function HeadphonesIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 12.5v-2a6.5 6.5 0 0113 0v2" />
+      <rect x="2.5" y="11.5" width="3.5" height="5" rx="1.5" />
+      <rect x="14" y="11.5" width="3.5" height="5" rx="1.5" />
+    </svg>
+  )
+}
+
+export function WaveformIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 10h1.5l1-4 2 8 2-10 2 12 2-8 1 2h3" />
+    </svg>
+  )
+}
+
+export function DiscIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="7.5" />
+      <circle cx="10" cy="10" r="2" />
+    </svg>
+  )
+}
