@@ -11,6 +11,7 @@ import { CreativityView } from '@/features/creativity/CreativityView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
+import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
 import { ChevronRightIcon } from '@/shared/icons'
 import type { CategoryId } from './categories'
 
@@ -24,6 +25,7 @@ export type View =
   | { kind: 'calendar' }
   | { kind: 'schedule' }
   | { kind: 'sessions' }
+  | { kind: 'model-dashboard' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -50,6 +52,10 @@ export default function App() {
       setView({ kind: 'sessions' })
       return
     }
+    if (id === 'model-dashboard') {
+      setView({ kind: 'model-dashboard' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -63,6 +69,7 @@ export default function App() {
     if (view.kind === 'calendar') return <CalendarView />
     if (view.kind === 'schedule') return <ScheduleView />
     if (view.kind === 'sessions') return <SessionsView />
+    if (view.kind === 'model-dashboard') return <ModelDashboardView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -105,7 +112,9 @@ export default function App() {
                       ? 'general-chat'
                       : view.kind === 'sessions'
                         ? 'task-queue'
-                        : null
+                        : view.kind === 'model-dashboard'
+                          ? 'model-dashboard'
+                          : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}

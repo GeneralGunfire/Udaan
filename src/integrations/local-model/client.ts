@@ -22,6 +22,39 @@ export async function isReachable(): Promise<boolean> {
   }
 }
 
+/** The model this app is configured to talk to, for display purposes (dashboards, status views). */
+export function configuredChatModel(): string {
+  return CHAT_MODEL
+}
+
+export interface RunningModel {
+  name: string
+  /** Total resident size in bytes, as reported by Ollama. */
+  sizeBytes: number
+  /** VRAM-resident portion in bytes, as reported by Ollama (0 if running on CPU only). */
+  sizeVramBytes: number
+  /** ISO timestamp; Ollama will unload the model at this time if idle. */
+  expiresAt: string
+}
+
+/** Lists models Ollama currently has loaded in memory, via `/api/ps`. Empty array if none loaded or Ollama unreachable. */
+export async function listRunningModels(): Promise<RunningModel[]> {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/ps`, { signal: AbortSignal.timeout(2000) })
+    if (!res.ok) return []
+    const data = await res.json()
+    const models = Array.isArray(data.models) ? data.models : []
+    return models.map((m: Record<string, unknown>) => ({
+      name: String(m.name ?? m.model ?? 'unknown'),
+      sizeBytes: Number(m.size ?? 0),
+      sizeVramBytes: Number(m.size_vram ?? 0),
+      expiresAt: String(m.expires_at ?? ''),
+    }))
+  } catch {
+    return []
+  }
+}
+
 /** Sends a chat completion request to the local Ollama daemon. Ollama must be running (`ollama serve`, or the installed background service). */
 export async function chat(messages: ChatMessage[], signal?: AbortSignal): Promise<ChatResult> {
   let res: Response
