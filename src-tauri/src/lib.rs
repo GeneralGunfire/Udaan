@@ -3,7 +3,10 @@ mod audio_library;
 mod claude_code;
 mod client_tracker;
 mod clipboard_manager;
+mod folder_watcher;
 mod local_model;
+mod pdf_tool;
+mod schedule;
 mod screenshot_tool;
 mod system_health;
 mod template_library;
@@ -53,6 +56,17 @@ pub fn run() {
       client_tracker::client_tracker_list_follow_ups,
       client_tracker::client_tracker_add_follow_up,
       client_tracker::client_tracker_set_follow_up_done,
+      folder_watcher::folder_watcher_poll,
+      pdf_tool::pdf_tool_inspect,
+      pdf_tool::pdf_tool_merge,
+      pdf_tool::pdf_tool_split,
+      pdf_tool::pdf_tool_stamp_text,
+      pdf_tool::pdf_tool_generate_sample,
+      schedule::schedule_list_events,
+      schedule::schedule_create_event,
+      schedule::schedule_update_event,
+      schedule::schedule_delete_event,
+      schedule::schedule_set_status,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -71,6 +85,9 @@ pub fn run() {
       app.manage(template_library_state);
       let client_tracker_state = client_tracker::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(client_tracker_state);
+      app.manage(folder_watcher::FolderWatcherState::default());
+      let schedule_state = schedule::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(schedule_state);
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);

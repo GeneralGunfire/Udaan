@@ -57,10 +57,12 @@ export function NotificationsView() {
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
                   n.status === 'done'
                     ? 'bg-success/20 text-success'
-                    : 'bg-red-400/20 text-red-400'
+                    : n.status === 'failed'
+                      ? 'bg-red-400/20 text-red-400'
+                      : 'bg-brand-teal/20 text-brand-teal'
                 }`}
               >
-                {n.status === 'done' ? 'Done' : 'Failed'}
+                {n.status === 'done' ? 'Done' : n.status === 'failed' ? 'Failed' : n.source || 'Info'}
               </span>
             </GlassPanel>
           ))}

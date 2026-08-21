@@ -15,6 +15,7 @@ import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorV
 import { MusicPlayerView } from '@/features/creativity/music-player/MusicPlayerView'
 import { ProposalGeneratorView } from '@/features/work/proposal-generator/ProposalGeneratorView'
 import { ClientTrackerView } from '@/features/work/client-tracker/ClientTrackerView'
+import { AutomationsView } from '@/features/automations/AutomationsView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -55,6 +56,7 @@ export type View =
   | { kind: 'music-player' }
   | { kind: 'proposal-generator' }
   | { kind: 'client-tracker' }
+  | { kind: 'automations' }
   | { kind: 'placeholder'; id: string; label: string }
 
 /** Maps a non-placeholder, non-category view to the sidebar row id it should highlight. */
@@ -78,6 +80,7 @@ const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
   'music-player': 'creativity-music-player',
   'proposal-generator': 'work-proposal-generator',
   'client-tracker': 'work-client-tracker',
+  automations: 'automations',
 }
 
 function activeViewIdFor(view: View): string | null {
@@ -174,6 +177,10 @@ export default function App() {
       setView({ kind: 'client-tracker' })
       return
     }
+    if (id === 'automations') {
+      setView({ kind: 'automations' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -202,6 +209,7 @@ export default function App() {
     if (view.kind === 'music-player') return <MusicPlayerView />
     if (view.kind === 'proposal-generator') return <ProposalGeneratorView />
     if (view.kind === 'client-tracker') return <ClientTrackerView />
+    if (view.kind === 'automations') return <AutomationsView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 

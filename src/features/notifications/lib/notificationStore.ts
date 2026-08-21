@@ -11,11 +11,15 @@ import { getTask, onTaskEvent, type ClaudeCodeTaskEvent } from '@/integrations/c
 
 export interface Notification {
   id: string
-  taskId: string
+  /** Claude-Code-task notifications carry a taskId; automation-pushed ones may not. */
+  taskId?: string
+  /** Original field name kept for the Claude Code path; used as the notification body generally. */
   prompt: string
-  status: 'done' | 'failed'
+  status: 'done' | 'failed' | 'info'
   createdAt: string
   read: boolean
+  /** Which automation rule produced this, if any — lets the Notifications view attribute it. */
+  source?: string
 }
 
 type Listener = () => void
@@ -86,5 +90,27 @@ export function getUnreadCount(): number {
 export function markAllRead() {
   if (notifications.every((n) => n.read)) return
   notifications = notifications.map((n) => ({ ...n, read: true }))
+  notify()
+}
+
+/**
+ * Generic push, for any source other than Claude Code task events — used
+ * by Rule-Based Automations (src/features/automations) so triggered
+ * actions ("create a notification") reuse this same log/badge instead of
+ * a separate automation-only notification list.
+ */
+export function pushNotification(input: { message: string; source: string }) {
+  ensureStarted()
+  notifications = [
+    {
+      id: `${input.source}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      prompt: input.message,
+      status: 'info',
+      createdAt: new Date().toISOString(),
+      read: false,
+      source: input.source,
+    },
+    ...notifications,
+  ]
   notify()
 }
