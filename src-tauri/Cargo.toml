@@ -25,11 +25,17 @@ tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "sync", "time"] }
 sysinfo = "0.33"
+arboard = "3"
+image = "0.25"
+base64 = "0.22"
+xcap = "0.9"
+lopdf = "0.36"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

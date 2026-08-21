@@ -446,3 +446,53 @@ export function DownloadIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function ClipboardIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="5" y="4" width="10" height="14" rx="1.5" />
+      <path d="M8 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
+      <path d="M7.5 9h5M7.5 12h5M7.5 15h3" />
+    </svg>
+  )
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 6h11" />
+      <path d="M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6" />
+      <path d="M6 6l.7 9.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L14 6" />
+      <path d="M8.3 9v4.2M11.7 9v4.2" />
+    </svg>
+  )
+}
+
+export function CropIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2v12a1 1 0 0 0 1 1h11" />
+      <path d="M2 6h12a1 1 0 0 1 1 1v11" />
+    </svg>
+  )
+}
+
+export function CameraIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="6" width="15" height="10.5" rx="1.5" />
+      <path d="M7 6l1.2-2h3.6L13 6" />
+      <circle cx="10" cy="11.2" r="2.6" />
+    </svg>
+  )
+}
+
+export function FileTextIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2.5h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+      <path d="M12 2.5V6h3" />
+      <path d="M7 10.5h6M7 13h6M7 15.5h3.5" />
+    </svg>
+  )
+}
