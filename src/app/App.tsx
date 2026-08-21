@@ -9,6 +9,7 @@ import { SchoolView } from '@/features/school/SchoolView'
 import { WorkView } from '@/features/work/WorkView'
 import { CreativityView } from '@/features/creativity/CreativityView'
 import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
+import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -36,6 +37,7 @@ export type View =
   | { kind: 'system-health' }
   | { kind: 'notifications' }
   | { kind: 'dj-board' }
+  | { kind: 'image-editor' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -86,6 +88,10 @@ export default function App() {
       setView({ kind: 'dj-board' })
       return
     }
+    if (id === 'creativity-image-editor') {
+      setView({ kind: 'image-editor' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -105,6 +111,7 @@ export default function App() {
     if (view.kind === 'system-health') return <SystemHealthView />
     if (view.kind === 'notifications') return <NotificationsView />
     if (view.kind === 'dj-board') return <DjBoardView />
+    if (view.kind === 'image-editor') return <ImageEditorView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -159,7 +166,9 @@ export default function App() {
                                   ? 'notification'
                                   : view.kind === 'dj-board'
                                     ? 'creativity-dj-mixer'
-                                    : null
+                                    : view.kind === 'image-editor'
+                                      ? 'creativity-image-editor'
+                                      : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}

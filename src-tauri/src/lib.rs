@@ -1,3 +1,4 @@
+mod asset_library;
 mod audio_library;
 mod claude_code;
 mod local_model;
@@ -22,6 +23,9 @@ pub fn run() {
       system_health::system_health_stats,
       audio_library::audio_library_scan_folder,
       audio_library::audio_library_read_file,
+      asset_library::asset_library_scan_folder,
+      asset_library::asset_library_read_file,
+      asset_library::asset_library_write_file,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
