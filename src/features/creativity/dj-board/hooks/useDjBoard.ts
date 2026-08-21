@@ -411,17 +411,37 @@ export function useDjBoard() {
     setMasterVolumeValue(volume)
   }, [])
 
-  const toggleEffect = useCallback((kind: EffectKind) => {
-    // TODO(real audio engine): no DSP node graph is built for effects yet —
-    // this only tracks UI/control state. See lib/audioEngine.ts header.
-    setEffects((prev) => ({
-      ...prev,
-      [kind]: { ...prev[kind], enabled: !prev[kind].enabled },
-    }))
+  /**
+   * Hold-to-apply effect, GarageBand-style: real DSP engages on both
+   * decks simultaneously (a DJ effect applies to whatever's audible,
+   * which is a mix of both decks through the crossfader) and ramps back
+   * out on release — see DeckAudioEngine.engageEffect/releaseEffect for
+   * the actual ramp/parameter logic.
+   */
+  const engageEffect = useCallback((kind: EffectKind) => {
+    setEffects((prev) => {
+      const amount = prev[kind].amount
+      deckEnginesRef.current.A?.engageEffect(kind, amount)
+      deckEnginesRef.current.B?.engageEffect(kind, amount)
+      return { ...prev, [kind]: { ...prev[kind], engaged: true } }
+    })
   }, [])
 
+  const releaseEffect = useCallback((kind: EffectKind) => {
+    deckEnginesRef.current.A?.releaseEffect(kind)
+    deckEnginesRef.current.B?.releaseEffect(kind)
+    setEffects((prev) => ({ ...prev, [kind]: { ...prev[kind], engaged: false } }))
+  }, [])
+
+  /** Live intensity update while an effect is held — pushes to both engines immediately if currently engaged. */
   const setEffectAmount = useCallback((kind: EffectKind, amount: number) => {
-    setEffects((prev) => ({ ...prev, [kind]: { ...prev[kind], amount } }))
+    setEffects((prev) => {
+      if (prev[kind].engaged) {
+        deckEnginesRef.current.A?.engageEffect(kind, amount)
+        deckEnginesRef.current.B?.engageEffect(kind, amount)
+      }
+      return { ...prev, [kind]: { ...prev[kind], amount } }
+    })
   }, [])
 
   /** Saves the current deck A/B settings (not track/playback state) as a named preset. */
@@ -512,7 +532,8 @@ export function useDjBoard() {
     savePreset,
     loadPreset,
     deletePreset,
-    toggleEffect,
+    engageEffect,
+    releaseEffect,
     setEffectAmount,
   }
 }

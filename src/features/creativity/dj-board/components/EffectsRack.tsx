@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { EffectKind, EffectsRackState } from '../lib/audioEngine'
 import { SparkleIcon, ChevronRightIcon } from '@/shared/icons'
 
 interface EffectsRackProps {
   effects: EffectsRackState
-  onToggle: (kind: EffectKind) => void
+  onEngage: (kind: EffectKind) => void
+  onRelease: (kind: EffectKind) => void
   onAmount: (kind: EffectKind, amount: number) => void
 }
 
@@ -16,14 +17,57 @@ const EFFECT_LABELS: Record<EffectKind, string> = {
 }
 
 /**
- * Effects rack — UI + control state only. No audio DSP graph is wired up
- * yet (see lib/audioEngine.ts header for why); enabling a slot here changes
- * only the state shown in this panel, not the sound. Collapsed by default
- * (point 5 of the redesign) so a not-yet-real feature doesn't visually
- * compete with controls that are — expand on demand via the header.
+ * Effects rack — real DSP now (see lib/audioEngine.ts for the actual
+ * node graph: convolution reverb, feedback delay, dedicated filter
+ * sweep, LFO flanger). Hold-to-apply, GarageBand-style: press and hold a
+ * pad to engage the effect, release to stop — it's not a toggle. While
+ * held, scroll (wheel) up/down on the pad adjusts intensity live; the
+ * bar underneath shows the current intensity and can also be
+ * dragged directly. Collapsed by default (point 5 of the original
+ * redesign) so it doesn't visually compete with transport/mixer.
  */
-export function EffectsRack({ effects, onToggle, onAmount }: EffectsRackProps) {
+export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsRackProps) {
   const [expanded, setExpanded] = useState(false)
+  const dragKind = useRef<EffectKind | null>(null)
+
+  const handlePointerDown = useCallback(
+    (kind: EffectKind, e: React.PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      dragKind.current = kind
+      onEngage(kind)
+    },
+    [onEngage],
+  )
+
+  const handlePointerMove = useCallback(
+    (kind: EffectKind, e: React.PointerEvent<HTMLDivElement>) => {
+      if (dragKind.current !== kind) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+      onAmount(kind, ratio)
+    },
+    [onAmount],
+  )
+
+  const handlePointerUp = useCallback(
+    (kind: EffectKind, e: React.PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+      if (dragKind.current === kind) {
+        dragKind.current = null
+        onRelease(kind)
+      }
+    },
+    [onRelease],
+  )
+
+  const handleWheel = useCallback(
+    (kind: EffectKind, amount: number, e: React.WheelEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      const delta = e.deltaY < 0 ? 0.05 : -0.05
+      onAmount(kind, Math.max(0, Math.min(1, amount + delta)))
+    },
+    [onAmount],
+  )
 
   return (
     <div className="glass-surface flex flex-col gap-3 rounded-xl p-3">
@@ -33,10 +77,10 @@ export function EffectsRack({ effects, onToggle, onAmount }: EffectsRackProps) {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-1.5">
-          <SparkleIcon width={12} height={12} className="text-text-tertiary" />
+          <SparkleIcon width={12} height={12} className="text-accent-creativity" />
           <h2 className="text-text-secondary text-[11.5px] font-semibold">Effects Rack</h2>
-          <span className="border-glass-border text-text-tertiary rounded-full border border-dashed px-2 py-0.5 text-[9px] font-medium tracking-wide uppercase">
-            Mock DSP
+          <span className="text-text-tertiary text-[9px] font-medium tracking-wide uppercase">
+            Hold to apply
           </span>
         </div>
         <span
@@ -49,54 +93,51 @@ export function EffectsRack({ effects, onToggle, onAmount }: EffectsRackProps) {
 
       {expanded && (
         <>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-4 gap-2.5">
             {(Object.keys(effects) as EffectKind[]).map((kind) => {
               const effect = effects[kind]
               return (
-                <div
-                  key={kind}
-                  className={`border-glass-border rounded-lg border p-2.5 transition-colors duration-150 ${
-                    effect.enabled ? 'bg-glass-hover' : 'bg-glass'
-                  }`}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-text-secondary text-[11px] font-medium">
-                      {EFFECT_LABELS[kind]}
-                    </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={effect.enabled}
-                      onClick={() => onToggle(kind)}
-                      className={`relative h-4 w-7 rounded-full transition-colors duration-150 ${
-                        effect.enabled ? 'bg-accent-creativity' : 'bg-glass-bg-hover'
-                      }`}
-                    >
-                      <span
-                        className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-150"
-                        style={{ transform: effect.enabled ? 'translateX(14px)' : 'translateX(2px)' }}
-                      />
-                    </button>
+                <div key={kind} className="flex flex-col gap-1.5">
+                  <div
+                    onPointerDown={(e) => handlePointerDown(kind, e)}
+                    onPointerMove={(e) => handlePointerMove(kind, e)}
+                    onPointerUp={(e) => handlePointerUp(kind, e)}
+                    onPointerLeave={(e) => {
+                      if (dragKind.current === kind) handlePointerUp(kind, e)
+                    }}
+                    onWheel={(e) => handleWheel(kind, effect.amount, e)}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={effect.engaged}
+                    title={`Hold to apply ${EFFECT_LABELS[kind]}. Scroll or drag to change intensity.`}
+                    className="relative flex h-16 cursor-pointer touch-none items-center justify-center rounded-lg text-[11px] font-semibold transition-transform duration-75 select-none"
+                    style={{
+                      background: effect.engaged
+                        ? 'var(--gradient-brand)'
+                        : 'var(--color-glass-bg-hover)',
+                      color: effect.engaged ? '#fff' : 'var(--color-text-secondary)',
+                      transform: effect.engaged ? 'scale(0.97)' : 'scale(1)',
+                    }}
+                  >
+                    {EFFECT_LABELS[kind]}
                   </div>
-                  <input
-                    type="range"
-                    aria-label={`${EFFECT_LABELS[kind]} amount`}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={effect.amount}
-                    onChange={(e) => onAmount(kind, Number(e.target.value))}
-                    disabled={!effect.enabled}
-                    className="dj-fader-horizontal w-full disabled:opacity-40"
-                  />
+                  <div className="bg-glass-bg-hover h-1 w-full overflow-hidden rounded-full">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-75"
+                      style={{
+                        width: `${effect.amount * 100}%`,
+                        background: 'var(--color-accent-creativity)',
+                      }}
+                    />
+                  </div>
                 </div>
               )
             })}
           </div>
 
           <p className="text-text-tertiary text-[10px] leading-relaxed">
-            TODO: real DSP (convolution reverb, feedback delay lines, biquad sweep, LFO-modulated
-            delay) — engine choice pending hardware input.
+            Real DSP: convolution reverb, feedback delay, dedicated filter sweep, LFO flanger —
+            applied to both decks while held (affects whatever's audible through the crossfader).
           </p>
         </>
       )}

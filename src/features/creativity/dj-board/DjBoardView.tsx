@@ -13,11 +13,12 @@ import type { DeckId } from './lib/types'
 
 /**
  * DJ Board — dual-deck mixer over a real Web Audio graph (playback, gain,
- * crossfader, 3-band EQ, dedicated bass, HP/LP filter sweep, sync, and
- * peak metering all genuine DSP). Effects rack is a control-state mock
- * (see components/EffectsRack.tsx), collapsed by default. Track source
- * is local files/folders only — no network/download logic anywhere in
- * this feature. Layout redesigned into a clear hierarchy: waveform ->
+ * crossfader, 3-band EQ, dedicated bass, HP/LP filter sweep, sync, peak
+ * metering, and the effects rack — reverb/delay/filter/flanger, all real
+ * DSP, hold-to-apply — are genuine audio processing, not mocked; see
+ * components/EffectsRack.tsx and lib/audioEngine.ts). Collapsed by
+ * default. Track source is local files/folders only — no network/
+ * download logic anywhere in this feature. Layout hierarchy: waveform ->
  * transport cluster -> mixer cluster per deck, with shared crossfader/
  * master/sync in the center column — see NOTES.md for the full before/
  * after and component-tree writeup.
@@ -176,7 +177,8 @@ export function DjBoardView() {
 
       <EffectsRack
         effects={board.effects}
-        onToggle={board.toggleEffect}
+        onEngage={board.engageEffect}
+        onRelease={board.releaseEffect}
         onAmount={board.setEffectAmount}
       />
 

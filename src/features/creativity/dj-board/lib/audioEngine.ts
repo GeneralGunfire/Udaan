@@ -1,21 +1,23 @@
 /**
- * Real Web Audio engine for one deck. Playback, gain, crossfader, and the
- * 3-band EQ + dedicated bass control are genuine DSP via native
- * AudioNodes — cheap on any hardware, no external engine needed.
+ * Real Web Audio engine for one deck. Playback, gain, crossfader, the
+ * 3-band EQ + dedicated bass control, the HP/LP filter sweep, and the
+ * effects rack (reverb/delay/filter/flanger) are all genuine DSP via
+ * native AudioNodes — cheap on any hardware, no external engine needed.
  *
- * The effects rack (reverb/delay/filter/flanger) is intentionally a MOCK
- * layer: state is tracked and exposed for the UI, but no audio node graph
- * is built for them yet. Real DSP there (convolution reverb impulse
- * responses, feedback delay lines, etc.) is heavier and its cost profile
- * depends on hardware the task explicitly flagged as needing direct user
- * input before choosing an approach. See `EffectsRack` TODOs below.
+ * Effects are wired as a "hold to apply" momentary send, GarageBand-
+ * Live-Loops-style: engage(kind) ramps the wet mix up over ~15ms
+ * (audible instantly, no click), release(kind) ramps it back to 0 —
+ * not a toggle. The `amount` control is intensity, applied continuously
+ * while held: filter cutoff sweep depth, delay feedback/mix, flanger
+ * depth, reverb wet mix.
  */
 
 export type EffectKind = 'reverb' | 'delay' | 'filter' | 'flanger'
 
 export interface EffectState {
-  enabled: boolean
-  /** 0-1 generic wet/mix amount — meaning depends on effect, UI-only until real DSP lands. */
+  /** True only while the control is actively held down. */
+  engaged: boolean
+  /** 0-1 intensity — meaning depends on effect (see each effect's setup below). */
   amount: number
 }
 
@@ -23,11 +25,25 @@ export type EffectsRackState = Record<EffectKind, EffectState>
 
 export function defaultEffectsRack(): EffectsRackState {
   return {
-    reverb: { enabled: false, amount: 0.3 },
-    delay: { enabled: false, amount: 0.3 },
-    filter: { enabled: false, amount: 0.5 },
-    flanger: { enabled: false, amount: 0.3 },
+    reverb: { engaged: false, amount: 0.5 },
+    delay: { engaged: false, amount: 0.4 },
+    filter: { engaged: false, amount: 0.6 },
+    flanger: { engaged: false, amount: 0.5 },
   }
+}
+
+/** Synthesizes a decaying-noise impulse response for convolution reverb — no external audio file needed. */
+function buildReverbImpulse(context: BaseAudioContext, seconds: number, decay: number): AudioBuffer {
+  const rate = context.sampleRate
+  const length = Math.max(1, Math.floor(rate * seconds))
+  const impulse = context.createBuffer(2, length, rate)
+  for (let channel = 0; channel < 2; channel++) {
+    const data = impulse.getChannelData(channel)
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay)
+    }
+  }
+  return impulse
 }
 
 export interface EqState {
@@ -53,11 +69,12 @@ function getAudioContext(): AudioContext {
 /**
  * One deck's real audio graph:
  *   source -> lowShelf -> mid(peaking) -> highShelf -> bassBoost(lowshelf) -> filter(HP/LP sweep) -> gain -> analyser -> deckOut
+ *                                                                                                        \-> [4 parallel effect sends] -> deckOut
  * `deckOut` is exposed so the crossfader (owned by the mixer, not the deck)
  * can patch each deck's output into the correct crossfade gain stage.
- * The filter and analyser are new nodes added alongside the existing,
- * verified-working EQ/bass/gain chain — that chain's own nodes and logic
- * are untouched.
+ * The filter, analyser, and effect sends are new nodes added alongside
+ * the existing, verified-working EQ/bass/gain chain — that chain's own
+ * nodes and logic are untouched.
  */
 export class DeckAudioEngine {
   readonly context: AudioContext
@@ -74,6 +91,25 @@ export class DeckAudioEngine {
   private readonly analyser: AnalyserNode
   private readonly analyserData: Uint8Array<ArrayBuffer>
   readonly output: GainNode
+
+  // --- Effects rack: real parallel sends, tapped after the main chain. ---
+  /** Effect reverb: convolver + wet gain, fed from a tap after gainNode. */
+  private readonly reverbConvolver: ConvolverNode
+  private readonly reverbWet: GainNode
+  /** Effect delay: real feedback delay line (DelayNode -> feedback gain -> back into itself). */
+  private readonly delayNode: DelayNode
+  private readonly delayFeedback: GainNode
+  private readonly delayWet: GainNode
+  /** Effect filter: a second, dedicated lowpass sweep (independent of the main HP/LP knob) for the hold-to-apply "filter down" effect. */
+  private readonly effectFilterNode: BiquadFilterNode
+  private readonly effectFilterWet: GainNode
+  /** Effect flanger: short modulated delay + LFO on delayTime, classic flanger topology. */
+  private readonly flangerDelay: DelayNode
+  private readonly flangerLfo: OscillatorNode
+  private readonly flangerLfoGain: GainNode
+  private readonly flangerFeedback: GainNode
+  private readonly flangerWet: GainNode
+  private readonly effectsTap: GainNode
 
   private startedAtContextTime = 0
   private startedAtOffset = 0
@@ -121,6 +157,62 @@ export class DeckAudioEngine {
     this.sweepFilter.connect(this.gainNode)
     this.gainNode.connect(this.analyser)
     this.analyser.connect(this.output)
+
+    // Effects tap — fed from the same post-EQ signal as the dry path, so
+    // effects apply to what's actually playing (post EQ/bass/filter),
+    // mixed back into `output` at a controllable wet gain.
+    this.effectsTap = this.context.createGain()
+    this.analyser.connect(this.effectsTap)
+
+    this.reverbConvolver = this.context.createConvolver()
+    this.reverbConvolver.buffer = buildReverbImpulse(this.context, 2.2, 2.5)
+    this.reverbWet = this.context.createGain()
+    this.reverbWet.gain.value = 0
+    this.effectsTap.connect(this.reverbConvolver)
+    this.reverbConvolver.connect(this.reverbWet)
+    this.reverbWet.connect(this.output)
+
+    this.delayNode = this.context.createDelay(1.5)
+    this.delayNode.delayTime.value = 0.3
+    this.delayFeedback = this.context.createGain()
+    this.delayFeedback.gain.value = 0.35
+    this.delayWet = this.context.createGain()
+    this.delayWet.gain.value = 0
+    this.effectsTap.connect(this.delayNode)
+    this.delayNode.connect(this.delayFeedback)
+    this.delayFeedback.connect(this.delayNode)
+    this.delayNode.connect(this.delayWet)
+    this.delayWet.connect(this.output)
+
+    this.effectFilterNode = this.context.createBiquadFilter()
+    this.effectFilterNode.type = 'lowpass'
+    this.effectFilterNode.frequency.value = 20000
+    this.effectFilterNode.Q.value = 4
+    this.effectFilterWet = this.context.createGain()
+    this.effectFilterWet.gain.value = 0
+    this.effectsTap.connect(this.effectFilterNode)
+    this.effectFilterNode.connect(this.effectFilterWet)
+    this.effectFilterWet.connect(this.output)
+
+    this.flangerDelay = this.context.createDelay(0.05)
+    this.flangerDelay.delayTime.value = 0.005
+    this.flangerLfo = this.context.createOscillator()
+    this.flangerLfo.type = 'sine'
+    this.flangerLfo.frequency.value = 0.3
+    this.flangerLfoGain = this.context.createGain()
+    this.flangerLfoGain.gain.value = 0.003
+    this.flangerFeedback = this.context.createGain()
+    this.flangerFeedback.gain.value = 0.4
+    this.flangerWet = this.context.createGain()
+    this.flangerWet.gain.value = 0
+    this.flangerLfo.connect(this.flangerLfoGain)
+    this.flangerLfoGain.connect(this.flangerDelay.delayTime)
+    this.flangerLfo.start()
+    this.effectsTap.connect(this.flangerDelay)
+    this.flangerDelay.connect(this.flangerFeedback)
+    this.flangerFeedback.connect(this.flangerDelay)
+    this.flangerDelay.connect(this.flangerWet)
+    this.flangerWet.connect(this.output)
   }
 
   async loadBuffer(bytes: Uint8Array): Promise<number> {
@@ -273,8 +365,68 @@ export class DeckAudioEngine {
     return peak
   }
 
+  private wetGainFor(kind: EffectKind): GainNode {
+    switch (kind) {
+      case 'reverb':
+        return this.reverbWet
+      case 'delay':
+        return this.delayWet
+      case 'filter':
+        return this.effectFilterWet
+      case 'flanger':
+        return this.flangerWet
+    }
+  }
+
+  /** Applies the 0-1 intensity to whatever DSP parameter each effect actually controls (not just wet mix). */
+  private applyEffectAmount(kind: EffectKind, amount: number) {
+    const clamped = Math.max(0, Math.min(1, amount))
+    if (kind === 'filter') {
+      // Higher intensity = more aggressive lowpass sweep (classic filter-down build/breakdown).
+      this.effectFilterNode.frequency.value = 12000 * Math.pow(0.01, clamped)
+    } else if (kind === 'delay') {
+      // Higher intensity = longer delay time + more feedback repeats.
+      this.delayNode.delayTime.value = 0.08 + clamped * 0.5
+      this.delayFeedback.gain.value = 0.15 + clamped * 0.55
+    } else if (kind === 'flanger') {
+      // Higher intensity = deeper sweep + faster LFO.
+      this.flangerLfoGain.gain.value = 0.001 + clamped * 0.006
+      this.flangerLfo.frequency.value = 0.15 + clamped * 1.2
+      this.flangerFeedback.gain.value = 0.2 + clamped * 0.5
+    }
+    // Reverb's "amount" is just wet mix, handled in engage()/release() via the target level.
+  }
+
+  /**
+   * GarageBand-style hold-to-apply: ramps the effect's wet gain up to a
+   * level derived from `amount` over ~15ms (fast enough to feel instant,
+   * slow enough to avoid a click), and applies the amount to whatever
+   * parameter that effect actually sweeps/modulates. Call again with a
+   * new amount while held to update intensity live (e.g. dragging a
+   * scroll/intensity control while the effect is engaged).
+   */
+  engageEffect(kind: EffectKind, amount: number) {
+    this.applyEffectAmount(kind, amount)
+    const wet = this.wetGainFor(kind)
+    const targetLevel = kind === 'reverb' ? 0.15 + amount * 0.55 : 0.7 + amount * 0.3
+    wet.gain.cancelScheduledValues(this.context.currentTime)
+    wet.gain.setTargetAtTime(targetLevel, this.context.currentTime, 0.008)
+  }
+
+  /** Releases a held effect — ramps wet gain back to 0, same smooth-ramp approach as engage. */
+  releaseEffect(kind: EffectKind) {
+    const wet = this.wetGainFor(kind)
+    wet.gain.cancelScheduledValues(this.context.currentTime)
+    wet.gain.setTargetAtTime(0, this.context.currentTime, 0.02)
+  }
+
   dispose() {
     this.stop()
+    try {
+      this.flangerLfo.stop()
+    } catch {
+      // already stopped — fine
+    }
     this.output.disconnect()
   }
 }
