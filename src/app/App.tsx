@@ -12,6 +12,7 @@ import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
 import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorView'
 import { StudyGeneratorView } from '@/features/school/study-generator/StudyGeneratorView'
 import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorView'
+import { MusicPlayerView } from '@/features/creativity/music-player/MusicPlayerView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -20,6 +21,10 @@ import { AccountView } from '@/features/account/AccountView'
 import { IntegrationsView } from '@/features/integrations-status/IntegrationsView'
 import { SystemHealthView } from '@/features/system-health/SystemHealthView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
+import { ClipboardManagerView } from '@/features/clipboard-manager/ClipboardManagerView'
+import { useClipboardShortcut } from '@/features/clipboard-manager/hooks/useClipboardShortcut'
+import { ScreenshotToolView } from '@/features/screenshot-tool/ScreenshotToolView'
+import { PdfToolView } from '@/features/pdf-tool/PdfToolView'
 import { ChevronRightIcon } from '@/shared/icons'
 import type { CategoryId } from './categories'
 
@@ -38,16 +43,51 @@ export type View =
   | { kind: 'integrations' }
   | { kind: 'system-health' }
   | { kind: 'notifications' }
+  | { kind: 'clipboard-manager' }
+  | { kind: 'screenshot-tool' }
+  | { kind: 'pdf-tool' }
   | { kind: 'dj-board' }
   | { kind: 'image-editor' }
   | { kind: 'study-generator' }
   | { kind: 'video-editor' }
+  | { kind: 'music-player' }
   | { kind: 'placeholder'; id: string; label: string }
+
+/** Maps a non-placeholder, non-category view to the sidebar row id it should highlight. */
+const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
+  calendar: 'calendar',
+  schedule: 'schedule',
+  'general-chat': 'general-chat',
+  sessions: 'task-queue',
+  'model-dashboard': 'model-dashboard',
+  account: 'account',
+  integrations: 'integrations',
+  'system-health': 'system-health',
+  notifications: 'notification',
+  'clipboard-manager': 'clipboard-manager',
+  'screenshot-tool': 'screenshot-tool',
+  'pdf-tool': 'pdf-tool',
+  'dj-board': 'creativity-dj-mixer',
+  'image-editor': 'creativity-image-editor',
+  'study-generator': 'school-study-generator',
+  'video-editor': 'creativity-video-editor',
+  'music-player': 'creativity-music-player',
+}
+
+function activeViewIdFor(view: View): string | null {
+  if (view.kind === 'placeholder') return view.id
+  return SIDEBAR_ID_BY_VIEW_KIND[view.kind] ?? null
+}
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null)
   const [view, setView] = useState<View>({ kind: 'general-chat' })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useClipboardShortcut(() => {
+    setActiveCategory(null)
+    setView({ kind: 'clipboard-manager' })
+  })
 
   function selectCategory(id: CategoryId) {
     setActiveCategory(id)
@@ -88,6 +128,18 @@ export default function App() {
       setView({ kind: 'notifications' })
       return
     }
+    if (id === 'clipboard-manager') {
+      setView({ kind: 'clipboard-manager' })
+      return
+    }
+    if (id === 'screenshot-tool') {
+      setView({ kind: 'screenshot-tool' })
+      return
+    }
+    if (id === 'pdf-tool') {
+      setView({ kind: 'pdf-tool' })
+      return
+    }
     if (id === 'creativity-dj-mixer') {
       setView({ kind: 'dj-board' })
       return
@@ -102,6 +154,10 @@ export default function App() {
     }
     if (id === 'creativity-video-editor') {
       setView({ kind: 'video-editor' })
+      return
+    }
+    if (id === 'creativity-music-player') {
+      setView({ kind: 'music-player' })
       return
     }
     setView({ kind: 'placeholder', id, label })
@@ -122,10 +178,14 @@ export default function App() {
     if (view.kind === 'integrations') return <IntegrationsView />
     if (view.kind === 'system-health') return <SystemHealthView />
     if (view.kind === 'notifications') return <NotificationsView />
+    if (view.kind === 'clipboard-manager') return <ClipboardManagerView />
+    if (view.kind === 'screenshot-tool') return <ScreenshotToolView />
+    if (view.kind === 'pdf-tool') return <PdfToolView />
     if (view.kind === 'dj-board') return <DjBoardView />
     if (view.kind === 'image-editor') return <ImageEditorView />
     if (view.kind === 'study-generator') return <StudyGeneratorView />
     if (view.kind === 'video-editor') return <VideoEditorView />
+    if (view.kind === 'music-player') return <MusicPlayerView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -157,37 +217,7 @@ export default function App() {
           <Sidebar
             activeCategory={activeCategory}
             onSelectCategory={selectCategory}
-            activeViewId={
-              view.kind === 'placeholder'
-                ? view.id
-                : view.kind === 'calendar'
-                  ? 'calendar'
-                  : view.kind === 'schedule'
-                    ? 'schedule'
-                    : view.kind === 'general-chat'
-                      ? 'general-chat'
-                      : view.kind === 'sessions'
-                        ? 'task-queue'
-                        : view.kind === 'model-dashboard'
-                          ? 'model-dashboard'
-                          : view.kind === 'account'
-                            ? 'account'
-                            : view.kind === 'integrations'
-                              ? 'integrations'
-                              : view.kind === 'system-health'
-                                ? 'system-health'
-                                : view.kind === 'notifications'
-                                  ? 'notification'
-                                  : view.kind === 'dj-board'
-                                    ? 'creativity-dj-mixer'
-                                    : view.kind === 'image-editor'
-                                      ? 'creativity-image-editor'
-                                      : view.kind === 'study-generator'
-                                        ? 'school-study-generator'
-                                        : view.kind === 'video-editor'
-                                          ? 'creativity-video-editor'
-                                          : null
-            }
+            activeViewId={activeViewIdFor(view)}
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}
             collapsed={sidebarCollapsed}

@@ -58,6 +58,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       { id: 'creativity-video-editor', label: 'Video Editor' },
       { id: 'creativity-image-editor', label: 'Image Editor' },
       { id: 'creativity-dj-mixer', label: 'DJ / Music Mixer' },
+      { id: 'creativity-music-player', label: 'Music Player' },
       { id: 'creativity-word-processor', label: 'Word Processor' },
       { id: 'creativity-asset-library', label: 'Asset Library' },
     ],
