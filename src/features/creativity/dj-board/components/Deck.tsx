@@ -141,16 +141,16 @@ export function Deck({
       }}
     >
       {/* Header: identity + track + BPM */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
             style={{ background: accent }}
           >
             {id}
           </span>
-          <div className="min-w-0">
-            <p className="text-text-primary max-w-44 truncate text-[12.5px] font-medium">
+          <div className="min-w-0 flex-1">
+            <p className="text-text-primary truncate text-[12.5px] font-medium">
               {state.isLoading ? 'Loading...' : (state.track?.fileName ?? 'Drop a track here')}
             </p>
             <p className="text-text-tertiary text-[10px] tabular-nums">
@@ -158,7 +158,7 @@ export function Deck({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <motion.button
             type="button"
             onClick={onSync}

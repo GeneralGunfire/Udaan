@@ -173,8 +173,8 @@ export function Sidebar({
                           backgroundColor: `var(${category.accentVar})`,
                         }}
                       />
-                      <span className="flex-1">{category.label}</span>
-                      <span className="text-text-tertiary text-[10px] font-normal">
+                      <span className="min-w-0 flex-1 truncate">{category.label}</span>
+                      <span className="text-text-tertiary shrink-0 truncate text-[10px] font-normal">
                         {category.descriptor}
                       </span>
                       <motion.span
@@ -218,14 +218,14 @@ export function Sidebar({
                                   stiffness: 500,
                                   damping: 32,
                                 }}
-                                className={`flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[12px] transition-colors duration-150 ${
+                                className={`flex w-full min-w-0 items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[12px] transition-colors duration-150 ${
                                   activeViewId === item.id
                                     ? 'bg-glass text-text-secondary'
                                     : 'text-text-tertiary hover:text-text-secondary hover:bg-glass'
                                 }`}
                               >
-                                <FolderIcon width={12} height={12} />
-                                {item.label}
+                                <FolderIcon width={12} height={12} className="shrink-0" />
+                                <span className="truncate">{item.label}</span>
                               </motion.button>
                             ))}
                           </div>
