@@ -1,6 +1,7 @@
 mod asset_library;
 mod audio_library;
 mod claude_code;
+mod client_tracker;
 mod clipboard_manager;
 mod local_model;
 mod screenshot_tool;
@@ -44,6 +45,14 @@ pub fn run() {
       screenshot_tool::screenshot_tool_copy_to_clipboard,
       template_library::template_library_list,
       template_library::template_library_register,
+      client_tracker::client_tracker_list_contacts,
+      client_tracker::client_tracker_upsert_contact,
+      client_tracker::client_tracker_delete_contact,
+      client_tracker::client_tracker_list_notes,
+      client_tracker::client_tracker_add_note,
+      client_tracker::client_tracker_list_follow_ups,
+      client_tracker::client_tracker_add_follow_up,
+      client_tracker::client_tracker_set_follow_up_done,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -60,6 +69,8 @@ pub fn run() {
       app.manage(clipboard_state);
       let template_library_state = template_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(template_library_state);
+      let client_tracker_state = client_tracker::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(client_tracker_state);
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);
