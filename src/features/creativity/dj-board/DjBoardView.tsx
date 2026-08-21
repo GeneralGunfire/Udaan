@@ -81,15 +81,17 @@ export function DjBoardView() {
   }
 
   return (
-    <div className="relative flex h-full w-full max-w-[1500px] flex-col gap-3 overflow-hidden py-2">
-      <button
-        type="button"
-        onClick={() => setShortcutsOpen(true)}
-        className="text-text-tertiary hover:text-text-secondary absolute top-0 right-0 z-10 flex shrink-0 items-center gap-1.5 text-[10.5px] transition-colors duration-100"
-      >
-        <KeyboardIcon width={12} height={12} />
-        Shortcuts (?)
-      </button>
+    <div className="flex h-full w-full max-w-[1500px] flex-col gap-3 overflow-hidden py-2">
+      <div className="flex shrink-0 justify-end">
+        <button
+          type="button"
+          onClick={() => setShortcutsOpen(true)}
+          className="text-text-tertiary hover:text-text-secondary flex items-center gap-1.5 text-[10.5px] transition-colors duration-100"
+        >
+          <KeyboardIcon width={12} height={12} />
+          Shortcuts (?)
+        </button>
+      </div>
 
       <div className="grid h-0 flex-1 grid-cols-[240px_1fr_190px_1fr] gap-3">
         <TrackLibrary
