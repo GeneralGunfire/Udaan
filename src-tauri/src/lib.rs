@@ -1,8 +1,11 @@
 mod asset_library;
 mod audio_library;
 mod claude_code;
+mod clipboard_manager;
 mod local_model;
+mod screenshot_tool;
 mod system_health;
+mod template_library;
 mod webview_permissions;
 
 use tauri::Manager;
@@ -12,6 +15,7 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,
@@ -26,6 +30,20 @@ pub fn run() {
       asset_library::asset_library_scan_folder,
       asset_library::asset_library_read_file,
       asset_library::asset_library_write_file,
+      clipboard_manager::clipboard_manager_list,
+      clipboard_manager::clipboard_manager_delete,
+      clipboard_manager::clipboard_manager_clear,
+      clipboard_manager::clipboard_manager_restore,
+      screenshot_tool::screenshot_tool_list_monitors,
+      screenshot_tool::screenshot_tool_list_windows,
+      screenshot_tool::screenshot_tool_capture_screen,
+      screenshot_tool::screenshot_tool_capture_window,
+      screenshot_tool::screenshot_tool_capture_region,
+      screenshot_tool::screenshot_tool_list_history,
+      screenshot_tool::screenshot_tool_read_file,
+      screenshot_tool::screenshot_tool_copy_to_clipboard,
+      template_library::template_library_list,
+      template_library::template_library_register,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -37,6 +55,11 @@ pub fn run() {
       }
       let state = claude_code::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(state);
+      app.manage(local_model::WhisperServer::new());
+      let clipboard_state = clipboard_manager::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(clipboard_state);
+      let template_library_state = template_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(template_library_state);
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);

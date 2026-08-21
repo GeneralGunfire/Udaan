@@ -13,6 +13,7 @@ import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorV
 import { StudyGeneratorView } from '@/features/school/study-generator/StudyGeneratorView'
 import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorView'
 import { MusicPlayerView } from '@/features/creativity/music-player/MusicPlayerView'
+import { ProposalGeneratorView } from '@/features/work/proposal-generator/ProposalGeneratorView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
@@ -51,6 +52,7 @@ export type View =
   | { kind: 'study-generator' }
   | { kind: 'video-editor' }
   | { kind: 'music-player' }
+  | { kind: 'proposal-generator' }
   | { kind: 'placeholder'; id: string; label: string }
 
 /** Maps a non-placeholder, non-category view to the sidebar row id it should highlight. */
@@ -72,6 +74,7 @@ const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
   'study-generator': 'school-study-generator',
   'video-editor': 'creativity-video-editor',
   'music-player': 'creativity-music-player',
+  'proposal-generator': 'work-proposal-generator',
 }
 
 function activeViewIdFor(view: View): string | null {
@@ -160,6 +163,10 @@ export default function App() {
       setView({ kind: 'music-player' })
       return
     }
+    if (id === 'work-proposal-generator') {
+      setView({ kind: 'proposal-generator' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -186,6 +193,7 @@ export default function App() {
     if (view.kind === 'study-generator') return <StudyGeneratorView />
     if (view.kind === 'video-editor') return <VideoEditorView />
     if (view.kind === 'music-player') return <MusicPlayerView />
+    if (view.kind === 'proposal-generator') return <ProposalGeneratorView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
