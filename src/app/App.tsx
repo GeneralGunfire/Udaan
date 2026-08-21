@@ -12,6 +12,7 @@ import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { SessionsView } from '@/features/sessions/SessionsView'
 import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
+import { AccountView } from '@/features/account/AccountView'
 import { ChevronRightIcon } from '@/shared/icons'
 import type { CategoryId } from './categories'
 
@@ -26,6 +27,7 @@ export type View =
   | { kind: 'schedule' }
   | { kind: 'sessions' }
   | { kind: 'model-dashboard' }
+  | { kind: 'account' }
   | { kind: 'placeholder'; id: string; label: string }
 
 export default function App() {
@@ -56,6 +58,10 @@ export default function App() {
       setView({ kind: 'model-dashboard' })
       return
     }
+    if (id === 'account') {
+      setView({ kind: 'account' })
+      return
+    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -70,6 +76,7 @@ export default function App() {
     if (view.kind === 'schedule') return <ScheduleView />
     if (view.kind === 'sessions') return <SessionsView />
     if (view.kind === 'model-dashboard') return <ModelDashboardView />
+    if (view.kind === 'account') return <AccountView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 
@@ -114,7 +121,9 @@ export default function App() {
                         ? 'task-queue'
                         : view.kind === 'model-dashboard'
                           ? 'model-dashboard'
-                          : null
+                          : view.kind === 'account'
+                            ? 'account'
+                            : null
             }
             onSelectPlaceholder={selectPlaceholder}
             onSelectGeneralChat={selectGeneralChat}
