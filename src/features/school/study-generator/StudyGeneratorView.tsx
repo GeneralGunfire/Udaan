@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStudyGenerator, type GeneratorBackend } from './hooks/useStudyGenerator'
 import type { DocumentType, GradeLevel } from './lib/promptBuilder'
+import { ReliabilityOutput } from './components/ReliabilityOutput'
 import { GaugeIcon, SparkleIcon } from '@/shared/icons'
 
 const DOCUMENT_TYPES: { id: DocumentType; label: string }[] = [
@@ -140,9 +141,7 @@ export function StudyGeneratorView() {
             {generator.generating && !generator.output ? (
               <p className="text-text-tertiary text-[11.5px]">Generating...</p>
             ) : generator.output ? (
-              <pre className="text-text-secondary font-sans text-[11.5px] leading-relaxed whitespace-pre-wrap">
-                {generator.output}
-              </pre>
+              <ReliabilityOutput text={generator.output} />
             ) : (
               <p className="text-text-tertiary text-[11.5px]">
                 Fill in a topic and source material, then generate. Every generation references the
