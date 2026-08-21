@@ -11,6 +11,7 @@ import { WallpaperPicker } from './WallpaperPicker'
 import { useGlobalSearch } from '@/features/global-search/hooks/useGlobalSearch'
 import { SearchResultsDropdown } from '@/features/global-search/components/SearchResultsDropdown'
 import type { SearchResult } from '@/features/global-search/lib/types'
+import { MiniPlayer } from '@/features/creativity/dj-board/components/MiniPlayer'
 
 /**
  * Lazily resolves the Tauri window handle. Only ever called from click
@@ -42,9 +43,11 @@ async function withAppWindow(
 interface TopBarProps {
   /** Called when the user picks a global search result — TopBar has no view/navigation state of its own. */
   onNavigateToSearchResult?: (result: SearchResult) => void
+  /** Opens the DJ Board view — used by the MiniPlayer so tapping it jumps back to the full board. */
+  onOpenDjBoard?: () => void
 }
 
-export function TopBar({ onNavigateToSearchResult }: TopBarProps) {
+export function TopBar({ onNavigateToSearchResult, onOpenDjBoard }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const { results, loading } = useGlobalSearch(searchOpen ? searchValue : '')
@@ -141,6 +144,8 @@ export function TopBar({ onNavigateToSearchResult }: TopBarProps) {
           )}
         </AnimatePresence>
       </div>
+
+      {onOpenDjBoard && <MiniPlayer onOpenDjBoard={onOpenDjBoard} />}
 
       {/* Utility pill — wallpaper picker */}
       <div
