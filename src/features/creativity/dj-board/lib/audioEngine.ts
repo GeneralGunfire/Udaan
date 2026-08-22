@@ -12,7 +12,7 @@
  * depth, reverb wet mix.
  */
 
-export type EffectKind = 'reverb' | 'delay' | 'filter' | 'flanger'
+export type EffectKind = 'reverb' | 'delay' | 'filter' | 'flanger' | 'bitcrush' | 'phaser'
 
 export interface EffectState {
   /** True only while the control is actively held down. */
@@ -29,6 +29,8 @@ export function defaultEffectsRack(): EffectsRackState {
     delay: { engaged: false, amount: 0.4 },
     filter: { engaged: false, amount: 0.6 },
     flanger: { engaged: false, amount: 0.5 },
+    bitcrush: { engaged: false, amount: 0.5 },
+    phaser: { engaged: false, amount: 0.5 },
   }
 }
 
@@ -44,6 +46,18 @@ function buildReverbImpulse(context: BaseAudioContext, seconds: number, decay: n
     }
   }
   return impulse
+}
+
+/** Builds a stepped transfer curve for WaveShaper — real bit-depth quantization, not a filter pretending to crunch. Higher amount = fewer steps = harsher crush. */
+function buildBitcrushCurve(amount: number): Float32Array<ArrayBuffer> {
+  const steps = Math.max(2, Math.round(32 * Math.pow(1 - amount, 2)) + 2)
+  const curveLength = 1024
+  const curve = new Float32Array(new ArrayBuffer(curveLength * 4))
+  for (let i = 0; i < curveLength; i++) {
+    const x = (i / (curveLength - 1)) * 2 - 1
+    curve[i] = Math.round(x * steps) / steps
+  }
+  return curve
 }
 
 export interface EqState {
@@ -109,7 +123,28 @@ export class DeckAudioEngine {
   private readonly flangerLfoGain: GainNode
   private readonly flangerFeedback: GainNode
   private readonly flangerWet: GainNode
+  /** Effect bitcrush: WaveShaper doing real sample/bit quantization (lo-fi crunch), plus a lowpass to tame aliasing harshness. */
+  private readonly bitcrushShaper: WaveShaperNode
+  private readonly bitcrushTone: BiquadFilterNode
+  private readonly bitcrushWet: GainNode
+  /** Effect phaser: 4 cascaded allpass filters swept by a shared LFO, classic phaser topology (not a flanger's short delay line). */
+  private readonly phaserStages: BiquadFilterNode[]
+  private readonly phaserLfo: OscillatorNode
+  private readonly phaserLfoGain: GainNode
+  private readonly phaserFeedback: GainNode
+  private readonly phaserWet: GainNode
   private readonly effectsTap: GainNode
+
+  /** Muffle: a real toggleable lowpass in the dry signal path (phone-in-pocket effect), click on/off. */
+  private readonly muffleFilter: BiquadFilterNode
+  private muffled = false
+  /** Bass Kill: instant low-band mute toggle, separate from the Bass knob so it's a hard on/off, not a sweep. */
+  private readonly bassKillNode: BiquadFilterNode
+  private bassKilled = false
+  /** Echo Out: one-shot fading repeat, fired on click — its own delay line, not tied to the hold-to-apply rack. */
+  private readonly echoOutDelay: DelayNode
+  private readonly echoOutFeedback: GainNode
+  private readonly echoOutWet: GainNode
 
   private startedAtContextTime = 0
   private startedAtOffset = 0
@@ -143,6 +178,18 @@ export class DeckAudioEngine {
     this.sweepFilter.frequency.value = 20000
     this.sweepFilter.Q.value = 0.7
 
+    /** Muffle toggle — real lowpass, off (20000Hz/open) by default, ramps to ~500Hz when engaged. */
+    this.muffleFilter = this.context.createBiquadFilter()
+    this.muffleFilter.type = 'lowpass'
+    this.muffleFilter.frequency.value = 20000
+    this.muffleFilter.Q.value = 0.9
+
+    /** Bass Kill toggle — a second, independent lowshelf so it's a hard on/off, not a value shared with the Bass knob. */
+    this.bassKillNode = this.context.createBiquadFilter()
+    this.bassKillNode.type = 'lowshelf'
+    this.bassKillNode.frequency.value = 150
+    this.bassKillNode.gain.value = 0
+
     this.gainNode = this.context.createGain()
     this.analyser = this.context.createAnalyser()
     this.analyser.fftSize = 256
@@ -154,7 +201,9 @@ export class DeckAudioEngine {
     this.midPeak.connect(this.highShelf)
     this.highShelf.connect(this.bassBoost)
     this.bassBoost.connect(this.sweepFilter)
-    this.sweepFilter.connect(this.gainNode)
+    this.sweepFilter.connect(this.muffleFilter)
+    this.muffleFilter.connect(this.bassKillNode)
+    this.bassKillNode.connect(this.gainNode)
     this.gainNode.connect(this.analyser)
     this.analyser.connect(this.output)
 
@@ -213,6 +262,60 @@ export class DeckAudioEngine {
     this.flangerFeedback.connect(this.flangerDelay)
     this.flangerDelay.connect(this.flangerWet)
     this.flangerWet.connect(this.output)
+
+    this.bitcrushShaper = this.context.createWaveShaper()
+    this.bitcrushShaper.curve = buildBitcrushCurve(0.5)
+    this.bitcrushTone = this.context.createBiquadFilter()
+    this.bitcrushTone.type = 'lowpass'
+    this.bitcrushTone.frequency.value = 8000
+    this.bitcrushWet = this.context.createGain()
+    this.bitcrushWet.gain.value = 0
+    this.effectsTap.connect(this.bitcrushShaper)
+    this.bitcrushShaper.connect(this.bitcrushTone)
+    this.bitcrushTone.connect(this.bitcrushWet)
+    this.bitcrushWet.connect(this.output)
+
+    this.phaserStages = Array.from({ length: 4 }, () => {
+      const stage = this.context.createBiquadFilter()
+      stage.type = 'allpass'
+      stage.frequency.value = 800
+      stage.Q.value = 3
+      return stage
+    })
+    this.phaserLfo = this.context.createOscillator()
+    this.phaserLfo.type = 'sine'
+    this.phaserLfo.frequency.value = 0.25
+    this.phaserLfoGain = this.context.createGain()
+    this.phaserLfoGain.gain.value = 600
+    this.phaserFeedback = this.context.createGain()
+    this.phaserFeedback.gain.value = 0.35
+    this.phaserWet = this.context.createGain()
+    this.phaserWet.gain.value = 0
+    this.phaserLfo.connect(this.phaserLfoGain)
+    this.phaserLfo.start()
+    let phaserChain: AudioNode = this.effectsTap
+    for (const stage of this.phaserStages) {
+      this.phaserLfoGain.connect(stage.frequency)
+      phaserChain.connect(stage)
+      phaserChain = stage
+    }
+    phaserChain.connect(this.phaserFeedback)
+    this.phaserFeedback.connect(this.phaserStages[0])
+    phaserChain.connect(this.phaserWet)
+    this.phaserWet.connect(this.output)
+
+    /** Echo Out: one-shot fading repeat, fired on click (see triggerEchoOut) — a normal feedback delay line at rest with the wet gain at 0. */
+    this.echoOutDelay = this.context.createDelay(1)
+    this.echoOutDelay.delayTime.value = 0.18
+    this.echoOutFeedback = this.context.createGain()
+    this.echoOutFeedback.gain.value = 0.55
+    this.echoOutWet = this.context.createGain()
+    this.echoOutWet.gain.value = 0
+    this.effectsTap.connect(this.echoOutDelay)
+    this.echoOutDelay.connect(this.echoOutFeedback)
+    this.echoOutFeedback.connect(this.echoOutDelay)
+    this.echoOutDelay.connect(this.echoOutWet)
+    this.echoOutWet.connect(this.output)
   }
 
   async loadBuffer(bytes: Uint8Array): Promise<number> {
@@ -303,6 +406,56 @@ export class DeckAudioEngine {
     this.bassBoost.gain.value = db
   }
 
+  /**
+   * Muffle — real click-to-toggle lowpass (phone-in-pocket effect), in
+   * the dry signal path (not a rack send), so it colors the actual
+   * output rather than mixing a wet copy alongside the clean signal.
+   * Smooth ramp both ways so toggling mid-beat doesn't click.
+   */
+  toggleMuffle(): boolean {
+    this.muffled = !this.muffled
+    const target = this.muffled ? 450 : 20000
+    this.muffleFilter.frequency.cancelScheduledValues(this.context.currentTime)
+    this.muffleFilter.frequency.setTargetAtTime(target, this.context.currentTime, 0.03)
+    return this.muffled
+  }
+
+  isMuffled(): boolean {
+    return this.muffled
+  }
+
+  /**
+   * Bass Kill — instant click-to-toggle low-band mute, a real DJ staple
+   * for drops/breakdowns. Separate node from the Bass knob so kill state
+   * and boost/cut value don't fight each other — kill always wins while
+   * active, and un-killing restores whatever the Bass knob was set to.
+   */
+  toggleBassKill(): boolean {
+    this.bassKilled = !this.bassKilled
+    const target = this.bassKilled ? -40 : 0
+    this.bassKillNode.gain.cancelScheduledValues(this.context.currentTime)
+    this.bassKillNode.gain.setTargetAtTime(target, this.context.currentTime, 0.01)
+    return this.bassKilled
+  }
+
+  isBassKilled(): boolean {
+    return this.bassKilled
+  }
+
+  /**
+   * Echo Out — one-shot fading repeat effect, fired on click (not held).
+   * Real feedback delay: wet gain jumps in, the source keeps playing
+   * normally into it, and the feedback loop naturally decays to silence
+   * over ~2.5s as gain.setTargetAtTime approaches 0 — no timer/interval
+   * needed, the decay is the actual audio feedback amplitude falling off.
+   */
+  triggerEchoOut() {
+    const now = this.context.currentTime
+    this.echoOutWet.gain.cancelScheduledValues(now)
+    this.echoOutWet.gain.setValueAtTime(0.6, now)
+    this.echoOutWet.gain.setTargetAtTime(0, now + 0.05, 0.5)
+  }
+
   setVolume(v: number) {
     this.gainNode.gain.value = Math.max(0, Math.min(1, v))
   }
@@ -375,6 +528,10 @@ export class DeckAudioEngine {
         return this.effectFilterWet
       case 'flanger':
         return this.flangerWet
+      case 'bitcrush':
+        return this.bitcrushWet
+      case 'phaser':
+        return this.phaserWet
     }
   }
 
@@ -393,6 +550,15 @@ export class DeckAudioEngine {
       this.flangerLfoGain.gain.value = 0.001 + clamped * 0.006
       this.flangerLfo.frequency.value = 0.15 + clamped * 1.2
       this.flangerFeedback.gain.value = 0.2 + clamped * 0.5
+    } else if (kind === 'bitcrush') {
+      // Higher intensity = fewer quantization steps (harsher crush) + darker tone to mask aliasing.
+      this.bitcrushShaper.curve = buildBitcrushCurve(clamped)
+      this.bitcrushTone.frequency.value = 9000 * Math.pow(0.05, clamped)
+    } else if (kind === 'phaser') {
+      // Higher intensity = wider sweep + faster LFO + more resonant feedback.
+      this.phaserLfoGain.gain.value = 300 + clamped * 1500
+      this.phaserLfo.frequency.value = 0.1 + clamped * 1.5
+      this.phaserFeedback.gain.value = 0.15 + clamped * 0.55
     }
     // Reverb's "amount" is just wet mix, handled in engage()/release() via the target level.
   }
@@ -424,6 +590,11 @@ export class DeckAudioEngine {
     this.stop()
     try {
       this.flangerLfo.stop()
+    } catch {
+      // already stopped — fine
+    }
+    try {
+      this.phaserLfo.stop()
     } catch {
       // already stopped — fine
     }

@@ -245,6 +245,30 @@ export function setFilter(deck: DeckId, value: number) {
   persistSession()
 }
 
+/** Real click-to-toggle lowpass (phone-in-pocket effect), separate from the hold-to-apply rack Filter. */
+export function toggleMuffle(deck: DeckId) {
+  ensureStarted()
+  const engine = deckEngines[deck]
+  if (!engine) return
+  const muffled = engine.toggleMuffle()
+  setDeck(deck, (prev) => ({ ...prev, muffled }))
+}
+
+/** Real click-to-toggle instant low-band mute — independent of the Bass knob's own value. */
+export function toggleBassKill(deck: DeckId) {
+  ensureStarted()
+  const engine = deckEngines[deck]
+  if (!engine) return
+  const bassKilled = engine.toggleBassKill()
+  setDeck(deck, (prev) => ({ ...prev, bassKilled }))
+}
+
+/** Real one-shot fading-repeat effect, fired on click — no persistent state to track, the decay is audio feedback settling to silence. */
+export function triggerEchoOut(deck: DeckId) {
+  ensureStarted()
+  deckEngines[deck]?.triggerEchoOut()
+}
+
 export function setTempoPercent(deck: DeckId, percent: number) {
   ensureStarted()
   const clamped = Math.max(-8, Math.min(8, percent))

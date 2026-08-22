@@ -126,6 +126,9 @@ export function DjBoardView() {
           onClearHotCue={(slot) => board.clearHotCue('A', slot)}
           onSetLoopBeats={(beats) => board.setLoopBeats('A', beats)}
           onToggleLoop={() => board.toggleLoop('A', board.deckA)}
+          onToggleMuffle={() => board.toggleMuffle('A')}
+          onToggleBassKill={() => board.toggleBassKill('A')}
+          onTriggerEchoOut={() => board.triggerEchoOut('A')}
         />
 
         <div className="flex flex-col gap-3">
@@ -168,6 +171,9 @@ export function DjBoardView() {
           onClearHotCue={(slot) => board.clearHotCue('B', slot)}
           onSetLoopBeats={(beats) => board.setLoopBeats('B', beats)}
           onToggleLoop={() => board.toggleLoop('B', board.deckB)}
+          onToggleMuffle={() => board.toggleMuffle('B')}
+          onToggleBassKill={() => board.toggleBassKill('B')}
+          onTriggerEchoOut={() => board.triggerEchoOut('B')}
         />
       </div>
 

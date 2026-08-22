@@ -8,7 +8,7 @@ import { Fader } from './Fader'
 import { PeakMeter } from './PeakMeter'
 import { HotCues } from './HotCues'
 import { LoopControls } from './LoopControls'
-import { PlayIcon, PauseIcon, DiscIcon, PlusIcon, SyncIcon } from '@/shared/icons'
+import { PlayIcon, PauseIcon, DiscIcon, PlusIcon, SyncIcon, MuffleIcon, BassKillIcon, EchoOutIcon } from '@/shared/icons'
 
 interface DeckProps {
   id: DeckId
@@ -32,6 +32,9 @@ interface DeckProps {
   onClearHotCue: (slot: number) => void
   onSetLoopBeats: (beats: 4 | 8 | 16) => void
   onToggleLoop: () => void
+  onToggleMuffle: () => void
+  onToggleBassKill: () => void
+  onTriggerEchoOut: () => void
 }
 
 /** Static/simplified waveform placeholder — real waveform peak analysis is future work. */
@@ -94,6 +97,9 @@ export function Deck({
   onClearHotCue,
   onSetLoopBeats,
   onToggleLoop,
+  onToggleMuffle,
+  onToggleBassKill,
+  onTriggerEchoOut,
 }: DeckProps) {
   const [dragOver, setDragOver] = useState(false)
   const [tapTimes, setTapTimes] = useState<number[]>([])
@@ -279,6 +285,55 @@ export function Deck({
         />
 
         <LoopControls loop={state.loop} accent={accent} onSetBeats={onSetLoopBeats} onToggle={onToggleLoop} />
+      </div>
+
+      {/* Deck effects — real click-to-toggle Muffle/Bass Kill, real one-shot Echo Out. Distinct from the hold-to-apply rack below. */}
+      <div className="flex items-center gap-1.5">
+        <motion.button
+          type="button"
+          onClick={onToggleMuffle}
+          disabled={!state.track}
+          aria-pressed={state.muffled}
+          title="Muffle — click to toggle a real lowpass over the track"
+          whileHover={state.track ? { scale: 1.04 } : undefined}
+          whileTap={state.track ? { scale: 0.96 } : undefined}
+          animate={{ background: state.muffled ? accent : 'var(--color-glass-bg-hover)' }}
+          transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[10px] font-semibold disabled:opacity-40"
+          style={{ color: state.muffled ? '#fff' : 'var(--color-text-secondary)' }}
+        >
+          <MuffleIcon width={12} height={12} />
+          Muffle
+        </motion.button>
+        <motion.button
+          type="button"
+          onClick={onToggleBassKill}
+          disabled={!state.track}
+          aria-pressed={state.bassKilled}
+          title="Bass Kill — click to instantly mute the low band"
+          whileHover={state.track ? { scale: 1.04 } : undefined}
+          whileTap={state.track ? { scale: 0.96 } : undefined}
+          animate={{ background: state.bassKilled ? 'var(--color-danger)' : 'var(--color-glass-bg-hover)' }}
+          transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[10px] font-semibold disabled:opacity-40"
+          style={{ color: state.bassKilled ? '#fff' : 'var(--color-text-secondary)' }}
+        >
+          <BassKillIcon width={12} height={12} />
+          Bass Kill
+        </motion.button>
+        <motion.button
+          type="button"
+          onClick={onTriggerEchoOut}
+          disabled={!state.track}
+          title="Echo Out — one-shot fading repeat"
+          whileHover={state.track ? { scale: 1.04 } : undefined}
+          whileTap={state.track ? { scale: 0.9 } : undefined}
+          transition={{ type: 'spring', stiffness: 500, damping: 26 }}
+          className="bg-glass-bg-hover text-text-secondary flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[10px] font-semibold disabled:opacity-40"
+        >
+          <EchoOutIcon width={12} height={12} />
+          Echo Out
+        </motion.button>
       </div>
 
       {/* 3. Mixer cluster — EQ / bass / filter / tempo / volume. Smaller, subordinate, own header + divider. */}

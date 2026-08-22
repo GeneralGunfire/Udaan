@@ -517,3 +517,86 @@ export function KeyboardIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function MuffleIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8v4h3l4 3.5V4.5L7 8H4z" />
+      <path d="M13 7.5a4 4 0 0 1 0 5" opacity="0.4" />
+      <path d="M2.5 2.5l15 15" />
+    </svg>
+  )
+}
+
+export function BassKillIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 13.5c1.5 0 1.5-6 3-6s1.5 9 3 9 1.5-13 3-13 1.5 10 3 10 1.5-4 3-4" />
+      <path d="M2.5 2.5l15 15" strokeWidth="2" />
+    </svg>
+  )
+}
+
+export function EchoOutIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="6" cy="10" r="2.2" />
+      <path d="M11 6.5a5 5 0 0 1 0 7" opacity="0.6" />
+      <path d="M14.5 4a8.5 8.5 0 0 1 0 12" opacity="0.3" />
+    </svg>
+  )
+}
+
+export function ReverbIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="2" />
+      <circle cx="10" cy="10" r="5" opacity="0.5" />
+      <circle cx="10" cy="10" r="8" opacity="0.25" />
+    </svg>
+  )
+}
+
+export function DelayIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 10a7 7 0 1 1 2.5 5.4" />
+      <path d="M3 14v-3.5h3.5" />
+    </svg>
+  )
+}
+
+export function FilterSweepIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 15V9a3.5 3.5 0 0 1 7 0v2a3.5 3.5 0 0 0 7 0V5" />
+    </svg>
+  )
+}
+
+export function FlangerIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 10c1-3 2-3 3-3s2 6 3 6 2-6 3-6 2 3 3 3" />
+      <path d="M2.5 10c1 3 2 3 3 3s2-6 3-6 2 6 3 6 2-3 3-3" opacity="0.35" />
+    </svg>
+  )
+}
+
+export function BitcrushIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 13h2.5v-3H8v-3h2.5V4H13v6h2.5v3h-2.5" />
+      <path d="M2.5 13v2.5" />
+    </svg>
+  )
+}
+
+export function PhaserIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 10c1.5-3.5 3-3.5 4.5 0s3 3.5 4.5 0 3-3.5 4.5 0" />
+      <path d="M2.5 10c1.5 3.5 3 3.5 4.5 0s3-3.5 4.5 0 3 3.5 4.5 0" opacity="0.35" />
+    </svg>
+  )
+}

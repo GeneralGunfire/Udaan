@@ -41,6 +41,10 @@ export interface DeckState {
   bass: number
   /** -1 (full lowpass sweep) .. 0 (open) .. 1 (full highpass sweep). */
   filter: number
+  /** Real click-to-toggle lowpass (phone-in-pocket effect) — distinct from the hold-to-apply rack Filter. */
+  muffled: boolean
+  /** Real click-to-toggle instant low-band mute, independent of the Bass knob's boost/cut value. */
+  bassKilled: boolean
 }
 
 export function defaultDeckState(): DeckState {
@@ -59,5 +63,7 @@ export function defaultDeckState(): DeckState {
     eq: { low: 0, mid: 0, high: 0 },
     bass: 0,
     filter: 0,
+    muffled: false,
+    bassKilled: false,
   }
 }
