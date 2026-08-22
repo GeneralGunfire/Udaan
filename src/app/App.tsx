@@ -15,7 +15,6 @@ import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorV
 import { MusicPlayerView } from '@/features/creativity/music-player/MusicPlayerView'
 import { ProposalGeneratorView } from '@/features/work/proposal-generator/ProposalGeneratorView'
 import { ClientTrackerView } from '@/features/work/client-tracker/ClientTrackerView'
-import { AutomationsView } from '@/features/automations/AutomationsView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
 import { ManageEventsView } from '@/features/schedule/ManageEventsView'
@@ -25,13 +24,9 @@ import {
 } from '@/integrations/schedule/scheduleStore'
 import { SessionsView } from '@/features/sessions/SessionsView'
 import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
-import { AccountView } from '@/features/account/AccountView'
 import { IntegrationsView } from '@/features/integrations-status/IntegrationsView'
 import { SystemHealthView } from '@/features/system-health/SystemHealthView'
 import { NotificationsView } from '@/features/notifications/NotificationsView'
-import { ClipboardManagerView } from '@/features/clipboard-manager/ClipboardManagerView'
-import { useClipboardShortcut } from '@/features/clipboard-manager/hooks/useClipboardShortcut'
-import { ScreenshotToolView } from '@/features/screenshot-tool/ScreenshotToolView'
 import { PdfToolView } from '@/features/pdf-tool/PdfToolView'
 import type { SearchResult } from '@/features/global-search/lib/types'
 import { ChevronRightIcon, PlusIcon } from '@/shared/icons'
@@ -50,12 +45,9 @@ export type View =
   | { kind: 'manage-events' }
   | { kind: 'sessions' }
   | { kind: 'model-dashboard' }
-  | { kind: 'account' }
   | { kind: 'integrations' }
   | { kind: 'system-health' }
   | { kind: 'notifications' }
-  | { kind: 'clipboard-manager' }
-  | { kind: 'screenshot-tool' }
   | { kind: 'pdf-tool' }
   | { kind: 'dj-board' }
   | { kind: 'image-editor' }
@@ -64,7 +56,6 @@ export type View =
   | { kind: 'music-player' }
   | { kind: 'proposal-generator' }
   | { kind: 'client-tracker' }
-  | { kind: 'automations' }
   | { kind: 'placeholder'; id: string; label: string }
 
 /** Maps a non-placeholder, non-category view to the sidebar row id it should highlight. */
@@ -74,12 +65,9 @@ const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
   'general-chat': 'general-chat',
   sessions: 'task-queue',
   'model-dashboard': 'model-dashboard',
-  account: 'account',
   integrations: 'integrations',
   'system-health': 'system-health',
   notifications: 'notification',
-  'clipboard-manager': 'clipboard-manager',
-  'screenshot-tool': 'screenshot-tool',
   'pdf-tool': 'pdf-tool',
   'dj-board': 'creativity-dj-mixer',
   'image-editor': 'creativity-image-editor',
@@ -88,7 +76,6 @@ const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
   'music-player': 'creativity-music-player',
   'proposal-generator': 'work-proposal-generator',
   'client-tracker': 'work-client-tracker',
-  automations: 'automations',
 }
 
 function activeViewIdFor(view: View): string | null {
@@ -111,11 +98,6 @@ export default function App() {
     hydrateScheduleCache()
     return onScheduleChange(() => setScheduleVersion((v) => v + 1))
   }, [])
-
-  useClipboardShortcut(() => {
-    setActiveCategory(null)
-    setView({ kind: 'clipboard-manager' })
-  })
 
   function selectCategory(id: CategoryId) {
     setActiveCategory(id)
@@ -140,10 +122,6 @@ export default function App() {
       setView({ kind: 'model-dashboard' })
       return
     }
-    if (id === 'account') {
-      setView({ kind: 'account' })
-      return
-    }
     if (id === 'integrations') {
       setView({ kind: 'integrations' })
       return
@@ -154,14 +132,6 @@ export default function App() {
     }
     if (id === 'notification') {
       setView({ kind: 'notifications' })
-      return
-    }
-    if (id === 'clipboard-manager') {
-      setView({ kind: 'clipboard-manager' })
-      return
-    }
-    if (id === 'screenshot-tool') {
-      setView({ kind: 'screenshot-tool' })
       return
     }
     if (id === 'pdf-tool') {
@@ -196,10 +166,6 @@ export default function App() {
       setView({ kind: 'client-tracker' })
       return
     }
-    if (id === 'automations') {
-      setView({ kind: 'automations' })
-      return
-    }
     setView({ kind: 'placeholder', id, label })
   }
 
@@ -222,12 +188,6 @@ export default function App() {
         setView({ kind: 'category', id: 'school' })
         setActiveCategory('school')
         return
-      case 'clipboard':
-        setView({ kind: 'clipboard-manager' })
-        return
-      case 'screenshot':
-        setView({ kind: 'screenshot-tool' })
-        return
     }
   }
 
@@ -246,12 +206,9 @@ export default function App() {
       return <ManageEventsView key={scheduleVersion} />
     if (view.kind === 'sessions') return <SessionsView />
     if (view.kind === 'model-dashboard') return <ModelDashboardView />
-    if (view.kind === 'account') return <AccountView />
     if (view.kind === 'integrations') return <IntegrationsView />
     if (view.kind === 'system-health') return <SystemHealthView />
     if (view.kind === 'notifications') return <NotificationsView />
-    if (view.kind === 'clipboard-manager') return <ClipboardManagerView />
-    if (view.kind === 'screenshot-tool') return <ScreenshotToolView />
     if (view.kind === 'pdf-tool') return <PdfToolView />
     if (view.kind === 'dj-board') return <DjBoardView />
     if (view.kind === 'image-editor') return <ImageEditorView />
@@ -260,7 +217,6 @@ export default function App() {
     if (view.kind === 'music-player') return <MusicPlayerView />
     if (view.kind === 'proposal-generator') return <ProposalGeneratorView />
     if (view.kind === 'client-tracker') return <ClientTrackerView />
-    if (view.kind === 'automations') return <AutomationsView />
     if (view.kind === 'placeholder')
       return <PlaceholderView label={view.label} />
 

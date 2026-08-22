@@ -1,12 +1,10 @@
 import type { SearchResult, SearchResultKind } from '../lib/types'
-import { TaskIcon, BellIcon, FileTextIcon, ClipboardIcon, CameraIcon } from '@/shared/icons'
+import { TaskIcon, BellIcon, FileTextIcon } from '@/shared/icons'
 
 const ICON_BY_KIND: Record<SearchResultKind, React.ComponentType<{ width?: number; height?: number; className?: string }>> = {
   task: TaskIcon,
   notification: BellIcon,
   document: FileTextIcon,
-  clipboard: ClipboardIcon,
-  screenshot: CameraIcon,
 }
 
 interface SearchResultsDropdownProps {

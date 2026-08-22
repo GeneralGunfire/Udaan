@@ -2,13 +2,11 @@ mod asset_library;
 mod audio_library;
 mod claude_code;
 mod client_tracker;
-mod clipboard_manager;
 mod folder_watcher;
 mod general_chat;
 mod local_model;
 mod pdf_tool;
 mod schedule;
-mod screenshot_tool;
 mod system_health;
 mod template_library;
 mod webview_permissions;
@@ -20,7 +18,6 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .invoke_handler(tauri::generate_handler![
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,
@@ -43,18 +40,6 @@ pub fn run() {
       asset_library::asset_library_read_file,
       asset_library::asset_library_write_file,
       asset_library::asset_library_stat_files,
-      clipboard_manager::clipboard_manager_list,
-      clipboard_manager::clipboard_manager_delete,
-      clipboard_manager::clipboard_manager_clear,
-      clipboard_manager::clipboard_manager_restore,
-      screenshot_tool::screenshot_tool_list_monitors,
-      screenshot_tool::screenshot_tool_list_windows,
-      screenshot_tool::screenshot_tool_capture_screen,
-      screenshot_tool::screenshot_tool_capture_window,
-      screenshot_tool::screenshot_tool_capture_region,
-      screenshot_tool::screenshot_tool_list_history,
-      screenshot_tool::screenshot_tool_read_file,
-      screenshot_tool::screenshot_tool_copy_to_clipboard,
       template_library::template_library_list,
       template_library::template_library_register,
       client_tracker::client_tracker_list_contacts,
@@ -90,8 +75,6 @@ pub fn run() {
       app.manage(local_model::WhisperServer::new());
       let general_chat_state = general_chat::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(general_chat_state);
-      let clipboard_state = clipboard_manager::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(clipboard_state);
       let template_library_state = template_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(template_library_state);
       let client_tracker_state = client_tracker::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;

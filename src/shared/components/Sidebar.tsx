@@ -9,13 +9,10 @@ import {
   QueueIcon,
   ChatBubbleIcon,
   BellIcon,
-  UserCircleIcon,
   PlugIcon,
   PulseIcon,
   ChevronRightIcon,
   FolderIcon,
-  ClipboardIcon,
-  CameraIcon,
   FileTextIcon,
 } from '@/shared/icons'
 
@@ -45,11 +42,7 @@ const WORKSPACE_ITEMS = [
     icon: QueueIcon,
     badge: PLACEHOLDER_BADGES.taskQueue,
   },
-  { id: 'clipboard-manager', label: 'Clipboard', icon: ClipboardIcon, badge: null },
-  { id: 'screenshot-tool', label: 'Screenshots', icon: CameraIcon, badge: null },
   { id: 'pdf-tool', label: 'PDF Tool', icon: FileTextIcon, badge: null },
-  { id: 'automations', label: 'Automations', icon: GaugeIcon, badge: null },
-  { id: 'account', label: 'Account', icon: UserCircleIcon, badge: null },
   { id: 'integrations', label: 'Integrations', icon: PlugIcon, badge: null },
   {
     id: 'system-health',

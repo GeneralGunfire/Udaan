@@ -1,8 +1,6 @@
 import { listTasks } from '@/integrations/claude-code'
 import { getNotifications } from '@/features/notifications/lib/notificationStore'
 import { listTemplates } from '@/integrations/template-library'
-import { listClipboardHistory } from '@/integrations/clipboard-manager'
-import { listScreenshotHistory } from '@/integrations/screenshot-tool'
 import { fuzzyScore } from './fuzzyMatch'
 import type { SearchResult } from './types'
 
@@ -11,15 +9,12 @@ import type { SearchResult } from './types'
  * data volumes for a personal single-user app — no need to maintain a live index). Sources:
  * Claude Code task history, the notification log, registered document templates (the closest
  * thing to "documents" that actually persists today — Study Generator and a Word Processor
- * were named as examples in the brief, but neither persists output yet, see NOTES.md), plus
- * this session's own Clipboard and Screenshot history.
+ * were named as examples in the brief, but neither persists output yet, see NOTES.md).
  */
 async function buildCorpus(): Promise<SearchResult[]> {
-  const [tasks, templates, clipboard, screenshots] = await Promise.all([
+  const [tasks, templates] = await Promise.all([
     listTasks().catch(() => []),
     listTemplates().catch(() => []),
-    listClipboardHistory().catch(() => []),
-    listScreenshotHistory().catch(() => []),
   ])
   const notifications = getNotifications()
 
@@ -55,29 +50,6 @@ async function buildCorpus(): Promise<SearchResult[]> {
       subtitle: `Template · ${t.owner}/${t.category}`,
       createdAt: t.createdAt,
       navTarget: { kind: 'document', id: t.id },
-    })
-  }
-
-  for (const c of clipboard) {
-    if (c.kind !== 'text') continue // image previews aren't meaningfully text-searchable
-    results.push({
-      id: `clipboard-${c.id}`,
-      kind: 'clipboard',
-      title: c.preview,
-      subtitle: 'Clipboard history',
-      createdAt: c.createdAt,
-      navTarget: { kind: 'clipboard', id: c.id },
-    })
-  }
-
-  for (const s of screenshots) {
-    results.push({
-      id: `screenshot-${s.path}`,
-      kind: 'screenshot',
-      title: s.fileName,
-      subtitle: 'Screenshot',
-      createdAt: s.createdAt,
-      navTarget: { kind: 'screenshot', id: s.path },
     })
   }
 

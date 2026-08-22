@@ -1,4 +1,4 @@
-export type SearchResultKind = 'task' | 'notification' | 'document' | 'clipboard' | 'screenshot'
+export type SearchResultKind = 'task' | 'notification' | 'document'
 
 export interface SearchResult {
   id: string

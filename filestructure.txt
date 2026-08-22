@@ -53,30 +53,8 @@
             |-- navy-petals.jpg
             |-- windows-blue.jpg
     |-- features
-        |-- account
-            |-- AccountView.tsx
-            |-- hooks
-                |-- useLocalProfile.ts
-        |-- automations
-            |-- AutomationsView.tsx
-            |-- components
-                |-- NewRuleForm.tsx
-                |-- RuleCard.tsx
-            |-- hooks
-                |-- useAutomationEngine.ts
-                |-- useAutomationRules.ts
-            |-- lib
-                |-- rulesStore.ts
-                |-- runRule.ts
-                |-- types.ts
         |-- calendar
             |-- CalendarView.tsx
-        |-- clipboard-manager
-            |-- ClipboardManagerView.tsx
-            |-- components
-            |-- hooks
-                |-- useClipboardHistory.ts
-                |-- useClipboardShortcut.ts
         |-- creativity
             |-- CreativityView.tsx
             |-- dj-board
@@ -194,12 +172,6 @@
                     |-- promptBuilder.ts
                     |-- reliabilityMarkers.ts
                 |-- StudyGeneratorView.tsx
-        |-- screenshot-tool
-            |-- components
-                |-- RegionSelector.tsx
-            |-- hooks
-                |-- useScreenshotTool.ts
-            |-- ScreenshotToolView.tsx
         |-- sessions
             |-- components
                 |-- NewTaskForm.tsx
@@ -252,10 +224,6 @@
             |-- client.ts
             |-- index.ts
             |-- types.ts
-        |-- clipboard-manager
-            |-- client.ts
-            |-- index.ts
-            |-- types.ts
         |-- folder-watcher
             |-- client.ts
             |-- index.ts
@@ -278,10 +246,6 @@
             |-- localModelQuery.ts
             |-- scheduleActions.ts
             |-- scheduleStore.ts
-            |-- types.ts
-        |-- screenshot-tool
-            |-- client.ts
-            |-- index.ts
             |-- types.ts
         |-- system-health
             |-- client.ts
@@ -367,9 +331,6 @@
         |-- client_tracker
             |-- mod.rs
             |-- store.rs
-        |-- clipboard_manager
-            |-- mod.rs
-            |-- store.rs
         |-- folder_watcher
             |-- mod.rs
         |-- general_chat
@@ -386,8 +347,6 @@
         |-- schedule
             |-- mod.rs
             |-- store.rs
-        |-- screenshot_tool
-            |-- mod.rs
         |-- system_health
             |-- mod.rs
         |-- template_library
