@@ -137,6 +137,7 @@
                 |-- VideoEditorView.tsx
         |-- general-chat
             |-- components
+                |-- ChatCommandPalette.tsx
                 |-- ChatMessage.tsx
                 |-- Composer.tsx
                 |-- MessageText.tsx
@@ -316,6 +317,7 @@
             |-- index.tsx
         |-- lib
             |-- cn.ts
+            |-- motion.ts
     |-- styles
         |-- fonts.css
         |-- theme.css

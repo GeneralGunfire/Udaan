@@ -3,6 +3,7 @@ import { Slot } from '@radix-ui/react-slot'
 import { motion, type HTMLMotionProps } from 'framer-motion'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/shared/lib/cn'
+import { pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 
 /**
  * shadcn-style Button, restyled onto this app's existing glass-token system
@@ -16,13 +17,16 @@ import { cn } from '@/shared/lib/cn'
  * (not barely-there) background tint; sizes moved to a 32/36/40px scale
  * closer to what Arc/Raycast/Linear actually ship.
  *
- * Scale-tap is built in (not opt-in per instance) so every button in the
- * app shares the same one interaction pattern rather than a bespoke motion
- * config per call site. `asChild` renders a plain (non-motion) Slot, since
- * Radix trigger components need to own the element themselves.
+ * Press feedback uses `pressableIcon` (hover 1.03 / tap 0.97) — tuned down
+ * from an earlier 1.04/0.96 pass that read as a visible "bounce" rather
+ * than a felt compression; a button should acknowledge a click, not
+ * perform one. Built in, not opt-in per instance, so every button in the
+ * app shares the same one interaction pattern. `asChild` renders a plain
+ * (non-motion) Slot, since Radix trigger components need to own the
+ * element themselves.
  */
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent font-medium transition-[background-color,border-color,color] duration-150 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/50',
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent font-medium transition-[background-color,border-color,color] duration-150 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-bg-elevated)]',
   {
     variants: {
       variant: {
@@ -74,9 +78,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <motion.button
         ref={ref}
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        whileHover={prefersReducedMotion() ? undefined : pressableIcon.whileHover}
+        whileTap={prefersReducedMotion() ? undefined : pressableIcon.whileTap}
+        transition={pressableIcon.transition}
         className={classes}
         style={resolvedStyle}
         {...props}

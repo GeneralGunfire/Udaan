@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import udaanMark from '@/assets/udaan-mark.png'
 import {
@@ -16,8 +16,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/shared/components/ui/dropdown-menu'
+import { spring, duration } from '@/shared/lib/motion'
 import { MODES, type ModeId } from './modes'
 import { ChatMessage } from './ChatMessage'
+import { ChatCommandPalette } from './ChatCommandPalette'
 import { useGeneralChat } from '../hooks/useGeneralChat'
 import { useMicTranscription } from '../hooks/useMicTranscription'
 import { useStickyScroll } from '../hooks/useStickyScroll'
@@ -60,6 +62,7 @@ export function Composer() {
   const [value, setValue] = useState('')
   const [activeMode, setActiveMode] = useState<ModeId>('local')
   const [sessionListOpen, setSessionListOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const {
     messages,
     responding,
@@ -116,12 +119,39 @@ export function Composer() {
 
   const isEmpty = !loadingHistory && messages.length === 0
 
+  // Cmd/Ctrl+K opens the chat command palette from anywhere on this page —
+  // the keyboard-first entry point the brief asks for, scoped to what
+  // General Chat can actually do (new chat, switch session/mode, focus the
+  // composer) rather than app-wide navigation, which is out of scope for
+  // this pass.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
     <div
       className={`mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col ${
         isEmpty ? 'justify-center' : ''
       }`}
     >
+      <ChatCommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        sessions={sessions}
+        activeMode={activeMode}
+        onNewChat={handleNewChat}
+        onSwitchSession={handleSwitchSession}
+        onSwitchMode={setActiveMode}
+        onFocusComposer={() => textareaRef.current?.focus()}
+      />
+
       <AnimatePresence mode="wait">
         {isEmpty ? (
           <motion.div
@@ -129,7 +159,7 @@ export function Composer() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+            transition={spring.emphasis}
             className="mb-6 flex shrink-0 flex-col items-center gap-5 px-1"
           >
             <div className="flex flex-col items-center gap-2 text-center">
@@ -155,31 +185,32 @@ export function Composer() {
               </div>
             </div>
 
-            <div className="grid w-full grid-cols-2 gap-2">
+            {/* Quieter than the composer below it — smaller text, no
+                backdrop-blur/border weight competing with the primary
+                surface, subtle opacity-only entrance. Secondary, not a
+                second hero. */}
+            <div className="grid w-full grid-cols-2 gap-1.5">
               {SUGGESTED_PROMPTS.map((prompt, i) => (
                 <motion.button
                   key={prompt}
                   type="button"
                   onClick={() => handleSubmit(prompt)}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 340,
-                    damping: 34,
-                    delay: 0.04 * i,
-                  }}
-                  whileHover={{ scale: 1.015 }}
-                  whileTap={{ scale: 0.985 }}
-                  className="text-text-secondary hover:text-text-primary rounded-xl border p-3 text-left text-[12.5px] leading-snug backdrop-blur-md transition-colors duration-150"
-                  style={{
-                    borderColor: 'var(--color-glass-border)',
-                    background: 'color-mix(in srgb, var(--color-bg-elevated) 78%, transparent)',
-                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.16, delay: 0.03 * i }}
+                  whileHover={{ scale: 1.008 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="text-text-tertiary hover:text-text-secondary hover:bg-glass rounded-lg px-2.5 py-2 text-left text-[12px] leading-snug transition-colors duration-150"
                 >
                   {prompt}
                 </motion.button>
               ))}
+            </div>
+            <div className="text-text-tertiary/70 flex items-center gap-1 text-[11px]">
+              <kbd className="border-glass-border rounded border px-1 py-0.5 font-mono text-[10px]">
+                {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K
+              </kbd>
+              <span>for commands</span>
             </div>
           </motion.div>
         ) : (
@@ -188,7 +219,7 @@ export function Composer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: duration.standard }}
             ref={containerRef}
             onScroll={handleScroll}
             className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto px-1 pb-3"
@@ -273,11 +304,7 @@ export function Composer() {
                     {isActive && (
                       <motion.div
                         layoutId="composer-mode-pill"
-                        transition={{
-                          type: 'spring',
-                          stiffness: 450,
-                          damping: 34,
-                        }}
+                        transition={spring.standard}
                         className="absolute inset-0 rounded-lg bg-white/12"
                       />
                     )}
@@ -306,7 +333,7 @@ export function Composer() {
                   <span className="text-[12px]">{sessions.length}</span>
                   <motion.span
                     animate={{ rotate: sessionListOpen ? 90 : 0 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    transition={spring.micro}
                     className="flex"
                   >
                     <ChevronRightIcon width={10} height={10} />

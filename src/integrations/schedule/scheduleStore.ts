@@ -14,11 +14,13 @@ import {
   updateEvent as dbUpdateEvent,
   deleteEvent as dbDeleteEvent,
   setEventStatus as dbSetEventStatus,
-  type EventCategory as DbEventCategory,
-  type EventStatus,
-  type NewScheduleEvent,
-  type ScheduleEvent as DbScheduleEvent,
 } from './client'
+import type {
+  EventCategory as DbEventCategory,
+  EventStatus,
+  NewScheduleEvent,
+  ScheduleEvent as DbScheduleEvent,
+} from './types'
 
 export type EventCategory = DbEventCategory
 

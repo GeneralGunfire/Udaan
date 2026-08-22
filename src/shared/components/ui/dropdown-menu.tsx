@@ -1,6 +1,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
+import { spring } from '@/shared/lib/motion'
 
 /**
  * Thin restyle of Radix's dropdown-menu primitives onto this app's glass
@@ -30,7 +31,7 @@ export function DropdownMenuContent({
           initial={{ opacity: 0, y: 6, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 6, scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+          transition={spring.standard}
           className={cn(
             'glass-surface border-glass-border z-20 flex max-h-72 w-64 flex-col overflow-hidden rounded-2xl',
             className,
