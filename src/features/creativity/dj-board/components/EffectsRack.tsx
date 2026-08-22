@@ -53,11 +53,12 @@ const EFFECT_ICONS: Record<EffectKind, (props: { width: number; height: number }
  * press and hold a pad to engage, release to stop — not a toggle.
  *
  * Redesigned for easier use: expanded by default (no extra click to see
- * what's available), bigger pads with generous hit area, a live
- * percentage readout on the pad itself (no need to squint at a thin bar
- * underneath), a short plain-language hint per effect, and the same
- * scroll/drag intensity control as before but now mirrored by a visible
- * numeric value so you know exactly what you're dialing in.
+ * what's available), compact pads sized to avoid crowding/overlap in a
+ * 3-column grid, a live percentage readout on the pad itself (no need
+ * to squint at a thin bar underneath), a short plain-language hint per
+ * effect, and the same scroll/drag intensity control as before. Hover
+ * feedback is opacity/press-scale only (never scale-up) so a hovered
+ * pad never grows into its neighbors.
  */
 export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsRackProps) {
   const [expanded, setExpanded] = useState(true)
@@ -112,12 +113,9 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
         onClick={() => setExpanded((e) => !e)}
         className="flex items-center justify-between"
       >
-        <div className="flex items-center gap-1.5">
-          <SparkleIcon width={12} height={12} className="text-accent-creativity" />
-          <h2 className="text-text-secondary text-[11.5px] font-semibold">Effects Rack</h2>
-          <span className="text-text-tertiary text-[9px] font-medium tracking-wide uppercase">
-            Hold to apply
-          </span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <SparkleIcon width={12} height={12} className="text-accent-creativity shrink-0" />
+          <h2 className="text-text-secondary truncate text-[11.5px] font-semibold">Effects Rack</h2>
           <AnimatePresence>
             {engagedCount > 0 && (
               <motion.span
@@ -148,7 +146,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
             transition={{ type: 'spring', stiffness: 400, damping: 38 }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               {(Object.keys(effects) as EffectKind[]).map((kind) => {
                 const effect = effects[kind]
                 const Icon = EFFECT_ICONS[kind]
@@ -169,10 +167,9 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                     aria-pressed={effect.engaged}
                     aria-label={`${EFFECT_LABELS[kind]}: hold to apply, scroll to adjust intensity`}
                     title={`Hold to apply ${EFFECT_LABELS[kind]}. Scroll or drag to change intensity.`}
-                    animate={{ scale: effect.engaged ? 0.96 : 1 }}
-                    whileHover={{ scale: effect.engaged ? 0.96 : 1.03 }}
+                    animate={{ scale: effect.engaged ? 0.95 : 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-                    className="relative flex h-20 cursor-pointer touch-none flex-col items-center justify-center gap-1 overflow-hidden rounded-lg select-none"
+                    className="relative flex h-14 cursor-pointer touch-none flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg select-none"
                     style={{
                       background: effect.engaged ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)',
                       color: effect.engaged ? '#fff' : 'var(--color-text-secondary)',
@@ -182,15 +179,15 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                     }}
                   >
                     <div
-                      className="absolute inset-x-0 bottom-0 rounded-lg opacity-25 transition-[height] duration-75"
+                      className="absolute inset-x-0 bottom-0 rounded-lg opacity-20 transition-[height] duration-75"
                       style={{
                         height: `${effect.amount * 100}%`,
                         background: effect.engaged ? '#fff' : 'var(--color-accent-creativity)',
                       }}
                     />
-                    <Icon width={14} height={14} />
-                    <span className="relative text-[11px] font-semibold">{EFFECT_LABELS[kind]}</span>
-                    <span className="relative text-[9.5px] font-semibold tabular-nums opacity-80">
+                    <Icon width={12} height={12} />
+                    <span className="relative text-[10px] font-semibold">{EFFECT_LABELS[kind]}</span>
+                    <span className="relative text-[8.5px] font-semibold tabular-nums opacity-75">
                       {Math.round(effect.amount * 100)}%
                     </span>
                   </motion.div>
