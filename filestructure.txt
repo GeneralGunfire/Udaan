@@ -308,6 +308,7 @@
             |-- ui
                 |-- button.tsx
                 |-- dropdown-menu.tsx
+                |-- tooltip.tsx
             |-- WallpaperPicker.tsx
             |-- Wordmark.tsx
         |-- hooks

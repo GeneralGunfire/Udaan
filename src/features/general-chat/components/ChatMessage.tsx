@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ClipboardIcon } from '@/shared/icons'
 import { Button } from '@/shared/components/ui/button'
+import { Tooltip } from '@/shared/components/ui/tooltip'
 import { MessageText } from './MessageText'
 import { MODES, type ModeId } from './modes'
 
@@ -92,22 +93,36 @@ export function ChatMessage({ message }: { message: ChatMessageData }) {
           {formatTime(message.createdAt) && (
             <span className="tabular-nums">{formatTime(message.createdAt)}</span>
           )}
-          <Button
-            type="button"
-            aria-label="Copy message"
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleCopy}
-            className="rounded-md"
-          >
-            {copied ? (
-              <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 10l4 4 8-8" />
-              </svg>
-            ) : (
-              <ClipboardIcon width={11} height={11} />
-            )}
-          </Button>
+          <Tooltip content={copied ? 'Copied' : 'Copy message'}>
+            <Button
+              type="button"
+              aria-label="Copy message"
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleCopy}
+              className="rounded-md"
+            >
+              {copied ? (
+                <motion.svg
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  width="10"
+                  height="10"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 10l4 4 8-8" />
+                </motion.svg>
+              ) : (
+                <ClipboardIcon width={11} height={11} />
+              )}
+            </Button>
+          </Tooltip>
         </div>
       )}
     </motion.div>

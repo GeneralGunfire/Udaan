@@ -16,7 +16,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/shared/components/ui/dropdown-menu'
-import { spring, duration } from '@/shared/lib/motion'
+import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
+import { spring, duration, prefersReducedMotion } from '@/shared/lib/motion'
 import { MODES, type ModeId } from './modes'
 import { ChatMessage } from './ChatMessage'
 import { ChatCommandPalette } from './ChatCommandPalette'
@@ -118,6 +119,7 @@ export function Composer() {
   }
 
   const isEmpty = !loadingHistory && messages.length === 0
+  const reduced = prefersReducedMotion()
 
   // Cmd/Ctrl+K opens the chat command palette from anywhere on this page —
   // the keyboard-first entry point the brief asks for, scoped to what
@@ -136,6 +138,7 @@ export function Composer() {
   }, [])
 
   return (
+    <TooltipProvider delayDuration={400}>
     <div
       className={`mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col ${
         isEmpty ? 'justify-center' : ''
@@ -156,10 +159,10 @@ export function Composer() {
         {isEmpty ? (
           <motion.div
             key="empty"
-            initial={{ opacity: 0, y: 6 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={spring.emphasis}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={reduced ? { duration: duration.instant } : spring.emphasis}
             className="mb-6 flex shrink-0 flex-col items-center gap-5 px-1"
           >
             <div className="flex flex-col items-center gap-2 text-center">
@@ -197,9 +200,9 @@ export function Composer() {
                   onClick={() => handleSubmit(prompt)}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ duration: 0.16, delay: 0.03 * i }}
-                  whileHover={{ scale: 1.008 }}
-                  whileTap={{ scale: 0.99 }}
+                  transition={{ duration: 0.16, delay: reduced ? 0 : 0.03 * i }}
+                  whileHover={reduced ? undefined : { scale: 1.008 }}
+                  whileTap={reduced ? undefined : { scale: 0.99 }}
                   className="text-text-tertiary hover:text-text-secondary hover:bg-glass rounded-lg px-2.5 py-2 text-left text-[12px] leading-snug transition-colors duration-150"
                 >
                   {prompt}
@@ -235,24 +238,30 @@ export function Composer() {
         )}
       </AnimatePresence>
 
-      {mic.error && (
-        <div
-          className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-red-500/25 px-3 py-2 text-[12px] text-red-400 backdrop-blur-md"
-          style={{ background: 'color-mix(in srgb, var(--color-bg-elevated) 75%, rgb(239 68 68 / 15%))' }}
-        >
-          <span>{mic.error}</span>
-          <Button
-            type="button"
-            onClick={mic.clearError}
-            aria-label="Dismiss"
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-lg opacity-70 hover:bg-transparent hover:opacity-100"
+      <AnimatePresence>
+        {mic.error && (
+          <motion.div
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, height: 0 }}
+            transition={spring.standard}
+            className="mb-2 flex shrink-0 items-center justify-between gap-2 overflow-hidden rounded-xl border border-red-500/25 px-3 py-2 text-[12px] text-red-400 backdrop-blur-md"
+            style={{ background: 'color-mix(in srgb, var(--color-bg-elevated) 75%, rgb(239 68 68 / 15%))' }}
           >
-            <WindowCloseIcon width={11} height={11} />
-          </Button>
-        </div>
-      )}
+            <span>{mic.error}</span>
+            <Button
+              type="button"
+              onClick={mic.clearError}
+              aria-label="Dismiss"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-lg opacity-70 hover:bg-transparent hover:opacity-100"
+            >
+              <WindowCloseIcon width={11} height={11} />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div
         className="relative w-full shrink-0 rounded-2xl border p-3 backdrop-blur-md transition-colors duration-200"
@@ -394,49 +403,93 @@ export function Composer() {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              aria-label={
-                mic.recording ? 'Stop recording' : 'Record voice message'
+            <Tooltip
+              content={
+                mic.transcribing
+                  ? 'Transcribing…'
+                  : mic.recording
+                    ? 'Stop recording'
+                    : 'Record voice message'
               }
-              onClick={handleMicClick}
-              disabled={mic.transcribing}
-              variant={mic.recording ? 'danger' : 'ghost'}
-              className="rounded-xl"
             >
-              {mic.recording ? (
-                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
-              ) : (
-                <MicIcon width={13} height={13} />
-              )}
-            </Button>
-            {responding ? (
               <Button
-                key="stop"
                 type="button"
-                aria-label="Stop response"
-                onClick={stop}
-                variant="ghost"
+                aria-label={
+                  mic.transcribing
+                    ? 'Transcribing'
+                    : mic.recording
+                      ? 'Stop recording'
+                      : 'Record voice message'
+                }
+                onClick={handleMicClick}
+                disabled={mic.transcribing}
+                variant={mic.recording ? 'danger' : 'ghost'}
                 className="rounded-xl"
               >
-                <StopIcon width={12} height={12} />
+                {mic.transcribing ? (
+                  <motion.span
+                    animate={reduced ? undefined : { rotate: 360 }}
+                    transition={reduced ? undefined : { duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    className="border-text-tertiary h-3 w-3 rounded-full border-[1.5px] border-t-transparent"
+                  />
+                ) : mic.recording ? (
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
+                ) : (
+                  <MicIcon width={13} height={13} />
+                )}
               </Button>
-            ) : (
-              <Button
-                key="send"
-                type="button"
-                aria-label="Send"
-                onClick={() => handleSubmit()}
-                disabled={value.trim().length === 0}
-                variant="brand"
-                className="rounded-xl disabled:opacity-30"
-              >
-                <SendIcon width={12} height={12} />
-              </Button>
-            )}
+            </Tooltip>
+
+            <div className="relative">
+              <AnimatePresence mode="wait" initial={false}>
+                {responding ? (
+                  <motion.div
+                    key="stop"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={spring.micro}
+                  >
+                    <Tooltip content="Stop response">
+                      <Button
+                        type="button"
+                        aria-label="Stop response"
+                        onClick={stop}
+                        variant="ghost"
+                        className="rounded-xl"
+                      >
+                        <StopIcon width={12} height={12} />
+                      </Button>
+                    </Tooltip>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="send"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={spring.micro}
+                  >
+                    <Tooltip content="Send">
+                      <Button
+                        type="button"
+                        aria-label="Send"
+                        onClick={() => handleSubmit()}
+                        disabled={value.trim().length === 0}
+                        variant="brand"
+                        className="rounded-xl disabled:opacity-30"
+                      >
+                        <SendIcon width={12} height={12} />
+                      </Button>
+                    </Tooltip>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
     </div>
+    </TooltipProvider>
   )
 }
