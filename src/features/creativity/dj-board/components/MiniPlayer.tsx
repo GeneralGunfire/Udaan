@@ -21,7 +21,8 @@ export function MiniPlayer({ onOpenDjBoard }: MiniPlayerProps) {
   if (!activeDeck) return null
 
   const state = activeDeck === 'A' ? board.deckA : board.deckB
-  const accent = activeDeck === 'A' ? 'var(--color-brand-cyan)' : 'var(--color-accent-creativity)'
+  // Matches Deck.tsx's deck-local accent (not the shared Creativity-category purple).
+  const accent = activeDeck === 'A' ? 'var(--color-brand-cyan)' : '#4ade80'
 
   return (
     <button

@@ -114,7 +114,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
         className="flex items-center justify-between"
       >
         <div className="flex min-w-0 items-center gap-1.5">
-          <SparkleIcon width={12} height={12} className="text-accent-creativity shrink-0" />
+          <SparkleIcon width={12} height={12} className="text-brand-cyan shrink-0" />
           <h2 className="text-text-secondary truncate text-[11.5px] font-semibold">Effects Rack</h2>
           <AnimatePresence>
             {engagedCount > 0 && (
@@ -122,7 +122,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.7 }}
-                className="bg-accent-creativity flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                className="bg-brand-cyan flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
               >
                 {engagedCount}
               </motion.span>
@@ -146,7 +146,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
             transition={{ type: 'spring', stiffness: 400, damping: 38 }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-3 gap-2">
+            <div className="mx-auto grid max-w-140 grid-cols-6 justify-items-center gap-2">
               {(Object.keys(effects) as EffectKind[]).map((kind) => {
                 const effect = effects[kind]
                 const Icon = EFFECT_ICONS[kind]
@@ -169,12 +169,12 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                     title={`Hold to apply ${EFFECT_LABELS[kind]}. Scroll or drag to change intensity.`}
                     animate={{ scale: effect.engaged ? 0.95 : 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-                    className="relative flex h-14 cursor-pointer touch-none flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg select-none"
+                    className="relative flex h-16 max-w-32 cursor-pointer touch-none flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg select-none"
                     style={{
                       background: effect.engaged ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)',
                       color: effect.engaged ? '#fff' : 'var(--color-text-secondary)',
                       boxShadow: effect.engaged
-                        ? '0 0 0 2px color-mix(in srgb, var(--color-accent-creativity) 45%, transparent)'
+                        ? '0 0 0 2px color-mix(in srgb, var(--color-brand-cyan) 45%, transparent)'
                         : 'none',
                     }}
                   >
@@ -182,7 +182,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                       className="absolute inset-x-0 bottom-0 rounded-lg opacity-20 transition-[height] duration-75"
                       style={{
                         height: `${effect.amount * 100}%`,
-                        background: effect.engaged ? '#fff' : 'var(--color-accent-creativity)',
+                        background: effect.engaged ? '#fff' : 'var(--color-brand-cyan)',
                       }}
                     />
                     <Icon width={12} height={12} />

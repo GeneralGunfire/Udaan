@@ -127,7 +127,10 @@ export function Deck({
   }, [tapTimes, onTapBpm])
 
   const progress = state.duration > 0 ? state.currentTime / state.duration : 0
-  const accent = id === 'A' ? 'var(--color-brand-cyan)' : 'var(--color-accent-creativity)'
+  // Deck-local accent — deliberately not the shared Creativity-category purple
+  // token (that's app-wide sidebar/editor branding); Deck B gets its own
+  // color so the two decks read as a classic blue-vs-green two-deck pair.
+  const accent = id === 'A' ? 'var(--color-brand-cyan)' : '#4ade80'
 
   return (
     <div
