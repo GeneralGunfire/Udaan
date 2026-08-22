@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { pickPdfFiles, pickPdfSavePath, inspectPdf, stampPdfText } from '@/integrations/pdf-tool'
 import type { PdfInfo } from '@/integrations/pdf-tool'
+import { Button } from '@/shared/components/ui/button'
 
 /**
  * Basic annotate: stamps one line of text onto a page. Full annotate (crop/arrow/free-draw)
@@ -50,13 +51,9 @@ export function StampPanel() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={pickInput}
-          className="bg-glass hover:bg-glass-hover text-text-secondary hover:text-text-primary rounded-md px-2.5 py-1.5 text-[11.5px] font-medium transition-colors duration-150"
-        >
+        <Button type="button" onClick={pickInput} variant="surface" size="pill-sm" className="rounded-md">
           Choose PDF
-        </button>
+        </Button>
         {input && (
           <span className="text-text-tertiary truncate text-[11.5px]">
             {input.path.split(/[\\/]/).pop()} · {input.pageCount} page{input.pageCount === 1 ? '' : 's'}
@@ -70,7 +67,7 @@ export function StampPanel() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Text to stamp…"
-            className="glass-surface text-text-primary placeholder:text-text-tertiary rounded-md px-2.5 py-1.5 text-[12px] outline-none"
+            className="glass-surface text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 rounded-md px-2.5 py-1.5 text-[12px] outline-none focus-visible:ring-2"
           />
           <div className="flex items-center gap-3 text-[11px]">
             <label className="text-text-tertiary flex items-center gap-1.5">
@@ -81,7 +78,7 @@ export function StampPanel() {
                 max={input.pageCount}
                 value={page}
                 onChange={(e) => setPage(Number(e.target.value) || 1)}
-                className="glass-surface text-text-primary w-14 rounded px-1.5 py-1 outline-none"
+                className="glass-surface text-text-primary focus-visible:ring-brand-cyan/60 w-14 rounded px-1.5 py-1 outline-none focus-visible:ring-2"
               />
             </label>
             <label className="text-text-tertiary flex items-center gap-1.5">
@@ -90,7 +87,7 @@ export function StampPanel() {
                 type="number"
                 value={x}
                 onChange={(e) => setX(Number(e.target.value) || 0)}
-                className="glass-surface text-text-primary w-16 rounded px-1.5 py-1 outline-none"
+                className="glass-surface text-text-primary focus-visible:ring-brand-cyan/60 w-16 rounded px-1.5 py-1 outline-none focus-visible:ring-2"
               />
             </label>
             <label className="text-text-tertiary flex items-center gap-1.5">
@@ -99,18 +96,20 @@ export function StampPanel() {
                 type="number"
                 value={y}
                 onChange={(e) => setY(Number(e.target.value) || 0)}
-                className="glass-surface text-text-primary w-16 rounded px-1.5 py-1 outline-none"
+                className="glass-surface text-text-primary focus-visible:ring-brand-cyan/60 w-16 rounded px-1.5 py-1 outline-none focus-visible:ring-2"
               />
             </label>
           </div>
-          <button
+          <Button
             type="button"
             disabled={busy || !text.trim()}
             onClick={runStamp}
-            className="bg-brand-teal/20 text-text-primary hover:bg-brand-teal/30 self-start rounded-md px-3 py-1.5 text-[11.5px] font-medium transition-colors duration-150 disabled:opacity-50"
+            variant="surface"
+            size="pill-sm"
+            className="bg-brand-teal/20 hover:bg-brand-teal/30 self-start rounded-md disabled:opacity-50"
           >
             {busy ? 'Stamping…' : 'Stamp & Save'}
-          </button>
+          </Button>
         </div>
       )}
 

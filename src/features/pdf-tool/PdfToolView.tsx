@@ -3,6 +3,8 @@ import { GlassPanel } from '@/shared/components/GlassPanel'
 import { FileTextIcon, TrashIcon, ScissorsIcon } from '@/shared/icons'
 import { usePdfTool } from './hooks/usePdfTool'
 import { StampPanel } from './components/StampPanel'
+import { Button } from '@/shared/components/ui/button'
+import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 
 type Tab = 'merge' | 'split' | 'annotate'
 
@@ -29,6 +31,7 @@ export function PdfToolView() {
   const [splitRangeText, setSplitRangeText] = useState('')
 
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="flex w-full max-w-2xl flex-col gap-4 overflow-y-auto py-4">
       <div className="flex items-center gap-2">
         <FileTextIcon width={16} height={16} className="text-brand-teal" />
@@ -41,7 +44,7 @@ export function PdfToolView() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`rounded-md px-3 py-1.5 text-[11.5px] font-medium capitalize transition-colors duration-150 ${
+            className={`focus-visible:ring-brand-cyan/60 rounded-md px-3 py-1.5 text-[11.5px] font-medium capitalize outline-none transition-colors duration-150 focus-visible:ring-2 ${
               tab === t
                 ? 'bg-brand-teal/20 text-text-primary'
                 : 'bg-glass text-text-secondary hover:bg-glass-hover'
@@ -62,13 +65,9 @@ export function PdfToolView() {
         <GlassPanel className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-text-primary text-[13px] font-semibold">Merge PDFs</h2>
-            <button
-              type="button"
-              onClick={addMergeInputs}
-              className="bg-glass hover:bg-glass-hover text-text-secondary hover:text-text-primary rounded-md px-2.5 py-1.5 text-[11.5px] font-medium transition-colors duration-150"
-            >
+            <Button type="button" onClick={addMergeInputs} variant="surface" size="pill-sm" className="rounded-md">
               Add files
-            </button>
+            </Button>
           </div>
 
           {mergeInputs.length === 0 ? (
@@ -87,28 +86,34 @@ export function PdfToolView() {
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="text-text-tertiary text-[10.5px]">{f.pageCount}p</span>
-                    <button
-                      type="button"
-                      onClick={() => removeMergeInput(f.path)}
-                      aria-label="Remove"
-                      className="text-text-tertiary hover:text-red-400 transition-colors duration-150"
-                    >
-                      <TrashIcon width={12} height={12} />
-                    </button>
+                    <Tooltip content="Remove">
+                      <Button
+                        type="button"
+                        onClick={() => removeMergeInput(f.path)}
+                        aria-label="Remove"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-md hover:text-red-400"
+                      >
+                        <TrashIcon width={12} height={12} />
+                      </Button>
+                    </Tooltip>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          <button
+          <Button
             type="button"
             disabled={busy || mergeInputs.length < 2}
             onClick={runMerge}
-            className="bg-brand-teal/20 text-text-primary hover:bg-brand-teal/30 self-start rounded-md px-3 py-1.5 text-[11.5px] font-medium transition-colors duration-150 disabled:opacity-50"
+            variant="surface"
+            size="pill-sm"
+            className="bg-brand-teal/20 hover:bg-brand-teal/30 self-start rounded-md disabled:opacity-50"
           >
             {busy ? 'Merging…' : 'Merge & Save'}
-          </button>
+          </Button>
 
           {mergeResult && (
             <p className="text-text-secondary text-[11.5px]">
@@ -123,13 +128,9 @@ export function PdfToolView() {
         <GlassPanel className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-text-primary text-[13px] font-semibold">Split PDF</h2>
-            <button
-              type="button"
-              onClick={pickSplitInput}
-              className="bg-glass hover:bg-glass-hover text-text-secondary hover:text-text-primary rounded-md px-2.5 py-1.5 text-[11.5px] font-medium transition-colors duration-150"
-            >
+            <Button type="button" onClick={pickSplitInput} variant="surface" size="pill-sm" className="rounded-md">
               Choose PDF
-            </button>
+            </Button>
           </div>
 
           {splitInput && (
@@ -143,10 +144,10 @@ export function PdfToolView() {
                   value={splitRangeText}
                   onChange={(e) => setSplitRangeText(e.target.value)}
                   placeholder="Ranges e.g. 1-2,3-4 (blank = one file per page)"
-                  className="glass-surface text-text-primary placeholder:text-text-tertiary min-w-0 flex-1 rounded-md px-2.5 py-1.5 text-[12px] outline-none"
+                  className="glass-surface text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 min-w-0 flex-1 rounded-md px-2.5 py-1.5 text-[12px] outline-none focus-visible:ring-2"
                 />
               </div>
-              <button
+              <Button
                 type="button"
                 disabled={busy}
                 onClick={() =>
@@ -156,10 +157,12 @@ export function PdfToolView() {
                       : undefined,
                   )
                 }
-                className="bg-brand-teal/20 text-text-primary hover:bg-brand-teal/30 self-start rounded-md px-3 py-1.5 text-[11.5px] font-medium transition-colors duration-150 disabled:opacity-50"
+                variant="surface"
+                size="pill-sm"
+                className="bg-brand-teal/20 hover:bg-brand-teal/30 self-start rounded-md disabled:opacity-50"
               >
                 {busy ? 'Splitting…' : 'Split & Save'}
-              </button>
+              </Button>
             </>
           )}
 
@@ -182,5 +185,6 @@ export function PdfToolView() {
         </GlassPanel>
       )}
     </div>
+    </TooltipProvider>
   )
 }

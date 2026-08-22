@@ -1,6 +1,7 @@
 import { GlassPanel } from '@/shared/components/GlassPanel'
 import { BellIcon, TrashIcon } from '@/shared/icons'
 import { useNotifications } from './hooks/useNotifications'
+import { Button } from '@/shared/components/ui/button'
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso)
@@ -35,22 +36,26 @@ export function NotificationsView() {
         {notifications.length > 0 && (
           <div className="flex items-center gap-3">
             {hasUnread && (
-              <button
+              <Button
                 type="button"
                 onClick={markAllRead}
-                className="text-text-tertiary hover:text-text-primary text-[11.5px] transition-colors duration-150"
+                variant="ghost"
+                size="pill-sm"
+                className="rounded-full"
               >
                 Mark all read
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={clearAll}
-              className="text-text-tertiary hover:text-red-400 flex items-center gap-1 text-[11.5px] transition-colors duration-150"
+              variant="ghost"
+              size="pill-sm"
+              className="rounded-full hover:text-red-400"
             >
               <TrashIcon width={12} height={12} />
               Clear all
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -73,7 +78,7 @@ export function NotificationsView() {
                 type="button"
                 onClick={() => markRead(n.id)}
                 disabled={n.read}
-                className="min-w-0 flex-1 text-left disabled:cursor-default"
+                className="focus-visible:ring-brand-cyan/60 min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 disabled:cursor-default"
               >
                 <div className="flex items-center gap-1.5">
                   {!n.read && <span className="bg-brand-teal h-1.5 w-1.5 shrink-0 rounded-full" />}

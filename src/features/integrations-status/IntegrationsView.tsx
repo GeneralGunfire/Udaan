@@ -3,6 +3,7 @@ import { GlassPanel } from '@/shared/components/GlassPanel'
 import { PlugIcon } from '@/shared/icons'
 import { listTasks } from '@/integrations/claude-code'
 import { isReachable as ollamaReachable } from '@/integrations/local-model'
+import { Button } from '@/shared/components/ui/button'
 
 type LiveStatus = 'checking' | 'connected' | 'error' | 'local'
 
@@ -134,13 +135,15 @@ export function IntegrationsView() {
             Integrations
           </h1>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => setRefreshKey((k) => k + 1)}
-          className="glass-surface text-text-secondary hover:text-text-primary rounded-full px-3 py-1.5 text-[11.5px] font-medium transition-colors duration-150"
+          variant="surface"
+          size="pill-sm"
+          className="rounded-full"
         >
           Recheck
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">
