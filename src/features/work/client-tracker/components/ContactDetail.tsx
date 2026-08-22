@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Contact } from '@/integrations/client-tracker'
 import { useContactNotes } from '../hooks/useContactNotes'
 import { PencilIcon, CalendarIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
 
 interface ContactDetailProps {
   contact: Contact | null
@@ -55,15 +56,11 @@ export function ContactDetail({ contact, onCreateFollowUp }: ContactDetailProps)
             onChange={(e) => setNoteBody(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitNote()}
             placeholder="Add a note..."
-            className="border-glass-border bg-glass text-text-primary flex-1 rounded-md border px-2 py-1.5 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 flex-1 rounded-md border px-2 py-1.5 text-[11px] outline-none focus-visible:ring-2"
           />
-          <button
-            type="button"
-            onClick={submitNote}
-            className="border-glass-border hover:bg-glass-hover text-text-secondary rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150"
-          >
+          <Button type="button" onClick={submitNote} variant="surface" size="pill-sm" className="rounded-md">
             Add
-          </button>
+          </Button>
         </div>
         <div className="flex flex-col gap-1.5">
           {notes.notes.length === 0 ? (
@@ -92,21 +89,17 @@ export function ContactDetail({ contact, onCreateFollowUp }: ContactDetailProps)
             value={followUpNote}
             onChange={(e) => setFollowUpNote(e.target.value)}
             placeholder="What to follow up on..."
-            className="border-glass-border bg-glass text-text-primary flex-1 rounded-md border px-2 py-1.5 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 flex-1 rounded-md border px-2 py-1.5 text-[11px] outline-none focus-visible:ring-2"
           />
           <input
             type="date"
             value={followUpDate}
             onChange={(e) => setFollowUpDate(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1.5 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1.5 text-[11px] outline-none focus-visible:ring-2"
           />
-          <button
-            type="button"
-            onClick={submitFollowUp}
-            className="border-glass-border hover:bg-glass-hover text-text-secondary rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150"
-          >
+          <Button type="button" onClick={submitFollowUp} variant="surface" size="pill-sm" className="rounded-md">
             Set
-          </button>
+          </Button>
         </div>
         <p className="text-text-tertiary mt-1.5 text-[10px] leading-relaxed">
           TODO: no calendar integration yet — this due date is checked when you open the Client

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Contact, ContactStatus } from '@/integrations/client-tracker'
 import { UsersIcon, PlusIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
 
 interface ContactListProps {
   contacts: Contact[]
@@ -48,14 +49,16 @@ export function ContactList({ contacts, loading, selectedId, onSelect, onCreate 
           <UsersIcon width={14} height={14} className="text-accent-work shrink-0" />
           <h2 className="text-text-primary text-[12.5px] font-semibold">Contacts</h2>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => setShowForm((s) => !s)}
-          className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
+          variant="ghost"
+          size="pill-sm"
+          className="rounded-md"
         >
           <PlusIcon width={11} height={11} />
           Add
-        </button>
+        </Button>
       </div>
 
       {showForm && (
@@ -65,53 +68,48 @@ export function ContactList({ contacts, loading, selectedId, onSelect, onCreate 
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           />
           <input
             type="text"
             placeholder="Company"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           />
           <input
             type="text"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           />
           <input
             type="text"
             placeholder="Phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as ContactStatus)}
-            className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           >
             <option value="lead">Lead</option>
             <option value="active">Active</option>
             <option value="past">Past</option>
           </select>
-          <button
+          <Button
             type="button"
             onClick={submit}
             disabled={!name.trim()}
-            className="text-white disabled:opacity-40"
-            style={{
-              background: 'var(--gradient-brand)',
-              borderRadius: 'var(--radius-md)',
-              padding: '6px',
-              fontSize: '11px',
-              fontWeight: 600,
-            }}
+            variant="brand"
+            size="pill-sm"
+            className="rounded-md disabled:opacity-40"
           >
             Save contact
-          </button>
+          </Button>
         </div>
       )}
 
@@ -127,7 +125,7 @@ export function ContactList({ contacts, loading, selectedId, onSelect, onCreate 
                 <button
                   type="button"
                   onClick={() => onSelect(c.id)}
-                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 ${
+                  className={`focus-visible:ring-brand-cyan/60 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-150 focus-visible:ring-2 ${
                     c.id === selectedId ? 'bg-glass-hover' : 'hover:bg-glass-hover'
                   }`}
                 >

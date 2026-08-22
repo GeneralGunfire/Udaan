@@ -3,6 +3,7 @@ import { useStudyGenerator, type GeneratorBackend } from './hooks/useStudyGenera
 import type { DocumentType, GradeLevel } from './lib/promptBuilder'
 import { ReliabilityOutput } from './components/ReliabilityOutput'
 import { GaugeIcon, SparkleIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
 
 const DOCUMENT_TYPES: { id: DocumentType; label: string }[] = [
   { id: 'study-guide', label: 'Study Guide + Questions' },
@@ -53,7 +54,7 @@ export function StudyGeneratorView() {
             <select
               value={documentType}
               onChange={(e) => setDocumentType(e.target.value as DocumentType)}
-              className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+              className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
             >
               {DOCUMENT_TYPES.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -68,7 +69,7 @@ export function StudyGeneratorView() {
             <select
               value={gradeLevel}
               onChange={(e) => setGradeLevel(e.target.value as GradeLevel)}
-              className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+              className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
             >
               {GRADE_LEVELS.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -85,7 +86,7 @@ export function StudyGeneratorView() {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. Photosynthesis, Chapter 3 of..."
-              className="border-glass-border bg-glass text-text-primary placeholder:text-text-tertiary rounded-md border px-2.5 py-1.5 text-[11.5px]"
+              className="border-glass-border bg-glass text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 rounded-md border px-2.5 py-1.5 text-[11.5px] outline-none focus-visible:ring-2"
             />
           </div>
 
@@ -98,7 +99,7 @@ export function StudyGeneratorView() {
               onChange={(e) => setSourceMaterial(e.target.value)}
               rows={10}
               placeholder="Paste the notes or text this document should be based on..."
-              className="border-glass-border bg-glass text-text-primary placeholder:text-text-tertiary flex-1 resize-none rounded-md border px-2.5 py-1.5 text-[11.5px] leading-relaxed"
+              className="border-glass-border bg-glass text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 flex-1 resize-none rounded-md border px-2.5 py-1.5 text-[11.5px] leading-relaxed outline-none focus-visible:ring-2"
             />
           </div>
 
@@ -109,27 +110,22 @@ export function StudyGeneratorView() {
               <select
                 value={backend}
                 onChange={(e) => setBackend(e.target.value as GeneratorBackend)}
-                className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+                className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
               >
                 <option value="claude">Claude Code (higher quality)</option>
                 <option value="local">Local model (faster, lower quality)</option>
               </select>
             </div>
-            <button
+            <Button
               type="button"
               onClick={handleGenerate}
               disabled={generator.generating || !topic.trim() || !sourceMaterial.trim()}
-              className="text-white transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40"
-              style={{
-                background: 'var(--gradient-brand)',
-                borderRadius: 'var(--radius-md)',
-                padding: '8px 16px',
-                fontSize: '11.5px',
-                fontWeight: 600,
-              }}
+              variant="brand"
+              size="pill-sm"
+              className="rounded-md disabled:opacity-40"
             >
-              {generator.generating ? 'Generating...' : 'Generate'}
-            </button>
+              {generator.generating ? 'Generating…' : 'Generate'}
+            </Button>
           </div>
 
           {generator.error && <p className="text-danger text-[11px]">{generator.error}</p>}

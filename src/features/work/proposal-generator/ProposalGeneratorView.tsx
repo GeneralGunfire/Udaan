@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTemplateLibrary } from './hooks/useTemplateLibrary'
 import { extractPlaceholders, fillTemplate, placeholderLabel } from './lib/fillTemplate'
 import { ProjectIcon, PencilIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
 
 /**
  * Proposal / Quote Generator — template-based document generation over
@@ -71,7 +72,7 @@ export function ProposalGeneratorView() {
                 key={t.id}
                 type="button"
                 onClick={() => selectTemplate(t.id)}
-                className={`rounded-md px-2 py-1.5 text-left text-[11px] transition-colors duration-150 ${
+                className={`focus-visible:ring-brand-cyan/60 rounded-md px-2 py-1.5 text-left text-[11px] outline-none transition-colors duration-150 focus-visible:ring-2 ${
                   t.id === selectedId
                     ? 'bg-glass-hover text-text-primary font-medium'
                     : 'text-text-secondary hover:bg-glass-hover'
@@ -101,7 +102,7 @@ export function ProposalGeneratorView() {
                       type="text"
                       value={values[key] ?? ''}
                       onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                      className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1.5 text-[11.5px]"
+                      className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1.5 text-[11.5px] outline-none focus-visible:ring-2"
                     />
                   </div>
                 ))
@@ -120,20 +121,12 @@ export function ProposalGeneratorView() {
             <h2 className="text-text-primary text-[12px] font-semibold">Preview</h2>
             {selected && (
               <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={copyToClipboard}
-                  className="text-text-secondary hover:bg-glass-hover rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-                >
+                <Button type="button" onClick={copyToClipboard} variant="ghost" size="pill-sm" className="rounded-md">
                   {copied ? 'Copied' : 'Copy'}
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadTxt}
-                  className="text-text-secondary hover:bg-glass-hover rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150"
-                >
+                </Button>
+                <Button type="button" onClick={downloadTxt} variant="ghost" size="pill-sm" className="rounded-md">
                   Download .txt
-                </button>
+                </Button>
               </div>
             )}
           </div>
