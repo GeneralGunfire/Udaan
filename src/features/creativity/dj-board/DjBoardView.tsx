@@ -81,7 +81,7 @@ export function DjBoardView() {
   }
 
   return (
-    <div className="flex h-full w-full max-w-[1500px] flex-col gap-3 overflow-hidden py-2">
+    <div className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-3 overflow-hidden py-2">
       <div className="flex shrink-0 justify-end">
         <button
           type="button"
@@ -93,7 +93,7 @@ export function DjBoardView() {
         </button>
       </div>
 
-      <div className="grid h-0 flex-1 grid-cols-[240px_1fr_190px_1fr] gap-3">
+      <div className="grid h-0 min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)_190px_minmax(0,1fr)] gap-3 *:min-h-0">
         <TrackLibrary
           folderPath={library.folderPath}
           tracks={library.tracks}
