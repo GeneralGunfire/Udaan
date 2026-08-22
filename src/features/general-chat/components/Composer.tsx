@@ -18,19 +18,14 @@ import {
 } from '@/shared/components/ui/dropdown-menu'
 import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 import { spring, duration, prefersReducedMotion } from '@/shared/lib/motion'
+import { useWallpaper } from '@/shared/hooks/useWallpaper'
+import { getWallpaper } from '@/app/wallpapers'
 import { MODES, type ModeId } from './modes'
 import { ChatMessage } from './ChatMessage'
 import { ChatCommandPalette } from './ChatCommandPalette'
 import { useGeneralChat } from '../hooks/useGeneralChat'
 import { useMicTranscription } from '../hooks/useMicTranscription'
 import { useStickyScroll } from '../hooks/useStickyScroll'
-
-const SUGGESTED_PROMPTS = [
-  "What's on my schedule today?",
-  'Summarize my recent notes',
-  'Help me draft an email',
-  'What can you help me with?',
-]
 
 /**
  * Home composer. Arc/Raycast-style rounded-rect surface with a single
@@ -80,7 +75,7 @@ export function Composer() {
   const { containerRef, handleScroll } = useStickyScroll(messages)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const MAX_TEXTAREA_HEIGHT = 160
+  const MAX_TEXTAREA_HEIGHT = 208
 
   function autoGrow(el: HTMLTextAreaElement) {
     el.style.height = 'auto'
@@ -120,6 +115,12 @@ export function Composer() {
 
   const isEmpty = !loadingHistory && messages.length === 0
   const reduced = prefersReducedMotion()
+  const { wallpaperId } = useWallpaper()
+  // Lighter wallpapers need a stronger localized veil to keep text/controls
+  // readable; darker ones need barely any — avoids a fixed-opacity overlay
+  // that either washes out on light art or looks unnecessarily heavy on
+  // dark art. Uses the wallpaper's own declared `mood`, not image analysis.
+  const veilStrength = getWallpaper(wallpaperId).mood === 'light' ? 1 : 0.55
 
   // Cmd/Ctrl+K opens the chat command palette from anywhere on this page —
   // the keyboard-first entry point the brief asks for, scoped to what
@@ -140,7 +141,7 @@ export function Composer() {
   return (
     <TooltipProvider delayDuration={400}>
     <div
-      className={`mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col ${
+      className={`mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col lg:max-w-3xl xl:max-w-[52rem] ${
         isEmpty ? 'justify-center' : ''
       }`}
     >
@@ -163,24 +164,41 @@ export function Composer() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
             transition={reduced ? { duration: duration.instant } : spring.emphasis}
-            className="mb-6 flex shrink-0 flex-col items-center gap-5 px-1"
+            className="relative mb-8 flex shrink-0 flex-col items-center gap-6 px-1"
           >
-            <div className="flex flex-col items-center gap-2 text-center">
+            {/* Localized atmospheric contrast layer — a soft radial veil
+                sized to just this content block (logo + tagline + hint),
+                not a card and not the full panel. Keeps text readable
+                over bright wallpapers without a hard-edged boundary;
+                barely visible against dark wallpapers since it's a
+                low-opacity dark radial, additive rather than a fixed
+                tint. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-[-25%] inset-y-[-30%] -z-10 transition-opacity duration-500"
+              style={{
+                opacity: veilStrength,
+                background:
+                  'radial-gradient(ellipse 65% 65% at 50% 40%, rgb(4 8 16 / 32%) 0%, rgb(4 8 16 / 14%) 55%, transparent 80%)',
+              }}
+            />
+
+            <div className="flex flex-col items-center gap-2.5 text-center">
               <img
                 src={udaanMark}
                 alt=""
-                className="h-9 w-9 object-contain"
+                className="h-11 w-11 object-contain"
                 style={{ filter: 'drop-shadow(0 2px 10px rgb(0 0 0 / 55%))' }}
               />
               <div>
                 <div
-                  className="font-display text-text-primary text-[18px] font-semibold"
-                  style={{ textShadow: '0 1px 8px rgb(0 0 0 / 45%)' }}
+                  className="font-display text-text-primary text-[22px] font-semibold"
+                  style={{ textShadow: '0 1px 10px rgb(0 0 0 / 50%)' }}
                 >
                   Udaan
                 </div>
                 <div
-                  className="font-display text-text-secondary text-[12.5px]"
+                  className="font-display text-text-secondary text-[13.5px]"
                   style={{ textShadow: '0 1px 8px rgb(0 0 0 / 45%)' }}
                 >
                   Your ideas, set in motion
@@ -188,29 +206,8 @@ export function Composer() {
               </div>
             </div>
 
-            {/* Quieter than the composer below it — smaller text, no
-                backdrop-blur/border weight competing with the primary
-                surface, subtle opacity-only entrance. Secondary, not a
-                second hero. */}
-            <div className="grid w-full grid-cols-2 gap-1.5">
-              {SUGGESTED_PROMPTS.map((prompt, i) => (
-                <motion.button
-                  key={prompt}
-                  type="button"
-                  onClick={() => handleSubmit(prompt)}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.16, delay: reduced ? 0 : 0.03 * i }}
-                  whileHover={reduced ? undefined : { scale: 1.008 }}
-                  whileTap={reduced ? undefined : { scale: 0.99 }}
-                  className="text-text-tertiary hover:text-text-secondary hover:bg-glass focus-visible:ring-brand-cyan/60 rounded-lg px-2.5 py-2 text-left text-[12px] leading-snug transition-colors duration-150 outline-none focus-visible:ring-2"
-                >
-                  {prompt}
-                </motion.button>
-              ))}
-            </div>
-            <div className="text-text-tertiary/70 flex items-center gap-1 text-[11px]">
-              <kbd className="border-glass-border rounded border px-1 py-0.5 font-mono text-[10px]">
+            <div className="text-text-tertiary/80 flex items-center gap-1.5 text-[11.5px]">
+              <kbd className="border-glass-border rounded border px-1.5 py-0.5 font-mono text-[10.5px]">
                 {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K
               </kbd>
               <span>for commands</span>
@@ -264,10 +261,10 @@ export function Composer() {
       </AnimatePresence>
 
       <div
-        className="focus-within:ring-brand-cyan/40 relative w-full shrink-0 rounded-2xl border p-3 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
+        className="focus-within:ring-brand-cyan/40 focus-within:border-glass-border relative w-full shrink-0 rounded-2xl border p-4 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
         style={{
           borderColor: 'var(--color-glass-border)',
-          background: 'color-mix(in srgb, var(--color-bg-elevated) 70%, transparent)',
+          background: 'color-mix(in srgb, var(--color-bg-elevated) 74%, transparent)',
         }}
       >
         <textarea
@@ -287,10 +284,10 @@ export function Composer() {
             mic.transcribing ? 'Transcribing…' : 'Type something to build…'
           }
           disabled={mic.transcribing}
-          rows={2}
-          className="text-text-primary placeholder:text-text-tertiary max-h-40 min-h-9 w-full resize-none overflow-y-auto bg-transparent text-[13.5px] leading-snug outline-none disabled:opacity-50"
+          rows={3}
+          className="text-text-primary placeholder:text-text-tertiary max-h-52 min-h-12 w-full resize-none overflow-y-auto bg-transparent text-[14.5px] leading-relaxed outline-none disabled:opacity-50"
         />
-        <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-2">
+        <div className="mt-3 flex items-center justify-between border-t border-white/6 pt-3">
           <div className="flex items-center gap-1.5">
             <div
               className="flex items-center gap-0.5 rounded-xl border p-0.5"

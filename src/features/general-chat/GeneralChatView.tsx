@@ -8,19 +8,23 @@ import { Composer } from './components/Composer'
  * `Composer` own its own internal scroll area — including the empty
  * state, since only `Composer` knows whether there are messages yet.
  *
- * No page-wide scrim here — tried a bottom-weighted gradient overlay
- * confined to this view's own `max-w-3xl` column, but it showed as a
- * visible hard-edged rectangle against the full-bleed wallpaper (the
- * scrim's own edges, not covering the whole panel). Reverted; per-surface
- * contrast (composer/bubbles each carry their own near-opaque fill +
- * blur, see Composer.tsx/ChatMessage.tsx) already solves legibility
- * without needing a shared background trick that would have to live at
- * the `App.tsx` panel level (out of this view's scope) to avoid that
- * seam.
+ * Width: this wrapper only bounds the column at the largest sizes
+ * (ultrawide guard); `Composer` itself now owns the actual responsive
+ * max-width so the logo/suggestions/composer share one axis instead of
+ * two independently-capped containers (this file was `max-w-3xl`,
+ * `Composer` was `max-w-2xl` — the mismatch read as misaligned edges).
+ *
+ * The localized readability treatment lives in `Composer.tsx` itself
+ * (scoped to just the content block, not this full-height panel) — a
+ * bottom-weighted gradient confined to *this* wrapper was tried and
+ * reverted in an earlier pass because it showed as a visible hard-edged
+ * rectangle against the full-bleed wallpaper when the wrapper's own
+ * height (full panel, via `justify-center` centering) didn't match the
+ * actual content height.
  */
 export function GeneralChatView() {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden px-6 py-8">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden px-6 py-8">
       <Composer />
     </div>
   )
