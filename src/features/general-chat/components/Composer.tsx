@@ -203,7 +203,7 @@ export function Composer() {
                   transition={{ duration: 0.16, delay: reduced ? 0 : 0.03 * i }}
                   whileHover={reduced ? undefined : { scale: 1.008 }}
                   whileTap={reduced ? undefined : { scale: 0.99 }}
-                  className="text-text-tertiary hover:text-text-secondary hover:bg-glass rounded-lg px-2.5 py-2 text-left text-[12px] leading-snug transition-colors duration-150"
+                  className="text-text-tertiary hover:text-text-secondary hover:bg-glass focus-visible:ring-brand-cyan/60 rounded-lg px-2.5 py-2 text-left text-[12px] leading-snug transition-colors duration-150 outline-none focus-visible:ring-2"
                 >
                   {prompt}
                 </motion.button>
@@ -264,7 +264,7 @@ export function Composer() {
       </AnimatePresence>
 
       <div
-        className="relative w-full shrink-0 rounded-2xl border p-3 backdrop-blur-md transition-colors duration-200"
+        className="focus-within:ring-brand-cyan/40 relative w-full shrink-0 rounded-2xl border p-3 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
         style={{
           borderColor: 'var(--color-glass-border)',
           background: 'color-mix(in srgb, var(--color-bg-elevated) 70%, transparent)',
