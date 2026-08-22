@@ -38,14 +38,19 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
     function onClickOutside(e: MouseEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
     // Deferred one tick so the click that opened the picker doesn't
     // immediately bubble into this listener and close it again.
     const id = window.setTimeout(() => {
       document.addEventListener('click', onClickOutside)
+      document.addEventListener('keydown', onKeyDown)
     }, 0)
     return () => {
       window.clearTimeout(id)
       document.removeEventListener('click', onClickOutside)
+      document.removeEventListener('keydown', onKeyDown)
     }
   }, [open])
 
@@ -66,7 +71,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`glass-surface flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none ${
+        className={`glass-surface focus-visible:ring-brand-cyan/60 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none focus-visible:ring-2 ${
           value ? 'text-text-primary' : 'text-text-tertiary'
         }`}
       >
@@ -89,7 +94,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
                 type="button"
                 aria-label="Previous month"
                 onClick={() => setCursor(new Date(year, month - 1, 1))}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-150"
+                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex h-6 w-6 items-center justify-center rounded-full outline-none transition-colors duration-150 focus-visible:ring-2"
               >
                 <span className="flex rotate-180">
                   <ChevronRightIcon width={11} height={11} />
@@ -102,7 +107,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
                 type="button"
                 aria-label="Next month"
                 onClick={() => setCursor(new Date(year, month + 1, 1))}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-150"
+                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex h-6 w-6 items-center justify-center rounded-full outline-none transition-colors duration-150 focus-visible:ring-2"
               >
                 <ChevronRightIcon width={11} height={11} />
               </button>
@@ -129,7 +134,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
                       onChange(iso)
                       setOpen(false)
                     }}
-                    className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[11.5px] font-medium transition-colors duration-150 ${
+                    className={`focus-visible:ring-brand-cyan/60 mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[11.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
                       isSelected
                         ? 'text-white'
                         : 'text-text-secondary hover:bg-glass-hover'
@@ -149,7 +154,7 @@ export function DatePicker({ value, onChange, placeholder = 'Select date' }: Dat
                   onChange('')
                   setOpen(false)
                 }}
-                className="text-text-tertiary hover:text-text-primary border-glass-border mt-2 w-full border-t pt-2 text-center text-[11.5px]"
+                className="text-text-tertiary hover:text-text-primary focus-visible:ring-brand-cyan/60 border-glass-border mt-2 w-full rounded-md border-t pt-2 text-center text-[11.5px] outline-none focus-visible:ring-2"
               >
                 Clear date
               </button>

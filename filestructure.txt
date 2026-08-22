@@ -272,6 +272,7 @@
             |-- TopBar.tsx
             |-- ui
                 |-- button.tsx
+                |-- dialog.tsx
                 |-- dropdown-menu.tsx
                 |-- tooltip.tsx
             |-- WallpaperPicker.tsx

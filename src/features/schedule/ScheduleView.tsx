@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { GlassPanel } from '@/shared/components/GlassPanel'
+import { spring, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 import { CalendarIcon, ChevronRightIcon } from '@/shared/icons'
 import {
   TODO_ITEMS,
@@ -43,6 +44,7 @@ export function ScheduleView() {
   const todayCount = getEventsForDate(today).length
   const doneTodos = TODO_ITEMS.filter((t) => t.done)
   const pendingTodos = TODO_ITEMS.filter((t) => !t.done)
+  const reduced = prefersReducedMotion()
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-4 overflow-y-auto py-4">
@@ -101,18 +103,14 @@ export function ScheduleView() {
                     key={f.id}
                     type="button"
                     onClick={() => setFilter(f.id)}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                    className="relative rounded-full px-2.5 py-1 text-[10.5px] font-medium"
+                    whileTap={reduced ? undefined : pressableIcon.whileTap}
+                    transition={pressableIcon.transition}
+                    className="focus-visible:ring-brand-cyan/60 relative rounded-full px-2.5 py-1 text-[10.5px] font-medium outline-none focus-visible:ring-2"
                   >
                     {isActive && (
                       <motion.div
                         layoutId="schedule-filter-pill"
-                        transition={{
-                          type: 'spring',
-                          stiffness: 400,
-                          damping: 32,
-                        }}
+                        transition={spring.standard}
                         className="bg-glass-hover absolute inset-0 rounded-full"
                       />
                     )}
@@ -232,11 +230,11 @@ function TodoSection({
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
-        className="text-text-secondary hover:text-text-primary flex items-center gap-1.5 text-[12px] font-medium transition-colors duration-150"
+        className="text-text-secondary hover:text-text-primary focus-visible:ring-brand-cyan/60 flex items-center gap-1.5 rounded-md text-[12px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2"
       >
         <motion.span
           animate={{ rotate: collapsed ? 0 : 90 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          transition={spring.micro}
           className="flex"
         >
           <ChevronRightIcon width={10} height={10} />

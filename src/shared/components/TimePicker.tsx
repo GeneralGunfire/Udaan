@@ -21,12 +21,17 @@ export function TimePicker({ value, onChange, placeholder = 'Select time' }: Tim
     function onClickOutside(e: MouseEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
     const id = window.setTimeout(() => {
       document.addEventListener('click', onClickOutside)
+      document.addEventListener('keydown', onKeyDown)
     }, 0)
     return () => {
       window.clearTimeout(id)
       document.removeEventListener('click', onClickOutside)
+      document.removeEventListener('keydown', onKeyDown)
     }
   }, [open])
 
@@ -39,7 +44,7 @@ export function TimePicker({ value, onChange, placeholder = 'Select time' }: Tim
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`glass-surface w-full rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none ${
+        className={`glass-surface focus-visible:ring-brand-cyan/60 w-full rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none focus-visible:ring-2 ${
           value ? 'text-text-primary' : 'text-text-tertiary'
         }`}
       >
@@ -62,7 +67,7 @@ export function TimePicker({ value, onChange, placeholder = 'Select time' }: Tim
                   key={h}
                   type="button"
                   onClick={() => commit(h, minute ?? 0)}
-                  className={`px-3 py-1 text-center text-[12.5px] transition-colors duration-150 ${
+                  className={`focus-visible:ring-brand-cyan/60 px-3 py-1 text-center text-[12.5px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset ${
                     h === hour
                       ? 'bg-glass-hover text-text-primary font-semibold'
                       : 'text-text-secondary hover:bg-glass-hover'
@@ -81,7 +86,7 @@ export function TimePicker({ value, onChange, placeholder = 'Select time' }: Tim
                     commit(hour ?? 0, m)
                     setOpen(false)
                   }}
-                  className={`px-3 py-1 text-center text-[12.5px] transition-colors duration-150 ${
+                  className={`focus-visible:ring-brand-cyan/60 px-3 py-1 text-center text-[12.5px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset ${
                     m === minute
                       ? 'bg-glass-hover text-text-primary font-semibold'
                       : 'text-text-secondary hover:bg-glass-hover'

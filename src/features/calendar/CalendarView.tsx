@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GlassPanel } from '@/shared/components/GlassPanel'
+import { Button } from '@/shared/components/ui/button'
+import { spring, duration, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 import { ChevronRightIcon, CalendarIcon, PlusIcon } from '@/shared/icons'
 import {
   getEventsForDate,
@@ -62,6 +64,7 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long' })
+  const reduced = prefersReducedMotion()
 
   const cells = useMemo(() => buildMonthCells(year, month), [year, month])
 
@@ -97,35 +100,29 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
             <h2 className="font-display text-text-primary text-[14px] font-semibold">
               {monthLabel} {year}
             </h2>
-            <div className="flex items-center gap-1">
-              <motion.button
+            <div className="flex items-center gap-0.5">
+              <Button
                 type="button"
                 aria-label="Previous month"
                 onClick={() => goMonth(-1)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-150"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
               >
-                <motion.span
-                  animate={{ rotate: 180 }}
-                  className="flex"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                >
+                <span className="flex rotate-180">
                   <ChevronRightIcon width={11} height={11} />
-                </motion.span>
-              </motion.button>
-              <motion.button
+                </span>
+              </Button>
+              <Button
                 type="button"
                 aria-label="Next month"
                 onClick={() => goMonth(1)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-150"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
               >
                 <ChevronRightIcon width={11} height={11} />
-              </motion.button>
+              </Button>
             </div>
           </div>
 
@@ -151,10 +148,10 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                   key={cell.iso}
                   type="button"
                   onClick={() => setSelectedDate(cell.iso!)}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  className={`relative mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium transition-colors duration-150 ${
+                  whileHover={reduced ? undefined : pressableIcon.whileHover}
+                  whileTap={reduced ? undefined : pressableIcon.whileTap}
+                  transition={pressableIcon.transition}
+                  className={`focus-visible:ring-brand-cyan/60 relative mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
                     isSelected
                       ? 'text-white'
                       : isToday
@@ -187,10 +184,10 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                   key={tag.id}
                   type="button"
                   onClick={() => toggleTag(tag.id)}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-150"
+                  whileHover={reduced ? undefined : pressableIcon.whileHover}
+                  whileTap={reduced ? undefined : pressableIcon.whileTap}
+                  transition={pressableIcon.transition}
+                  className="focus-visible:ring-brand-cyan/60 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold outline-none transition-all duration-150 focus-visible:ring-2"
                   style={{
                     backgroundColor: active
                       ? `color-mix(in srgb, var(${categoryAccentVar(tag.id)}) 16%, transparent)`
@@ -235,7 +232,7 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                     key={event.id}
                     type="button"
                     onClick={() => setSelectedDate(event.date)}
-                    className="hover:bg-glass-hover flex items-start gap-2 rounded-[8px] px-1.5 py-1 text-left transition-colors duration-150"
+                    className="hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex items-start gap-2 rounded-[8px] px-1.5 py-1 text-left outline-none transition-colors duration-150 focus-visible:ring-2"
                   >
                     <span
                       className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
@@ -294,50 +291,42 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
             <h1 className="font-display text-text-primary text-[20px] font-semibold">
               {monthLabel} {year}
             </h1>
-            <div className="flex items-center gap-1">
-              <motion.button
+            <div className="flex items-center gap-0.5">
+              <Button
                 type="button"
                 aria-label="Previous month"
                 onClick={() => goMonth(-1)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-150"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
               >
-                <motion.span
-                  animate={{ rotate: 180 }}
-                  className="flex"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                >
+                <span className="flex rotate-180">
                   <ChevronRightIcon width={13} height={13} />
-                </motion.span>
-              </motion.button>
-              <motion.button
+                </span>
+              </Button>
+              <Button
                 type="button"
                 aria-label="Next month"
                 onClick={() => goMonth(1)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                className="text-text-tertiary hover:text-text-primary hover:bg-glass-hover flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-150"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
               >
                 <ChevronRightIcon width={13} height={13} />
-              </motion.button>
+              </Button>
             </div>
           </div>
 
-          <motion.button
+          <Button
             type="button"
             onClick={onAddEvent}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-semibold text-white"
-            style={{ background: 'var(--gradient-brand)' }}
+            variant="brand"
+            size="pill"
+            className="rounded-full"
           >
             <PlusIcon width={13} height={13} />
             New Event
-          </motion.button>
+          </Button>
         </div>
 
         <div className="grid grid-cols-7 gap-1">
@@ -372,10 +361,10 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                 key={cell.iso}
                 type="button"
                 onClick={() => setSelectedDate(cell.iso!)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                className={`relative flex h-20 flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium transition-colors duration-150 ${
+                whileHover={reduced ? undefined : { scale: 1.01 }}
+                whileTap={reduced ? undefined : { scale: 0.99 }}
+                transition={spring.micro}
+                className={`focus-visible:ring-brand-cyan/60 relative flex h-20 flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
                   isSelected
                     ? 'bg-glass-hover text-text-primary'
                     : 'text-text-secondary hover:bg-glass'
@@ -413,10 +402,10 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
         <AnimatePresence mode="wait">
           <motion.div
             key={selectedDate}
-            initial={{ opacity: 0, y: 6 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={{ duration: duration.micro }}
             className="border-glass-border flex flex-col gap-2 border-t pt-3"
           >
             <h3 className="text-text-tertiary text-[11px] font-semibold tracking-wide uppercase">
