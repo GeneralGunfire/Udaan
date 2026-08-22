@@ -124,6 +124,7 @@
             |-- hooks
                 |-- useGeneralChat.ts
                 |-- useMicTranscription.ts
+                |-- useOllamaControl.ts
                 |-- useStickyScroll.ts
             |-- lib
         |-- global-search
@@ -339,6 +340,7 @@
         |-- lib.rs
         |-- local_model
             |-- mod.rs
+            |-- ollama_process.rs
             |-- transcribe.py
             |-- transcribe.rs
         |-- main.rs

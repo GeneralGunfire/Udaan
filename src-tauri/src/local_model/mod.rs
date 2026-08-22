@@ -1,8 +1,11 @@
+mod ollama_process;
 mod transcribe;
 
+pub use ollama_process::OllamaProcess;
 pub use transcribe::WhisperServer;
 
 use tauri::State;
+use tokio::process::Command;
 
 #[tauri::command]
 pub async fn local_model_transcribe(
@@ -29,4 +32,48 @@ pub async fn local_model_transcribe_bytes(
   let result = state.transcribe(path.to_string_lossy().into_owned()).await;
   let _ = tokio::fs::remove_file(&path).await;
   result
+}
+
+#[tauri::command]
+pub async fn local_model_start_ollama(state: State<'_, OllamaProcess>) -> Result<(), String> {
+  {
+    let guard = state.0.lock().unwrap();
+    if guard.is_some() {
+      return Ok(()); // already running one we started
+    }
+  }
+
+  let child = Command::new("ollama")
+    .arg("serve")
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null())
+    .spawn()
+    .map_err(|e| format!("Could not start \"ollama serve\": {e}. Is Ollama installed and on PATH?"))?;
+
+  *state.0.lock().unwrap() = Some(child);
+  Ok(())
+}
+
+#[tauri::command]
+pub async fn local_model_stop_ollama(state: State<'_, OllamaProcess>) -> Result<(), String> {
+  let mut child = {
+    let mut guard = state.0.lock().unwrap();
+    guard.take()
+  };
+  if let Some(child) = child.as_mut() {
+    child
+      .kill()
+      .await
+      .map_err(|e| format!("Failed to stop Ollama: {e}"))?;
+  }
+  Ok(())
+}
+
+/// True only if *this app* started the currently-tracked process — not a
+/// general "is Ollama running" check (that's `isReachable()` on the
+/// frontend, via the HTTP API, which also covers an externally-started
+/// instance).
+#[tauri::command]
+pub async fn local_model_started_ollama(state: State<'_, OllamaProcess>) -> Result<bool, String> {
+  Ok(state.0.lock().unwrap().is_some())
 }

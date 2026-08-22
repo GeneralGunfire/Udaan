@@ -5,6 +5,7 @@ import {
   SendIcon,
   MicIcon,
   StopIcon,
+  PlayIcon,
   PlusIcon,
   ChevronRightIcon,
   WindowCloseIcon,
@@ -26,6 +27,7 @@ import { ChatCommandPalette } from './ChatCommandPalette'
 import { useGeneralChat } from '../hooks/useGeneralChat'
 import { useMicTranscription } from '../hooks/useMicTranscription'
 import { useStickyScroll } from '../hooks/useStickyScroll'
+import { useOllamaControl } from '../hooks/useOllamaControl'
 
 /**
  * Home composer. Arc/Raycast-style rounded-rect surface with a single
@@ -72,6 +74,7 @@ export function Composer() {
     closeSession,
   } = useGeneralChat(activeMode)
   const mic = useMicTranscription()
+  const ollama = useOllamaControl()
   const { containerRef, handleScroll } = useStickyScroll(messages)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -241,7 +244,7 @@ export function Composer() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {mic.error && (
+        {(mic.error || ollama.error) && (
           <motion.div
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -250,10 +253,10 @@ export function Composer() {
             className="mb-2 flex shrink-0 items-center justify-between gap-2 overflow-hidden rounded-xl border border-red-500/25 px-3 py-2 text-[12px] text-red-400 backdrop-blur-md"
             style={{ background: 'color-mix(in srgb, var(--color-bg-elevated) 75%, rgb(239 68 68 / 15%))' }}
           >
-            <span>{mic.error}</span>
+            <span>{mic.error || ollama.error}</span>
             <Button
               type="button"
-              onClick={mic.clearError}
+              onClick={mic.error ? mic.clearError : ollama.clearError}
               aria-label="Dismiss"
               variant="ghost"
               size="icon-sm"
@@ -336,6 +339,54 @@ export function Composer() {
                 )
               })}
             </div>
+
+            <AnimatePresence>
+              {activeMode === 'local' && (
+                <motion.div
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
+                  transition={spring.micro}
+                >
+                  <Tooltip
+                    content={
+                      ollama.pending
+                        ? ollama.running
+                          ? 'Stopping Ollama…'
+                          : 'Starting Ollama…'
+                        : ollama.running
+                          ? ollama.startedByApp
+                            ? 'Stop Ollama'
+                            : 'Ollama is running (started outside Udaan)'
+                          : 'Start Ollama'
+                    }
+                  >
+                    <Button
+                      type="button"
+                      aria-label={ollama.running ? 'Stop Ollama' : 'Start Ollama'}
+                      variant="ghost"
+                      size="pill-sm"
+                      disabled={ollama.pending || (ollama.running && !ollama.startedByApp)}
+                      onClick={() => (ollama.running ? ollama.stop() : ollama.start())}
+                      className="gap-1.5 rounded-lg"
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-200 ${
+                          ollama.running ? 'bg-emerald-400' : 'bg-text-tertiary/50'
+                        } ${ollama.pending ? 'animate-pulse' : ''}`}
+                      />
+                      <span className="text-[12px]">
+                        {ollama.running ? 'Ollama' : 'Start Ollama'}
+                      </span>
+                      {ollama.running && ollama.startedByApp && (
+                        <StopIcon width={9} height={9} className="text-text-tertiary" />
+                      )}
+                      {!ollama.running && <PlayIcon width={9} height={9} className="text-text-tertiary" />}
+                    </Button>
+                  </Tooltip>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <DropdownMenu
               open={sessionListOpen}

@@ -108,6 +108,21 @@ export async function chat(
   }
 }
 
+/** Starts `ollama serve` as a background process managed by Udaan itself, so it survives after this call returns and can later be stopped with `stopOllama()`. No-op if Udaan already has one running. */
+export function startOllama(): Promise<void> {
+  return invoke('local_model_start_ollama')
+}
+
+/** Stops the `ollama serve` process Udaan itself started. Never touches an Ollama instance the user launched some other way. */
+export function stopOllama(): Promise<void> {
+  return invoke('local_model_stop_ollama')
+}
+
+/** True only if Udaan itself currently has an `ollama serve` process running — not a general reachability check (use `isReachable()` for that, which also covers an externally-started instance). */
+export function hasStartedOllama(): Promise<boolean> {
+  return invoke('local_model_started_ollama')
+}
+
 /** Transcribes an audio file at `path` with the local whisper (tiny) model via the Rust backend. */
 export function transcribe(path: string): Promise<TranscriptionResult> {
   return invoke('local_model_transcribe', { path })

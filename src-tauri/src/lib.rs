@@ -26,6 +26,9 @@ pub fn run() {
       claude_code::claude_code_check_cli,
       local_model::local_model_transcribe,
       local_model::local_model_transcribe_bytes,
+      local_model::local_model_start_ollama,
+      local_model::local_model_stop_ollama,
+      local_model::local_model_started_ollama,
       general_chat::general_chat_create_session,
       general_chat::general_chat_list_sessions,
       general_chat::general_chat_list_messages,
@@ -73,6 +76,7 @@ pub fn run() {
       let state = claude_code::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(state);
       app.manage(local_model::WhisperServer::new());
+      app.manage(local_model::OllamaProcess::default());
       let general_chat_state = general_chat::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(general_chat_state);
       let template_library_state = template_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
@@ -88,6 +92,17 @@ pub fn run() {
       }
 
       Ok(())
+    })
+    .on_window_event(|window, event| {
+      // Best-effort: if the user started Ollama from Udaan's own button and
+      // then closes the window, don't leave it running as an orphaned
+      // background process. Only ever kills a process we spawned
+      // ourselves — see OllamaProcess's own doc comment.
+      if let tauri::WindowEvent::CloseRequested { .. } = event {
+        if let Some(state) = window.try_state::<local_model::OllamaProcess>() {
+          state.kill_blocking();
+        }
+      }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
