@@ -10,6 +10,8 @@ import {
   FlangerIcon,
   BitcrushIcon,
   PhaserIcon,
+  DistortionIcon,
+  TremoloIcon,
 } from '@/shared/icons'
 
 interface EffectsRackProps {
@@ -26,6 +28,8 @@ const EFFECT_LABELS: Record<EffectKind, string> = {
   flanger: 'Flanger',
   bitcrush: 'Bitcrush',
   phaser: 'Phaser',
+  distortion: 'Distortion',
+  tremolo: 'Tremolo',
 }
 
 const EFFECT_HINTS: Record<EffectKind, string> = {
@@ -35,6 +39,8 @@ const EFFECT_HINTS: Record<EffectKind, string> = {
   flanger: 'Jet-swoosh modulation — deeper and faster at high intensity.',
   bitcrush: 'Lo-fi crunch — quantizes the signal, harsher as you push it.',
   phaser: 'Sweeping notch cascade — wide, slow swirl at high intensity.',
+  distortion: 'Analog-style drive/saturation — harder clip at high intensity.',
+  tremolo: 'Rhythmic volume pulse — deeper and faster at high intensity.',
 }
 
 const EFFECT_ICONS: Record<EffectKind, (props: { width: number; height: number }) => React.ReactElement> = {
@@ -44,6 +50,8 @@ const EFFECT_ICONS: Record<EffectKind, (props: { width: number; height: number }
   flanger: FlangerIcon,
   bitcrush: BitcrushIcon,
   phaser: PhaserIcon,
+  distortion: DistortionIcon,
+  tremolo: TremoloIcon,
 }
 
 /**
@@ -53,12 +61,13 @@ const EFFECT_ICONS: Record<EffectKind, (props: { width: number; height: number }
  * press and hold a pad to engage, release to stop — not a toggle.
  *
  * Redesigned for easier use: expanded by default (no extra click to see
- * what's available), compact pads sized to avoid crowding/overlap in a
- * 3-column grid, a live percentage readout on the pad itself (no need
- * to squint at a thin bar underneath), a short plain-language hint per
- * effect, and the same scroll/drag intensity control as before. Hover
- * feedback is opacity/press-scale only (never scale-up) so a hovered
- * pad never grows into its neighbors.
+ * what's available), a 4-column grid where every pad is `w-full` inside
+ * an equal-width grid track — sized purely by the grid, not by each
+ * label's text length, so all 8 pads are uniformly sized regardless of
+ * "Reverb" vs "Distortion" — a live percentage readout on the pad
+ * itself, and a short plain-language hint per effect. Hover feedback is
+ * opacity/press-scale only (never scale-up) so a hovered pad never
+ * grows into its neighbors.
  */
 export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsRackProps) {
   const [expanded, setExpanded] = useState(true)
@@ -146,7 +155,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
             transition={{ type: 'spring', stiffness: 400, damping: 38 }}
             className="overflow-hidden"
           >
-            <div className="mx-auto grid max-w-140 grid-cols-6 justify-items-center gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {(Object.keys(effects) as EffectKind[]).map((kind) => {
                 const effect = effects[kind]
                 const Icon = EFFECT_ICONS[kind]
@@ -169,7 +178,7 @@ export function EffectsRack({ effects, onEngage, onRelease, onAmount }: EffectsR
                     title={`Hold to apply ${EFFECT_LABELS[kind]}. Scroll or drag to change intensity.`}
                     animate={{ scale: effect.engaged ? 0.95 : 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-                    className="relative flex h-16 max-w-32 cursor-pointer touch-none flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg select-none"
+                    className="relative flex h-16 w-full cursor-pointer touch-none flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg select-none"
                     style={{
                       background: effect.engaged ? 'var(--gradient-brand)' : 'var(--color-glass-bg-hover)',
                       color: effect.engaged ? '#fff' : 'var(--color-text-secondary)',

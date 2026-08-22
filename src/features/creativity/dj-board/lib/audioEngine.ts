@@ -12,7 +12,7 @@
  * depth, reverb wet mix.
  */
 
-export type EffectKind = 'reverb' | 'delay' | 'filter' | 'flanger' | 'bitcrush' | 'phaser'
+export type EffectKind = 'reverb' | 'delay' | 'filter' | 'flanger' | 'bitcrush' | 'phaser' | 'distortion' | 'tremolo'
 
 export interface EffectState {
   /** True only while the control is actively held down. */
@@ -31,6 +31,8 @@ export function defaultEffectsRack(): EffectsRackState {
     flanger: { engaged: false, amount: 0.5 },
     bitcrush: { engaged: false, amount: 0.5 },
     phaser: { engaged: false, amount: 0.5 },
+    distortion: { engaged: false, amount: 0.4 },
+    tremolo: { engaged: false, amount: 0.5 },
   }
 }
 
@@ -56,6 +58,18 @@ function buildBitcrushCurve(amount: number): Float32Array<ArrayBuffer> {
   for (let i = 0; i < curveLength; i++) {
     const x = (i / (curveLength - 1)) * 2 - 1
     curve[i] = Math.round(x * steps) / steps
+  }
+  return curve
+}
+
+/** Builds a tanh soft-clip transfer curve for WaveShaper — real analog-style saturation, distinct from bitcrush's stepped quantization. Higher amount = harder drive = more clipping. */
+function buildDistortionCurve(amount: number): Float32Array<ArrayBuffer> {
+  const drive = 1 + amount * 40
+  const curveLength = 1024
+  const curve = new Float32Array(new ArrayBuffer(curveLength * 4))
+  for (let i = 0; i < curveLength; i++) {
+    const x = (i / (curveLength - 1)) * 2 - 1
+    curve[i] = Math.tanh(x * drive) / Math.tanh(drive)
   }
   return curve
 }
@@ -133,6 +147,15 @@ export class DeckAudioEngine {
   private readonly phaserLfoGain: GainNode
   private readonly phaserFeedback: GainNode
   private readonly phaserWet: GainNode
+  /** Effect distortion: WaveShaper doing real tanh soft-clip saturation (analog-style drive), plus a tone filter to tame harsh high-order harmonics. */
+  private readonly distortionShaper: WaveShaperNode
+  private readonly distortionTone: BiquadFilterNode
+  private readonly distortionWet: GainNode
+  /** Effect tremolo: real amplitude modulation — an LFO driving a gain node's gain, classic rhythmic volume-pulse effect. */
+  private readonly tremoloGain: GainNode
+  private readonly tremoloLfo: OscillatorNode
+  private readonly tremoloLfoGain: GainNode
+  private readonly tremoloWet: GainNode
   private readonly effectsTap: GainNode
 
   /** Muffle: a real toggleable lowpass in the dry signal path (phone-in-pocket effect), click on/off. */
@@ -303,6 +326,39 @@ export class DeckAudioEngine {
     this.phaserFeedback.connect(this.phaserStages[0])
     phaserChain.connect(this.phaserWet)
     this.phaserWet.connect(this.output)
+
+    this.distortionShaper = this.context.createWaveShaper()
+    this.distortionShaper.curve = buildDistortionCurve(0.4)
+    this.distortionShaper.oversample = '4x'
+    this.distortionTone = this.context.createBiquadFilter()
+    this.distortionTone.type = 'lowpass'
+    this.distortionTone.frequency.value = 6000
+    this.distortionWet = this.context.createGain()
+    this.distortionWet.gain.value = 0
+    this.effectsTap.connect(this.distortionShaper)
+    this.distortionShaper.connect(this.distortionTone)
+    this.distortionTone.connect(this.distortionWet)
+    this.distortionWet.connect(this.output)
+
+    // Tremolo: the LFO (bipolar, -1..1) drives tremoloGain's gain AudioParam
+    // directly via a scaling gain stage, riding on top of tremoloGain's own
+    // base value of 1 — so gain swings between (1 - depth) and (1 + depth)
+    // around unity, a standard AM-tremolo topology.
+    this.tremoloGain = this.context.createGain()
+    this.tremoloGain.gain.value = 1
+    this.tremoloLfo = this.context.createOscillator()
+    this.tremoloLfo.type = 'sine'
+    this.tremoloLfo.frequency.value = 5
+    this.tremoloLfoGain = this.context.createGain()
+    this.tremoloLfoGain.gain.value = 0
+    this.tremoloWet = this.context.createGain()
+    this.tremoloWet.gain.value = 0
+    this.tremoloLfo.connect(this.tremoloLfoGain)
+    this.tremoloLfoGain.connect(this.tremoloGain.gain)
+    this.tremoloLfo.start()
+    this.effectsTap.connect(this.tremoloGain)
+    this.tremoloGain.connect(this.tremoloWet)
+    this.tremoloWet.connect(this.output)
 
     /** Echo Out: one-shot fading repeat, fired on click (see triggerEchoOut) — a normal feedback delay line at rest with the wet gain at 0. */
     this.echoOutDelay = this.context.createDelay(1)
@@ -532,6 +588,10 @@ export class DeckAudioEngine {
         return this.bitcrushWet
       case 'phaser':
         return this.phaserWet
+      case 'distortion':
+        return this.distortionWet
+      case 'tremolo':
+        return this.tremoloWet
     }
   }
 
@@ -559,6 +619,14 @@ export class DeckAudioEngine {
       this.phaserLfoGain.gain.value = 300 + clamped * 1500
       this.phaserLfo.frequency.value = 0.1 + clamped * 1.5
       this.phaserFeedback.gain.value = 0.15 + clamped * 0.55
+    } else if (kind === 'distortion') {
+      // Higher intensity = harder drive (more clipping) + darker tone to tame fizz.
+      this.distortionShaper.curve = buildDistortionCurve(clamped)
+      this.distortionTone.frequency.value = 8000 * Math.pow(0.25, clamped)
+    } else if (kind === 'tremolo') {
+      // Higher intensity = deeper volume swing + faster pulse rate.
+      this.tremoloLfoGain.gain.value = clamped * 0.8
+      this.tremoloLfo.frequency.value = 2 + clamped * 10
     }
     // Reverb's "amount" is just wet mix, handled in engage()/release() via the target level.
   }
@@ -595,6 +663,11 @@ export class DeckAudioEngine {
     }
     try {
       this.phaserLfo.stop()
+    } catch {
+      // already stopped — fine
+    }
+    try {
+      this.tremoloLfo.stop()
     } catch {
       // already stopped — fine
     }

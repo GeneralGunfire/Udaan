@@ -600,3 +600,19 @@ export function PhaserIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function DistortionIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 10h2l1.5-5 2 10 2-10 2 10 1.5-5h2" />
+    </svg>
+  )
+}
+
+export function TremoloIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 10a2 2 0 1 1 4 0 2 2 0 1 1 4 0 2 2 0 1 1 4 0 2 2 0 1 1 3 0" />
+    </svg>
+  )
+}
