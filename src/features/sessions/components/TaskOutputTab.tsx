@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { CodeEditorIcon, WindowCloseIcon } from '@/shared/icons'
 import { parseStreamLine, type ClaudeCodeTask } from '@/integrations/claude-code'
 import { TaskStatusBadge } from './TaskStatusBadge'
+import { Button } from '@/shared/components/ui/button'
+import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 
 interface TaskOutputTabProps {
   task: ClaudeCodeTask
@@ -20,40 +22,49 @@ export function TaskOutputTab({ task, onClose, onOpenInVSCode }: TaskOutputTabPr
   )
 
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="glass-surface flex h-full min-h-0 w-full max-w-3xl flex-col rounded-lg">
       <div className="border-glass-border flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0">
-          <p className="text-text-primary truncate text-sm font-medium">{task.prompt}</p>
+          <p className="text-text-primary truncate text-[13px] font-medium">{task.prompt}</p>
           <p className="text-text-tertiary truncate text-[11px]">{task.cwd}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <TaskStatusBadge status={task.status} />
-          <button
-            type="button"
-            onClick={() => onOpenInVSCode(task.cwd)}
-            title="Open in VS Code"
-            className="text-text-tertiary hover:text-text-primary flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-150 hover:bg-glass"
-          >
-            <CodeEditorIcon width={14} height={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Close"
-            className="text-text-tertiary hover:text-text-primary flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-150 hover:bg-glass"
-          >
-            <WindowCloseIcon width={12} height={12} />
-          </button>
+          <Tooltip content="Open in VS Code">
+            <Button
+              type="button"
+              aria-label="Open in VS Code"
+              onClick={() => onOpenInVSCode(task.cwd)}
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-md"
+            >
+              <CodeEditorIcon width={14} height={14} />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Close">
+            <Button
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-md"
+            >
+              <WindowCloseIcon width={12} height={12} />
+            </Button>
+          </Tooltip>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {lines.length === 0 ? (
-          <p className="text-text-tertiary text-sm">
+          <p className="text-text-tertiary text-[13px]">
             {task.status === 'queued' ? 'Waiting in queue…' : 'Starting…'}
           </p>
         ) : (
-          <div className="flex flex-col gap-2 text-sm">
+          <div className="flex flex-col gap-2 text-[13px]">
             {lines.map((l) => (
               <div
                 key={l.key}
@@ -89,5 +100,6 @@ export function TaskOutputTab({ task, onClose, onOpenInVSCode }: TaskOutputTabPr
         )}
       </div>
     </div>
+    </TooltipProvider>
   )
 }

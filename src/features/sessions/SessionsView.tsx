@@ -23,8 +23,8 @@ export function SessionsView() {
     <div className="flex h-full w-full self-stretch gap-4">
       <GlassPanel className="flex w-80 shrink-0 flex-col gap-4 overflow-hidden">
         <div>
-          <h1 className="text-text-primary text-lg font-medium">Claude Code Sessions</h1>
-          <p className="text-text-secondary mt-1 text-sm">
+          <h1 className="text-text-primary text-[16px] font-semibold">Claude Code Sessions</h1>
+          <p className="text-text-secondary mt-1 text-[12.5px]">
             Queue headless Claude Code runs and watch their output live.
           </p>
         </div>
@@ -35,7 +35,7 @@ export function SessionsView() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
-            <p className="text-text-tertiary px-1 py-6 text-center text-sm">Loading…</p>
+            <p className="text-text-tertiary px-1 py-6 text-center text-[12.5px]">Loading…</p>
           ) : (
             <TaskList
               tasks={tasks}
@@ -56,7 +56,7 @@ export function SessionsView() {
           />
         ) : (
           <GlassPanel className="flex h-full items-center justify-center">
-            <p className="text-text-tertiary text-sm">Select a task to view its output.</p>
+            <p className="text-text-tertiary text-[13px]">Select a task to view its output.</p>
           </GlassPanel>
         )}
       </div>

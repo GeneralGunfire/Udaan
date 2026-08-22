@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@/shared/components/ui/button'
 
 interface NewTaskFormProps {
   onSubmit: (prompt: string, cwd: string) => Promise<unknown>
@@ -32,22 +33,24 @@ export function NewTaskForm({ onSubmit }: NewTaskFormProps) {
         onChange={(e) => setPrompt(e.target.value)}
         placeholder="Prompt for Claude Code…"
         rows={3}
-        className="glass-surface text-text-primary placeholder:text-text-tertiary resize-none rounded-lg px-3 py-2.5 text-sm outline-none"
+        className="glass-surface text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 resize-none rounded-lg px-3 py-2.5 text-[13px] outline-none focus-visible:ring-2"
       />
       <input
         value={cwd}
         onChange={(e) => setCwd(e.target.value)}
         placeholder="Working directory, e.g. C:\path\to\project"
-        className="glass-surface text-text-primary placeholder:text-text-tertiary rounded-lg px-3 py-2 text-sm outline-none"
+        className="glass-surface text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 rounded-lg px-3 py-2 text-[13px] outline-none focus-visible:ring-2"
       />
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      <button
+      {error && <p className="text-[11.5px] text-red-400">{error}</p>}
+      <Button
         type="submit"
         disabled={submitting || !prompt.trim() || !cwd.trim()}
-        className="bg-brand-cyan/20 hover:bg-brand-cyan/30 text-text-primary self-end rounded-lg px-4 py-1.5 text-sm font-medium transition-colors duration-150 disabled:opacity-40"
+        variant="brand"
+        size="pill-sm"
+        className="self-end rounded-lg disabled:opacity-40"
       >
         {submitting ? 'Queuing…' : 'Queue task'}
-      </button>
+      </Button>
     </form>
   )
 }
