@@ -267,6 +267,7 @@
             |-- DatePicker.tsx
             |-- GlassPanel.tsx
             |-- PlaceholderView.tsx
+            |-- QuickEditEvent.tsx
             |-- Sidebar.tsx
             |-- TimePicker.tsx
             |-- TopBar.tsx
@@ -274,6 +275,7 @@
                 |-- button.tsx
                 |-- dialog.tsx
                 |-- dropdown-menu.tsx
+                |-- popover.tsx
                 |-- tooltip.tsx
             |-- WallpaperPicker.tsx
             |-- Wordmark.tsx

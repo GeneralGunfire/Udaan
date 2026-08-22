@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { GlassPanel } from '@/shared/components/GlassPanel'
+import { QuickEditEvent } from '@/shared/components/QuickEditEvent'
 import { spring, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 import { CalendarIcon, ChevronRightIcon } from '@/shared/icons'
 import {
@@ -166,25 +167,27 @@ export function ScheduleView() {
                       </span>
                     ) : (
                       filtered.map((event) => (
-                        <div
-                          key={event.id}
-                          className="flex items-center gap-2 text-[12px]"
-                        >
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{
-                              backgroundColor: `var(${categoryDotVar(event.category)})`,
-                            }}
-                          />
-                          <span className="text-text-secondary truncate">
-                            {event.title}
-                          </span>
-                          {event.startTime && (
-                            <span className="text-text-tertiary shrink-0 tabular-nums">
-                              {event.startTime}
+                        <QuickEditEvent key={event.id} event={event} side="bottom">
+                          <button
+                            type="button"
+                            className="hover:bg-glass-hover focus-visible:ring-brand-cyan/60 -mx-1 flex items-center gap-2 rounded-md px-1 py-0.5 text-left text-[12px] outline-none transition-colors duration-150 focus-visible:ring-2"
+                          >
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: `var(${categoryDotVar(event.category)})`,
+                              }}
+                            />
+                            <span className="text-text-secondary truncate">
+                              {event.title}
                             </span>
-                          )}
-                        </div>
+                            {event.startTime && (
+                              <span className="text-text-tertiary shrink-0 tabular-nums">
+                                {event.startTime}
+                              </span>
+                            )}
+                          </button>
+                        </QuickEditEvent>
                       ))
                     )}
                   </div>

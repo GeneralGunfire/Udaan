@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GlassPanel } from '@/shared/components/GlassPanel'
 import { Button } from '@/shared/components/ui/button'
+import { QuickEditEvent } from '@/shared/components/QuickEditEvent'
 import { spring, duration, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 import { ChevronRightIcon, CalendarIcon, PlusIcon } from '@/shared/icons'
 import {
   getEventsForDate,
   getUpcomingEvents,
+  updateScheduleEvent,
   type EventCategory,
 } from '@/integrations/schedule/scheduleStore'
 
@@ -89,6 +91,23 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
       else next.add(id)
       return next
     })
+  }
+
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
+  const [dragOverISO, setDragOverISO] = useState<string | null>(null)
+
+  /** Drag an event pill onto a different day cell to reschedule it — a
+   * date-only patch via the same updateScheduleEvent used everywhere else,
+   * so it stays consistent with quick-edit/manage-events. No-ops if
+   * dropped back on its own current day. */
+  function handleDrop(targetISO: string) {
+    setDragOverISO(null)
+    const id = draggingEventId
+    setDraggingEventId(null)
+    if (!id) return
+    updateScheduleEvent(id, { date: targetISO }).catch((err) =>
+      console.error('Failed to reschedule event:', err),
+    )
   }
 
   return (
@@ -356,19 +375,40 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
             const visible = events.slice(0, 1)
             const overflow = events.length - visible.length
 
+            const isDragOver = dragOverISO === cell.iso
+
             return (
-              <motion.button
+              <motion.div
                 key={cell.iso}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedDate(cell.iso!)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedDate(cell.iso!)
+                  }
+                }}
+                onDragOver={(e) => {
+                  if (!draggingEventId) return
+                  e.preventDefault()
+                  setDragOverISO(cell.iso)
+                }}
+                onDragLeave={() => setDragOverISO((v) => (v === cell.iso ? null : v))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  handleDrop(cell.iso!)
+                }}
                 whileHover={reduced ? undefined : { scale: 1.01 }}
                 whileTap={reduced ? undefined : { scale: 0.99 }}
                 transition={spring.micro}
-                className={`focus-visible:ring-brand-cyan/60 relative flex h-20 flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
+                className={`focus-visible:ring-brand-cyan/60 relative flex h-20 cursor-pointer flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
                   isSelected
                     ? 'bg-glass-hover text-text-primary'
                     : 'text-text-secondary hover:bg-glass'
-                } ${isToday ? 'ring-brand-teal/60 ring-1' : ''}`}
+                } ${isToday ? 'ring-brand-teal/60 ring-1' : ''} ${
+                  isDragOver ? 'bg-brand-cyan/10 ring-brand-cyan ring-2' : ''
+                }`}
               >
                 <span
                   className={isToday ? 'text-brand-teal font-semibold' : ''}
@@ -377,16 +417,30 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                 </span>
                 <div className="flex w-full flex-1 flex-col justify-end gap-1 overflow-hidden">
                   {visible.map((e) => (
-                    <span
-                      key={e.id}
-                      className="truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight font-semibold"
-                      style={{
-                        backgroundColor: `color-mix(in srgb, var(${categoryAccentVar(e.category)}) 20%, transparent)`,
-                        color: `var(${categoryAccentVar(e.category)})`,
-                      }}
-                    >
-                      {e.title}
-                    </span>
+                    <QuickEditEvent key={e.id} event={e}>
+                      <span
+                        draggable
+                        onDragStart={(ev) => {
+                          ev.stopPropagation()
+                          ev.dataTransfer.effectAllowed = 'move'
+                          setDraggingEventId(e.id)
+                        }}
+                        onDragEnd={() => {
+                          setDraggingEventId(null)
+                          setDragOverISO(null)
+                        }}
+                        onClick={(ev) => ev.stopPropagation()}
+                        className={`block cursor-grab truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight font-semibold transition-opacity duration-150 active:cursor-grabbing ${
+                          draggingEventId === e.id ? 'opacity-40' : ''
+                        }`}
+                        style={{
+                          backgroundColor: `color-mix(in srgb, var(${categoryAccentVar(e.category)}) 20%, transparent)`,
+                          color: `var(${categoryAccentVar(e.category)})`,
+                        }}
+                      >
+                        {e.title}
+                      </span>
+                    </QuickEditEvent>
                   ))}
                   {overflow > 0 && (
                     <span className="text-text-tertiary self-start rounded-full bg-glass-hover px-1.5 py-0.5 text-[9px] font-semibold">
@@ -394,7 +448,7 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
                     </span>
                   )}
                 </div>
-              </motion.button>
+              </motion.div>
             )
           })}
         </div>
@@ -423,25 +477,27 @@ export function CalendarView({ onAddEvent }: CalendarViewProps) {
               getEventsForDate(selectedDate)
                 .filter((e) => activeTags.has(e.category))
                 .map((event) => (
-                  <div
-                    key={event.id}
-                    className="hover:bg-glass-hover flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 transition-colors duration-150"
-                  >
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor: `var(${categoryAccentVar(event.category)})`,
-                      }}
-                    />
-                    <span className="text-text-primary flex-1 text-[13px] font-medium">
-                      {event.title}
-                    </span>
-                    <span className="text-text-tertiary text-[11.5px] font-medium tabular-nums">
-                      {event.startTime
-                        ? `${event.startTime}${event.endTime ? `–${event.endTime}` : ''}`
-                        : 'All day'}
-                    </span>
-                  </div>
+                  <QuickEditEvent key={event.id} event={event}>
+                    <button
+                      type="button"
+                      className="hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-2"
+                    >
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: `var(${categoryAccentVar(event.category)})`,
+                        }}
+                      />
+                      <span className="text-text-primary flex-1 truncate text-[13px] font-medium">
+                        {event.title}
+                      </span>
+                      <span className="text-text-tertiary text-[11.5px] font-medium tabular-nums">
+                        {event.startTime
+                          ? `${event.startTime}${event.endTime ? `–${event.endTime}` : ''}`
+                          : 'All day'}
+                      </span>
+                    </button>
+                  </QuickEditEvent>
                 ))
             )}
           </motion.div>
