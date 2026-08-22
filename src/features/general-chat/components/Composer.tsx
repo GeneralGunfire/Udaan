@@ -302,8 +302,16 @@ export function Composer() {
                     variant="ghost"
                     size="pill"
                     onClick={() => {
+                      if (mode.id === activeMode) return
                       setActiveMode(mode.id)
                       setSessionListOpen(false)
+                      // Local and Claude are separate conversation spaces —
+                      // an unsent draft typed in one shouldn't silently
+                      // carry over into the other; switching mode should
+                      // feel like switching to a fresh input, not leaving
+                      // stale text sitting there unexplained.
+                      setValue('')
+                      if (textareaRef.current) textareaRef.current.style.height = 'auto'
                     }}
                     className={`relative rounded-lg px-2.5 py-1 ${isActive ? 'hover:bg-transparent' : 'hover:bg-white/8'}`}
                   >
