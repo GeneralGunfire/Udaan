@@ -1987,11 +1987,60 @@ unrelated "chunk >500kB" advisory). Recommend the user click through
 Cmd/Ctrl+K, the new-chat/focus-composer/switch-mode/switch-session
 actions, and Escape-to-close before relying on this.
 
+### Continued: tooltips, transcribing state, coordinated send/stop
+
+User said "go" (continue autonomously) after the first two commits.
+Asked which direction; chose "keep going within General Chat" over
+expanding to the sidebar or attempting a live visual check. Closed the
+next tier of gaps from the interaction-polish addendum:
+
+- **New `ui/tooltip.tsx`** — Radix `react-tooltip` (not yet a dependency;
+  added it) restyled onto glass tokens, same pattern as the existing
+  dropdown-menu restyle. Wired onto every icon-only control that had no
+  visible label: mic button (all three states), send, stop, and the
+  message copy button. Deliberately *not* added to the chat-history
+  trigger (has a visible count, not icon-only) or the per-session close
+  button (nested inside a Radix DropdownMenu's own hover/focus handling
+  — stacking a second Radix primitive's hover logic there risked a
+  fragile interaction for a control whose ✕ icon + `aria-label` is
+  already self-evident).
+- **Mic "transcribing" state** — previously invisible on the button
+  itself (only the textarea placeholder text changed); added a real
+  spinning-ring indicator so a background async op doesn't look like
+  nothing is happening.
+- **Send/Stop** — were two independently mounted/unmounted `Button`s
+  keyed differently; now cross-fade inside one positioned wrapper
+  (`spring.micro`, opacity+scale) so it reads as one control changing
+  state rather than two controls swapping.
+- **Reduced-motion** — was only checked inside the command palette and
+  the shared `Button`. Added the same guard to the empty<->messages
+  swap, the suggested-prompt stagger, and the (now-animated) mic-error
+  banner.
+- **Copy-message checkmark** — was a flat instant swap; now a small
+  spring pop, proportional to how small the action is (per the
+  addendum's "success feedback should match the action's importance").
+
+Left the assistant "thinking" three-dot pulse in `ChatMessage.tsx`
+untouched — it's the same restrained staggered-pulse pattern Slack/
+iMessage/Discord all use for exactly this, already proportional; changing
+it would be motion-for-motion's-sake, which the brief itself warns
+against removing/adding without a comprehension reason.
+
+Verification: same constraint as the first two commits — port 1420 still
+occupied by another session's dev server (`curl` still returns 200), no
+screenshot tool available. Verified via clean `tsc -b`, `oxlint` (only
+the same pre-existing `button.tsx` warning), and a clean full `pnpm
+build`. Recommend clicking through mic recording -> stop -> transcribing,
+hovering every icon button for its tooltip, and sending a message to see
+the send/stop crossfade before relying on this.
+
 ### Summary of commits this session
 
 1. `Checkpoint: general-chat refactor, schedule SQLite backend, splash
    screen, shadcn-style ui primitives`
 2. `Add chat command palette (Cmd/Ctrl+K), motion token system,
    calibrate button press feel`
+3. `Add tooltips, transcribing spinner, coordinated send/stop transition,
+   reduced-motion guards`
 
 See `git log --oneline` for hashes.
