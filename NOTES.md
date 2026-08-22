@@ -2034,6 +2034,79 @@ build`. Recommend clicking through mic recording -> stop -> transcribing,
 hovering every icon button for its tooltip, and sending a message to see
 the send/stop crossfade before relying on this.
 
+### Continued again: keyboard focus fix, then workspace scale + contrast
+
+Closed one more addendum gap after the tooltip/state-transition round:
+the message textarea had `outline-none` with **no replacement focus
+indicator at all** — a real accessibility bug on the composer's single
+most important control, not just a polish nit. Fixed with a
+`focus-within` ring on its container (border+ring, not a raw outline)
+and applied the same ring to the suggested-prompt buttons, which were
+raw `motion.button`s outside the shared `Button` primitive and so never
+inherited its focus-visible treatment.
+
+Then the user posted a screenshot (light "Windows Blue" wallpaper,
+default composer) and a long addendum about scale/contrast/cohesion. My
+first read of "no, the screenshot is how I want it to be" was **wrong**
+— interpreted as "ignore the addendum," when the user actually meant
+"that screenshot is the target look, the current build doesn't match
+it, implement toward it." Asked directly to confirm before touching
+more code once the ambiguity was clear; user confirmed "no not even
+close" — i.e. build the addendum as written, screenshot as reference.
+Worth remembering: when a user says an image "is how I want it," treat
+that as a target to build toward, not a signal to stop, unless they
+also say the current state already matches.
+
+Implemented:
+- **Width axis unification** — `GeneralChatView.tsx` (`max-w-3xl`) and
+  `Composer.tsx` (`max-w-2xl`) had different caps, which is exactly the
+  "logo/suggestions/composer at different widths" problem the addendum
+  called out. Consolidated onto `Composer`'s own responsive cap
+  (`max-w-2xl -> lg:max-w-3xl -> xl:max-w-[52rem]`), which now governs
+  the message column too (previously boxed into the same narrow
+  `max-w-2xl` as the empty state).
+- **Composer surface scale-up** — `p-3->p-4`, `rows={2}->{3}`,
+  `text-[13.5px]->[14.5px]`, textarea max-height `160px->208px` (kept
+  the JS `MAX_TEXTAREA_HEIGHT` constant in sync with the Tailwind
+  `max-h-52`, since `autoGrow()` reads it directly). Did not scale
+  every button — the addendum itself warns against a "zoomed-in UI";
+  36px icon buttons are already a solid target, the composer *surface*
+  was the actual complaint.
+- **Mood-adaptive readability veil** — a soft radial gradient (not a
+  card, not a full-panel tint) behind the empty-state content block,
+  strength driven by the wallpaper's own pre-existing `mood: 'dark' |
+  'light' | 'any'` field (`app/wallpapers.ts`) rather than building any
+  image-analysis system, per the addendum's own "a simple overlay
+  strategy based on current background/theme state is preferable"
+  guidance. Light wallpapers get `opacity: 1`, dark get `0.55`.
+- **Suggestion click behavior** — addendum described a suggestion
+  "becoming composer content" with the composer gaining focus, which is
+  a real behavior change from the existing send-immediately click.
+  Asked directly rather than silently changing established interaction
+  behavior as a side effect of a visual pass; user chose fill-and-focus
+  (matches the addendum). Built it (`handleSuggestionClick`, cursor
+  placed at end of the filled text, not a full selection).
+- **Then removed the suggestion boxes entirely** — a direct mid-task
+  follow-up message arrived (shouted, unambiguous: "REMOVE TEH
+  USGGESTION BOXEES") after the fill-and-focus behavior was already
+  built. Removed the whole grid, the now-dead `SUGGESTED_PROMPTS`
+  constant, and `handleSuggestionClick` together — not left as unused
+  code. The empty state is now just logo + tagline + the Cmd+K hint,
+  directly above the composer. Tightened the atmospheric veil's inset
+  percentages afterward since it was originally sized for the taller
+  logo+tagline+grid+hint block and would have been proportionally too
+  large for the shorter remaining content.
+
+Verification: same environment constraint as the whole session — port
+1420 still occupied by another concurrent session's dev server, no
+screenshot tool available. Verified via clean `tsc -b`, `oxlint` (only
+the pre-existing `button.tsx` warning), and a clean full `pnpm build`.
+**Strongly recommend the user visually confirm this round** before
+relying on it — this pass was driven by a screenshot + written brief
+with no way to render the actual result back for comparison in this
+environment, which is a meaningfully higher risk of a visual miss than
+the earlier interaction-only commits.
+
 ### Summary of commits this session
 
 1. `Checkpoint: general-chat refactor, schedule SQLite backend, splash
@@ -2042,5 +2115,9 @@ the send/stop crossfade before relying on this.
    calibrate button press feel`
 3. `Add tooltips, transcribing spinner, coordinated send/stop transition,
    reduced-motion guards`
+4. `Fix missing keyboard focus indicator on composer textarea and
+   suggested prompts`
+5. `Widen chat workspace, add mood-adaptive readability veil, remove
+   suggestion boxes`
 
 See `git log --oneline` for hashes.
