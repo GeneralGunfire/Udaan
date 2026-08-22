@@ -2121,3 +2121,81 @@ the earlier interaction-only commits.
    suggestion boxes`
 
 See `git log --oneline` for hashes.
+
+## 2026-08-22 — DJ Board: new deck effects, knob redesign, effects rack redesign
+
+User asked for "more effects and things to do with the deck, maybe
+even a muffler toggled on click," plus an explicit request to redesign
+the knob interaction ("make the dials easier to use and maybe revise a
+different approach") rather than tweak it incrementally. A later
+mid-task message asked for the effects rack itself to also get an
+easier-to-use, visually improved redesign, plus more effects in it —
+addressed in the same pass.
+
+**New per-deck engine methods** (`audioEngine.ts`), all real Web Audio
+DSP, no mocking, scoped per-deck like the existing EQ/bass/filter code:
+- `toggleMuffle()` — real lowpass inserted into the dry signal path
+  (not a rack send) so it colors the actual output; smooth
+  `setTargetAtTime` ramp both ways so toggling mid-beat doesn't click.
+- `toggleBassKill()` — a second, independent lowshelf node so kill
+  state doesn't fight the Bass knob's own boost/cut value; kill always
+  wins while active, un-killing restores whatever the knob was set to.
+- `triggerEchoOut()` — one-shot fired on click, not held: a real
+  feedback delay line whose wet gain jumps in and then decays to
+  silence via `setTargetAtTime` — the decay is actual audio feedback
+  amplitude falling off, no timer/interval involved.
+
+Wired through the same singleton-store pattern as everything else
+(`boardEngineStore.ts` → `useDjBoard.ts` → `Deck.tsx`), and surfaced as
+a new three-button row in `Deck.tsx` between the Transport and Mixer
+clusters, using three new hand-built SVG icons
+(`MuffleIcon`/`BassKillIcon`/`EchoOutIcon` in `shared/icons/index.tsx`).
+
+**Effects rack: two new real effects added** (`bitcrush`, `phaser`),
+taking it from 4 to 6 hold-to-apply sends:
+- Bitcrush — `WaveShaperNode` doing genuine sample/bit quantization
+  (a stepped transfer curve, `buildBitcrushCurve()`), not a filter
+  pretending to crunch, plus a lowpass to tame aliasing harshness as
+  intensity increases.
+- Phaser — 4 cascaded allpass `BiquadFilterNode`s swept by a shared
+  LFO with feedback, the standard phaser topology (distinct from the
+  flanger's short modulated delay line).
+Verified the DSP parameter math with a Node script before committing
+(bitcrush step count decreases correctly as amount rises — harsher
+crush; tone darkens correctly; phaser LFO depth/rate/feedback all
+scale correctly across the 0-1 range).
+
+**Knob redesign** — genuinely different interaction model, not a
+tweak, per the user's explicit ask: SVG fill-arc shows position at a
+glance (previously only a rotating dot, no arc, had to drag to see
+where it was set), value chip always visible underneath (previously
+hidden until drag), gentler drag sensitivity (more travel per unit of
+change, easier to land on a precise value — was `/140`, now `/220`),
+and scroll-wheel plus arrow keys as full alternative inputs so
+grabbing and dragging is no longer the only way to adjust a value.
+Double-click resets to 0 (bipolar) or min (unipolar).
+
+**Effects rack redesign** — addressed the later mid-task ask
+("improve how the effects rack looks visually and improve how the
+user uses it"): expanded by default instead of collapsed (previously
+required an extra click just to see what effects existed), bigger
+pads (h-16 → h-20) with a live percentage readout directly on the pad
+rather than a thin bar underneath it, a header badge showing how many
+effects are currently engaged, a distinct hand-built icon per effect
+(previously all four effects shared one generic sparkle), and a
+one-line plain-language hint that swaps in on hover/focus per effect
+so a first-time user knows what each one actually does before holding
+it down.
+
+Verification: `tsc -b --noEmit` clean, `oxlint` clean (scoped to
+touched files), full `vite build` succeeds. No live browser available
+in this environment (port 1420 occupied by a concurrent session's dev
+server, same constraint noted in prior sessions) — user has not yet
+visually confirmed the new deck-effects row or rack layout; recommend
+they check it in the running app before considering this fully done.
+
+Commit: `Add Muffle/Bass Kill/Echo Out deck effects, redesign knobs
+and effects rack` — staged by explicit filename only (never `-A`);
+working tree had heavy unrelated concurrent-session activity at commit
+time (large feature deletions, `App.tsx`, `Sidebar.tsx`, search index
+all mid-edit by another session) and none of it was touched.
