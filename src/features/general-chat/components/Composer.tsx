@@ -75,7 +75,7 @@ export function Composer() {
   const { containerRef, handleScroll } = useStickyScroll(messages)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const MAX_TEXTAREA_HEIGHT = 208
+  const MAX_TEXTAREA_HEIGHT = 192
 
   function autoGrow(el: HTMLTextAreaElement) {
     el.style.height = 'auto'
@@ -166,20 +166,22 @@ export function Composer() {
             transition={reduced ? { duration: duration.instant } : spring.emphasis}
             className="relative mb-8 flex shrink-0 flex-col items-center gap-6 px-1"
           >
-            {/* Localized atmospheric contrast layer — a soft radial veil
+            {/* Localized atmospheric contrast layer — a soft dark veil
                 sized to just this content block (logo + tagline + hint),
-                not a card and not the full panel. Keeps text readable
-                over bright wallpapers without a hard-edged boundary;
-                barely visible against dark wallpapers since it's a
-                low-opacity dark radial, additive rather than a fixed
-                tint. */}
+                not a card and not the full panel. Tighter and stronger
+                than the first pass: that version (32%/14% radial +
+                text-shadow alone) still lost the tagline against a light
+                wallpaper — near-white-at-74%-opacity text has very little
+                margin to begin with, so the veil needs to do real work,
+                not just a hint of one. Strength still scales off the
+                wallpaper's own `mood` field. */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-[-25%] inset-y-[-30%] -z-10 transition-opacity duration-500"
+              className="pointer-events-none absolute inset-x-[-18%] inset-y-[-22%] -z-10 transition-opacity duration-500"
               style={{
                 opacity: veilStrength,
                 background:
-                  'radial-gradient(ellipse 65% 65% at 50% 40%, rgb(4 8 16 / 32%) 0%, rgb(4 8 16 / 14%) 55%, transparent 80%)',
+                  'radial-gradient(ellipse 60% 62% at 50% 42%, rgb(2 5 10 / 58%) 0%, rgb(2 5 10 / 30%) 50%, transparent 78%)',
               }}
             />
 
@@ -187,27 +189,30 @@ export function Composer() {
               <img
                 src={udaanMark}
                 alt=""
-                className="h-11 w-11 object-contain"
-                style={{ filter: 'drop-shadow(0 2px 10px rgb(0 0 0 / 55%))' }}
+                className="h-12 w-12 object-contain"
+                style={{ filter: 'drop-shadow(0 2px 12px rgb(0 0 0 / 75%))' }}
               />
               <div>
                 <div
-                  className="font-display text-text-primary text-[22px] font-semibold"
-                  style={{ textShadow: '0 1px 10px rgb(0 0 0 / 50%)' }}
+                  className="font-display text-[24px] font-semibold text-white"
+                  style={{ textShadow: '0 1px 3px rgb(0 0 0 / 90%), 0 2px 14px rgb(0 0 0 / 65%)' }}
                 >
                   Udaan
                 </div>
                 <div
-                  className="font-display text-text-secondary text-[13.5px]"
-                  style={{ textShadow: '0 1px 8px rgb(0 0 0 / 45%)' }}
+                  className="font-display text-[14.5px] text-white/85"
+                  style={{ textShadow: '0 1px 3px rgb(0 0 0 / 85%), 0 2px 12px rgb(0 0 0 / 60%)' }}
                 >
                   Your ideas, set in motion
                 </div>
               </div>
             </div>
 
-            <div className="text-text-tertiary/80 flex items-center gap-1.5 text-[11.5px]">
-              <kbd className="border-glass-border rounded border px-1.5 py-0.5 font-mono text-[10.5px]">
+            <div
+              className="flex items-center gap-1.5 text-[11.5px] text-white/70"
+              style={{ textShadow: '0 1px 3px rgb(0 0 0 / 80%)' }}
+            >
+              <kbd className="rounded border border-white/25 bg-black/20 px-1.5 py-0.5 font-mono text-[10.5px] text-white/85">
                 {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K
               </kbd>
               <span>for commands</span>
@@ -261,7 +266,7 @@ export function Composer() {
       </AnimatePresence>
 
       <div
-        className="focus-within:ring-brand-cyan/40 focus-within:border-glass-border relative w-full shrink-0 rounded-2xl border p-4 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
+        className="focus-within:ring-brand-cyan/40 focus-within:border-glass-border relative w-full shrink-0 rounded-2xl border p-3.5 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
         style={{
           borderColor: 'var(--color-glass-border)',
           background: 'color-mix(in srgb, var(--color-bg-elevated) 74%, transparent)',
@@ -285,9 +290,9 @@ export function Composer() {
           }
           disabled={mic.transcribing}
           rows={3}
-          className="text-text-primary placeholder:text-text-tertiary max-h-52 min-h-12 w-full resize-none overflow-y-auto bg-transparent text-[14.5px] leading-relaxed outline-none disabled:opacity-50"
+          className="text-text-primary placeholder:text-text-tertiary max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-[14px] leading-relaxed outline-none disabled:opacity-50"
         />
-        <div className="mt-3 flex items-center justify-between border-t border-white/6 pt-3">
+        <div className="mt-2.5 flex items-center justify-between border-t border-white/6 pt-2.5">
           <div className="flex items-center gap-1.5">
             <div
               className="flex items-center gap-0.5 rounded-xl border p-0.5"
