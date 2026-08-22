@@ -1882,3 +1882,116 @@ round is exactly the foundation that makes that next step cheaper.
   span), not fixed in this pass since it's a restructure, not a style
   fix. Worth a dedicated look if MiniPlayer/DJ Board gets its own
   polish pass later.
+
+## 2026-08-22 (session 7) — Command palette + motion tokens, General Chat only
+
+### Scope, per explicit user instruction
+
+The user's brief was an extremely broad "deep interaction & UX overhaul"
+covering sidebar, center experience, composer, keyboard model, motion
+system, states, a11y, and more, framed as if the app were still at an
+early "assembled, not designed" stage. Asked directly how to scope it;
+user chose **General Chat only** — not the sidebar, not other views —
+plus "commit all" (the tree had a lot of other sessions' uncommitted
+work sitting in it) and "add cmdk" for the command palette.
+
+### Checkpoint commit first
+
+Before touching anything, committed all pre-existing uncommitted work
+exactly as found (`63d13b9`) — general-chat message-rendering/sticky-
+scroll rework, the real SQLite schedule backend + CRUD UI, the splash
+screen, and the new Radix-based `ui/` primitives (`button.tsx`,
+`dropdown-menu.tsx`, `cn.ts`) that a concurrent session had left
+staged-but-uncommitted. Used explicit `git add -u` + named new-file
+paths, not `git add -A`, per the standing convention in this file — and
+deliberately left `scratch-test*.wav/.webm` and `scratch-wp-check.cjs`
+untracked (personal debug/test artifacts, not project source).
+
+### Audit finding: the brief's premise didn't match the actual code
+
+Read `Composer.tsx`, `ChatMessage.tsx`, `Sidebar.tsx`, `useGeneralChat.ts`,
+`useStickyScroll.ts`, and the prior session-6 NOTES entries above this
+one before writing a single line. The "four generic pills / mechanically
+placed controls / no hover-focus-press states / scroll yanks the user to
+bottom" complaints in the brief describe a much earlier, unpolished state
+of this exact page — session 6 (same day) already did a real Button
+primitive with cva variants, layout-aware `layoutId` mode-pill animation,
+hover-reveal message metadata, a `useStickyScroll` hook matching Slack/
+Discord behavior exactly, and Radix-backed dropdown/menu primitives with
+real focus trapping. Didn't rebuild any of that from scratch — would have
+been pure regression risk for zero benefit. Instead treated the brief as
+"close the *remaining* gaps," which narrowed to: no command palette, no
+keyboard-shortcut model, motion values invented ad hoc per component
+(no shared vocabulary), and a couple of over-strong press/hover values.
+
+### What was actually built
+
+1. **`src/shared/lib/motion.ts`** — small shared spring/duration/easing
+   token module (`spring.micro/standard/panel/emphasis`, `pressable`/
+   `pressableIcon` presets, `prefersReducedMotion()`). Not a big system —
+   just enough that new interaction code has one place to pull values
+   from instead of inventing `{ stiffness: 420, damping: 34 }` per call
+   site, which is what every prior session (including this one's own
+   first drafts) was doing.
+2. **`ChatCommandPalette.tsx`** — cmdk-based (`Command.Dialog`), scoped
+   deliberately to what General Chat itself can do: new chat, focus
+   composer, switch Local/Claude mode, jump to a recent session. Opens
+   on Cmd/Ctrl+K (wired in `Composer.tsx`), closes on Escape/backdrop
+   click via cmdk's own dialog behavior. **Not** an app-wide navigator —
+   that would need sidebar/other-view awareness, out of scope per the
+   user's own scoping answer.
+3. **Button press/hover recalibration** — `whileHover`/`whileTap` moved
+   from `{1.04}/{0.96}` to the shared `pressableIcon` preset
+   (`{1.03}/{0.97}`) — the old values read as a visible bounce, not the
+   "felt not seen" compression the interaction-polish addendum asked
+   for. Added `focus-visible:ring-offset` so the ring reads clearly
+   against dark glass surfaces, not just a bare ring color.
+4. **Suggested prompts de-emphasized** — smaller text, no competing
+   border/blur surface, opacity-only entrance (no y-translate stagger),
+   plus a small "⌘K for commands" hint replacing some of their visual
+   weight — so they read as secondary to the composer, not a second
+   hero, per the brief's explicit "reduce competition with the composer"
+   ask.
+5. **One-line unrelated build fix** — `integrations/schedule/
+   scheduleStore.ts` was importing `EventCategory`/`EventStatus`/
+   `NewScheduleEvent`/`ScheduleEvent` from `./client`, which only
+   `import type`s them from `./types` and re-declares them locally
+   without exporting — a real `tsc -b` failure, already flagged in this
+   file's session-4 entry as a known one-line fix ("add `export`... or
+   import from the right module"). Fixed by importing from `./types`
+   directly instead, since that's the actual source of truth. Confirmed
+   via `git blame`-adjacent reasoning that this wasn't caused by
+   anything in this session's own diff before touching it.
+
+### Not done, deliberately, given the "chat page only" scope
+
+Sidebar hover/active/collapse polish, center-experience background
+treatment, app-wide keyboard shortcuts (Cmd+1..N nav, "/" search),
+toasts/notification hierarchy, drag/reorder, and the full accessibility/
+states/performance audit stages from the original brief — all explicitly
+out of scope per the user's own answer to "which stages." None of that
+was touched, and none of the always-on chrome (`Sidebar.tsx`, `TopBar.tsx`,
+`App.tsx`) was edited this session.
+
+### Verification
+
+No live GUI test — port 1420 was already bound by another concurrent
+session's `pnpm dev`/Tauri instance (`curl localhost:1420` returned 200),
+and per the precedent set in this file's session-4 entry, stopping
+someone else's dev server needs the user's own confirmation, not assumed.
+No screenshot tool was available in this environment either. Verified
+instead via `tsc -b` (clean), `oxlint` on every touched directory (clean
+except one pre-existing warning in `button.tsx` predating this session),
+and a full `pnpm build` (clean production build, only the app's existing
+unrelated "chunk >500kB" advisory). Recommend the user click through
+Cmd/Ctrl+K, the new-chat/focus-composer/switch-mode/switch-session
+actions, and Escape-to-close before relying on this.
+
+### Summary of commits this session
+
+1. `Checkpoint: general-chat refactor, schedule SQLite backend, splash
+   screen, shadcn-style ui primitives`
+2. `Add chat command palette (Cmd/Ctrl+K), motion token system,
+   calibrate button press feel`
+
+See `git log --oneline` for hashes.
