@@ -34,6 +34,7 @@ pub fn run() {
       general_chat::general_chat_list_messages,
       general_chat::general_chat_add_message,
       general_chat::general_chat_update_message,
+      general_chat::general_chat_delete_session,
       system_health::system_health_stats,
       audio_library::audio_library_scan_folder,
       audio_library::audio_library_read_file,

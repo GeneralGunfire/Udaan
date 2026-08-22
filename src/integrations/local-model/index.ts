@@ -6,5 +6,5 @@ export {
   configuredChatModel,
   listRunningModels,
 } from './client'
-export type { ChatMessage, ChatResult, TranscriptionResult } from './types'
+export type { ChatMessage, ChatOptions, ChatResult, ChatTool, ChatToolCall, TranscriptionResult } from './types'
 export type { RunningModel } from './client'

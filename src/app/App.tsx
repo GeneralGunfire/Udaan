@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AmbientBackground } from '@/shared/components/AmbientBackground'
 import { TopBar } from '@/shared/components/TopBar'
@@ -18,6 +18,11 @@ import { ClientTrackerView } from '@/features/work/client-tracker/ClientTrackerV
 import { AutomationsView } from '@/features/automations/AutomationsView'
 import { CalendarView } from '@/features/calendar/CalendarView'
 import { ScheduleView } from '@/features/schedule/ScheduleView'
+import { ManageEventsView } from '@/features/schedule/ManageEventsView'
+import {
+  hydrateScheduleCache,
+  onScheduleChange,
+} from '@/integrations/schedule/scheduleStore'
 import { SessionsView } from '@/features/sessions/SessionsView'
 import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
 import { AccountView } from '@/features/account/AccountView'
@@ -28,7 +33,9 @@ import { ClipboardManagerView } from '@/features/clipboard-manager/ClipboardMana
 import { useClipboardShortcut } from '@/features/clipboard-manager/hooks/useClipboardShortcut'
 import { ScreenshotToolView } from '@/features/screenshot-tool/ScreenshotToolView'
 import { PdfToolView } from '@/features/pdf-tool/PdfToolView'
-import { ChevronRightIcon } from '@/shared/icons'
+import type { SearchResult } from '@/features/global-search/lib/types'
+import { ChevronRightIcon, PlusIcon } from '@/shared/icons'
+import { AddEventModal } from '@/shared/components/AddEventModal'
 import type { CategoryId } from './categories'
 
 /**
@@ -40,6 +47,7 @@ export type View =
   | { kind: 'category'; id: CategoryId }
   | { kind: 'calendar' }
   | { kind: 'schedule' }
+  | { kind: 'manage-events' }
   | { kind: 'sessions' }
   | { kind: 'model-dashboard' }
   | { kind: 'account' }
@@ -92,6 +100,17 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null)
   const [view, setView] = useState<View>({ kind: 'general-chat' })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Bumped whenever schedule data changes (create/edit/delete/status), so
+  // Calendar/Schedule remount and pick up fresh data — those view files
+  // read a synchronous in-memory cache and have no subscription of their
+  // own, by design (see scheduleStore.ts).
+  const [scheduleVersion, setScheduleVersion] = useState(0)
+  const [addEventOpen, setAddEventOpen] = useState(false)
+
+  useEffect(() => {
+    hydrateScheduleCache()
+    return onScheduleChange(() => setScheduleVersion((v) => v + 1))
+  }, [])
 
   useClipboardShortcut(() => {
     setActiveCategory(null)
@@ -189,10 +208,42 @@ export default function App() {
     setView({ kind: 'general-chat' })
   }
 
+  /** Global search results have no per-item detail view yet — navigate to the closest list view that shows them. */
+  function navigateToSearchResult(result: SearchResult) {
+    setActiveCategory(null)
+    switch (result.navTarget.kind) {
+      case 'task':
+        setView({ kind: 'sessions' })
+        return
+      case 'notification':
+        setView({ kind: 'notifications' })
+        return
+      case 'document':
+        setView({ kind: 'category', id: 'school' })
+        setActiveCategory('school')
+        return
+      case 'clipboard':
+        setView({ kind: 'clipboard-manager' })
+        return
+      case 'screenshot':
+        setView({ kind: 'screenshot-tool' })
+        return
+    }
+  }
+
   function renderView() {
     if (view.kind === 'general-chat') return <GeneralChatView />
-    if (view.kind === 'calendar') return <CalendarView />
-    if (view.kind === 'schedule') return <ScheduleView />
+    if (view.kind === 'calendar')
+      return (
+        <CalendarView
+          key={scheduleVersion}
+          onAddEvent={() => setAddEventOpen(true)}
+        />
+      )
+    if (view.kind === 'schedule')
+      return <ScheduleView key={scheduleVersion} />
+    if (view.kind === 'manage-events')
+      return <ManageEventsView key={scheduleVersion} />
     if (view.kind === 'sessions') return <SessionsView />
     if (view.kind === 'model-dashboard') return <ModelDashboardView />
     if (view.kind === 'account') return <AccountView />
@@ -229,7 +280,10 @@ export default function App() {
     <div className="relative flex h-screen w-screen flex-col p-6 md:p-10">
       <AmbientBackground />
 
-      <TopBar />
+      <TopBar
+        onNavigateToSearchResult={navigateToSearchResult}
+        onOpenDjBoard={() => selectPlaceholder('creativity-dj-mixer', 'DJ / Music Mixer')}
+      />
 
       <div
         className="border-glass-border relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border"
@@ -237,7 +291,7 @@ export default function App() {
           boxShadow: 'var(--shadow-panel)',
         }}
       >
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <Sidebar
             activeCategory={activeCategory}
             onSelectCategory={selectCategory}
@@ -248,27 +302,63 @@ export default function App() {
             onCollapsedChange={setSidebarCollapsed}
           />
 
-          <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-y-auto p-8">
-            <AnimatePresence>
-              {sidebarCollapsed && (
-                <motion.button
-                  type="button"
-                  onClick={() => setSidebarCollapsed(false)}
-                  aria-label="Expand sidebar"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  className="glass-surface text-text-secondary hover:text-text-primary hover:bg-glass-hover absolute top-4 left-4 z-10 flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-xl transition-colors duration-150"
-                >
-                  <ChevronRightIcon width={14} height={14} />
-                </motion.button>
-              )}
-            </AnimatePresence>
+          <AnimatePresence>
+            {sidebarCollapsed && (
+              <motion.button
+                type="button"
+                onClick={() => setSidebarCollapsed(false)}
+                aria-label="Expand sidebar"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="glass-surface text-text-secondary hover:text-text-primary hover:bg-glass-hover absolute top-3 left-3 z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full backdrop-blur-xl transition-colors duration-150"
+              >
+                <ChevronRightIcon width={14} height={14} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          <main
+            className={`relative flex min-w-0 flex-1 p-8 ${
+              view.kind === 'general-chat' || view.kind === 'dj-board'
+                ? 'items-stretch justify-stretch overflow-hidden'
+                : 'items-center justify-center overflow-y-auto'
+            }`}
+          >
             {renderView()}
+
+            {(view.kind === 'calendar' ||
+              view.kind === 'schedule' ||
+              view.kind === 'manage-events') && (
+              <div className="absolute right-6 bottom-6 flex flex-col items-end gap-2">
+                {view.kind !== 'manage-events' && (
+                  <button
+                    type="button"
+                    onClick={() => setView({ kind: 'manage-events' })}
+                    className="glass-surface text-text-secondary hover:text-text-primary rounded-full px-3 py-2 text-[12px] font-medium"
+                  >
+                    Manage events
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label="Add event"
+                  onClick={() => setAddEventOpen(true)}
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg"
+                  style={{ background: 'var(--gradient-brand)' }}
+                >
+                  <PlusIcon width={18} height={18} />
+                </button>
+              </div>
+            )}
           </main>
         </div>
       </div>
+
+      {addEventOpen && (
+        <AddEventModal onClose={() => setAddEventOpen(false)} />
+      )}
     </div>
   )
 }

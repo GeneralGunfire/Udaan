@@ -1,6 +1,9 @@
 use std::process::Stdio;
+use std::sync::Arc;
 
-use tokio::process::Command;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::Mutex;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TranscriptionResult {
@@ -10,31 +13,112 @@ pub struct TranscriptionResult {
   pub language_probability: f32,
 }
 
-/// Runs the bundled `transcribe.py` against `python3` on PATH.
-///
-/// faster-whisper is Python-only, so unlike the Ollama chat path (a plain
-/// HTTP call from the frontend) this has to shell out — same shape as the
-/// `claude_code` runner's process spawn, just synchronous and one-shot.
-pub async fn run(path: String) -> Result<TranscriptionResult, String> {
-  let script_path = script_path()?;
+struct WhisperProcess {
+  child: Child,
+  stdin: ChildStdin,
+  stdout: BufReader<ChildStdout>,
+}
 
-  let output = Command::new("python3")
-    .arg(&script_path)
-    .arg(&path)
-    .stdin(Stdio::null())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .output()
-    .await
-    .map_err(|e| format!("Failed to spawn python3: {e}"))?;
+/// Keeps one long-lived `transcribe.py` process alive so the whisper model
+/// (~7-8s to load) is only paid once, not on every mic click. Requests are
+/// serialized through the mutex since whisper doesn't handle concurrent
+/// calls on a single model instance.
+#[derive(Clone)]
+pub struct WhisperServer {
+  process: Arc<Mutex<Option<WhisperProcess>>>,
+}
 
-  if !output.status.success() {
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    return Err(format!("transcribe.py failed: {stderr}"));
+impl WhisperServer {
+  pub fn new() -> Self {
+    Self { process: Arc::new(Mutex::new(None)) }
   }
 
-  let stdout = String::from_utf8_lossy(&output.stdout);
-  serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse transcription output: {e} ({stdout})"))
+  pub async fn transcribe(&self, path: String) -> Result<TranscriptionResult, String> {
+    let mut guard = self.process.lock().await;
+
+    if guard.is_none() {
+      *guard = Some(spawn().await?);
+    }
+
+    match transcribe_with(guard.as_mut().unwrap(), &path).await {
+      Ok(result) => Ok(result),
+      Err(e) => {
+        // The process may have died (e.g. crashed on bad audio) — drop it so
+        // the next call respawns instead of repeating the same failure.
+        *guard = None;
+        Err(e)
+      }
+    }
+  }
+}
+
+async fn spawn() -> Result<WhisperProcess, String> {
+  let script_path = script_path()?;
+
+  let mut child = Command::new("python3")
+    .arg(&script_path)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .kill_on_drop(true)
+    .spawn()
+    .map_err(|e| format!("Failed to spawn python3: {e}"))?;
+
+  let stdin = child.stdin.take().expect("stdin piped");
+  let mut stdout = BufReader::new(child.stdout.take().expect("stdout piped"));
+
+  // Block until the model finishes loading and the server signals readiness.
+  let mut ready_line = String::new();
+  stdout
+    .read_line(&mut ready_line)
+    .await
+    .map_err(|e| format!("Failed to read whisper server readiness: {e}"))?;
+  if !ready_line.contains("\"ready\"") {
+    return Err(format!("Unexpected whisper server startup output: {ready_line}"));
+  }
+
+  Ok(WhisperProcess { child, stdin, stdout })
+}
+
+async fn transcribe_with(process: &mut WhisperProcess, path: &str) -> Result<TranscriptionResult, String> {
+  let request = serde_json::json!({ "audio_path": path });
+  let line = format!("{}\n", request);
+
+  process
+    .stdin
+    .write_all(line.as_bytes())
+    .await
+    .map_err(|e| format!("Failed to write to whisper server: {e}"))?;
+  process
+    .stdin
+    .flush()
+    .await
+    .map_err(|e| format!("Failed to flush whisper server stdin: {e}"))?;
+
+  let mut response_line = String::new();
+  let bytes_read = process
+    .stdout
+    .read_line(&mut response_line)
+    .await
+    .map_err(|e| format!("Failed to read whisper server response: {e}"))?;
+
+  if bytes_read == 0 {
+    let status = process.child.try_wait().ok().flatten();
+    return Err(format!("Whisper server process exited unexpectedly (status: {status:?})"));
+  }
+
+  #[derive(serde::Deserialize)]
+  #[serde(untagged)]
+  enum Response {
+    Ok(TranscriptionResult),
+    Err { error: String },
+  }
+
+  match serde_json::from_str(&response_line) {
+    Ok(Response::Ok(result)) => Ok(result),
+    Ok(Response::Err { error }) => Err(format!("Transcription failed: {error}")),
+    Err(e) => Err(format!("Failed to parse whisper server response: {e} ({response_line})")),
+  }
 }
 
 fn script_path() -> Result<std::path::PathBuf, String> {

@@ -7,7 +7,7 @@
  * on that budget — do not swap in a larger model without re-checking free RAM.
  */
 import { invoke } from '@tauri-apps/api/core'
-import type { ChatMessage, ChatResult, TranscriptionResult } from './types'
+import type { ChatMessage, ChatOptions, ChatResult, ChatTool, TranscriptionResult } from './types'
 
 const OLLAMA_URL = 'http://localhost:11434'
 const CHAT_MODEL = 'qwen2.5:1.5b'
@@ -55,14 +55,33 @@ export async function listRunningModels(): Promise<RunningModel[]> {
   }
 }
 
-/** Sends a chat completion request to the local Ollama daemon. Ollama must be running (`ollama serve`, or the installed background service). */
-export async function chat(messages: ChatMessage[], signal?: AbortSignal): Promise<ChatResult> {
+/**
+ * Sends a chat completion request to the local Ollama daemon. Ollama must
+ * be running (`ollama serve`, or the installed background service). Pass
+ * `tools` to enable real function-calling (qwen2.5:1.5b supports it) —
+ * the model will either reply with text or emit `toolCalls` on the result,
+ * never both meaningfully at once in practice.
+ */
+export async function chat(
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+  options?: ChatOptions,
+  tools?: ChatTool[],
+): Promise<ChatResult> {
   let res: Response
   try {
     res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: CHAT_MODEL, messages, stream: false }),
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        messages,
+        stream: false,
+        ...(options?.temperature !== undefined
+          ? { options: { temperature: options.temperature } }
+          : {}),
+        ...(tools && tools.length > 0 ? { tools } : {}),
+      }),
       signal,
     })
   } catch (err) {
@@ -74,8 +93,16 @@ export async function chat(messages: ChatMessage[], signal?: AbortSignal): Promi
   if (!res.ok) throw new Error(`Ollama chat request failed: ${res.status} ${res.statusText}`)
   const data = await res.json()
 
+  const rawToolCalls = Array.isArray(data.message?.tool_calls) ? data.message.tool_calls : []
+
   return {
     content: data.message?.content ?? '',
+    toolCalls:
+      rawToolCalls.length > 0
+        ? rawToolCalls.map((tc: { function: { name: string; arguments: Record<string, unknown> } }) => ({
+            function: { name: tc.function.name, arguments: tc.function.arguments },
+          }))
+        : undefined,
     evalCount: data.eval_count ?? 0,
     evalDurationMs: (data.eval_duration ?? 0) / 1_000_000,
   }

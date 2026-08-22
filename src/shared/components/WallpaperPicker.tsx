@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useWallpaper } from '@/shared/hooks/useWallpaper'
 import { WALLPAPERS } from '@/app/wallpapers'
 import { ImageIcon } from '@/shared/icons'
+import { Button } from './ui/button'
 
 export function WallpaperPicker() {
   const { wallpaperId, setWallpaperId } = useWallpaper()
@@ -17,11 +18,16 @@ export function WallpaperPicker() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)
     }
-    // 'click' (not 'pointerdown') so a thumbnail's own onClick always
-    // commits before this can close the popover out from under it.
-    document.addEventListener('click', onClickOutside)
-    document.addEventListener('keydown', onKeyDown)
+    // Registered on the next tick, not synchronously with the toggle click —
+    // some embedded webviews (e.g. WebView2) can still be dispatching the
+    // very click that opened the popover when this listener attaches in
+    // the same event-loop turn, which would close it immediately.
+    const id = window.setTimeout(() => {
+      document.addEventListener('click', onClickOutside)
+      document.addEventListener('keydown', onKeyDown)
+    }, 0)
     return () => {
+      window.clearTimeout(id)
       document.removeEventListener('click', onClickOutside)
       document.removeEventListener('keydown', onKeyDown)
     }
@@ -34,22 +40,16 @@ export function WallpaperPicker() {
 
   return (
     <div ref={rootRef} className="relative">
-      <motion.button
+      <Button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label="Change wallpaper"
         aria-expanded={open}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150 ${
-          open
-            ? 'bg-glass-hover text-text-primary'
-            : 'text-text-secondary hover:text-text-primary hover:bg-glass-hover'
-        }`}
+        variant="ghost"
+        className={`h-8 w-8 ${open ? 'bg-white/10 text-text-primary border-white/10' : ''}`}
       >
-        <ImageIcon width={17} height={17} />
-      </motion.button>
+        <ImageIcon width={16} height={16} />
+      </Button>
 
       <AnimatePresence>
         {open && (
@@ -58,14 +58,14 @@ export function WallpaperPicker() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-            className="glass-surface absolute top-11 right-0 z-50 w-80 rounded-2xl p-4 backdrop-blur-2xl"
+            className="glass-surface absolute top-10 right-0 z-50 w-80 rounded-2xl p-4 backdrop-blur-2xl"
             style={{ boxShadow: 'var(--shadow-panel)' }}
           >
             <div className="mb-3 flex items-center justify-between">
               <span className="text-text-primary text-[13px] font-medium">
                 Wallpaper
               </span>
-              <span className="text-text-tertiary text-[11px]">
+              <span className="text-text-tertiary text-[12px]">
                 {WALLPAPERS.find((w) => w.id === wallpaperId)?.label}
               </span>
             </div>
@@ -114,7 +114,7 @@ export function WallpaperPicker() {
                       )}
                     </span>
                     <span
-                      className={`text-[11px] transition-colors duration-150 ${
+                      className={`text-[12px] transition-colors duration-150 ${
                         isActive
                           ? 'text-text-primary font-medium'
                           : 'text-text-tertiary group-hover:text-text-secondary'

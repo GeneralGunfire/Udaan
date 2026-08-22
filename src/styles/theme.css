@@ -53,6 +53,15 @@
     height: 100%;
   }
 
+  /* Matches the window's own background to the app's base color. The
+     Tauri window is opaque with no configured background color, so any
+     sub-pixel gap between the DOM's 100% height and the actual window
+     client area (DPI rounding, etc.) would otherwise show the OS
+     window's default white through as a thin line at an edge. */
+  html {
+    background-color: var(--color-bg-base);
+  }
+
   body {
     margin: 0;
     background-color: var(--color-bg-base);

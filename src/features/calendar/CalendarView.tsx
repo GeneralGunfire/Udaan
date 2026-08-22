@@ -41,7 +41,11 @@ function buildMonthCells(year: number, month: number) {
   return cells
 }
 
-export function CalendarView() {
+interface CalendarViewProps {
+  onAddEvent?: () => void
+}
+
+export function CalendarView({ onAddEvent }: CalendarViewProps) {
   const today = useMemo(() => new Date(), [])
   const todayISO = toISO(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -324,6 +328,7 @@ export function CalendarView() {
 
           <motion.button
             type="button"
+            onClick={onAddEvent}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -347,14 +352,19 @@ export function CalendarView() {
 
           {cells.map((cell, i) => {
             if (cell.day === null || cell.iso === null) {
-              return <div key={`empty-${i}`} className="h-14" />
+              return <div key={`empty-${i}`} className="h-20" />
             }
             const events = getEventsForDate(cell.iso).filter((e) =>
               activeTags.has(e.category),
             )
             const isToday = cell.iso === todayISO
             const isSelected = cell.iso === selectedDate
-            const visible = events.slice(0, 2)
+            // Cap at 1 visible event pill + an overflow badge rather than 2 —
+            // 2 pills plus a "+N more" line no longer fit the cell's content
+            // area without clipping/stacking once a day has 2+ real events
+            // (verified against real multi-event days: they used to visually
+            // overlap). A single pill + badge always fits at this cell height.
+            const visible = events.slice(0, 1)
             const overflow = events.length - visible.length
 
             return (
@@ -365,7 +375,7 @@ export function CalendarView() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                className={`relative flex h-16 flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium transition-colors duration-150 ${
+                className={`relative flex h-20 flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium transition-colors duration-150 ${
                   isSelected
                     ? 'bg-glass-hover text-text-primary'
                     : 'text-text-secondary hover:bg-glass'
@@ -376,7 +386,7 @@ export function CalendarView() {
                 >
                   {cell.day}
                 </span>
-                <div className="flex w-full flex-1 flex-col gap-0.5 overflow-hidden">
+                <div className="flex w-full flex-1 flex-col justify-end gap-1 overflow-hidden">
                   {visible.map((e) => (
                     <span
                       key={e.id}
@@ -390,7 +400,7 @@ export function CalendarView() {
                     </span>
                   ))}
                   {overflow > 0 && (
-                    <span className="text-text-tertiary px-1 text-[9.5px] font-medium">
+                    <span className="text-text-tertiary self-start rounded-full bg-glass-hover px-1.5 py-0.5 text-[9px] font-semibold">
                       +{overflow} more
                     </span>
                   )}

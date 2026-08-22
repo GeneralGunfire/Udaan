@@ -1,5 +1,4 @@
 |-- .claude
-    |-- scheduled_tasks.lock
 |-- .github
     |-- workflows
         |-- ci.yml
@@ -12,6 +11,7 @@
 |-- .vsinstall-help.log
 |-- ChatGPT Image Aug 20, 2026, 06_49_02 PM.png
 |-- index.html
+|-- NOTES.md
 |-- package.json
 |-- pnpm-lock.yaml
 |-- pnpm-workspace.yaml
@@ -19,7 +19,10 @@
     |-- favicon.svg
     |-- icons.svg
 |-- README.md
-|-- scratch-chat-shot.cjs
+|-- scratch-test-mislabeled.wav
+|-- scratch-test.wav
+|-- scratch-test.webm
+|-- scratch-wp-check.cjs
 |-- screenshot.png
 |-- src
     |-- app
@@ -30,8 +33,6 @@
         |-- WallpaperProvider.tsx
         |-- wallpapers.ts
     |-- assets
-        |-- ambient-smoke-bg-light.jpeg
-        |-- ambient-smoke-bg.png
         |-- fonts
             |-- Montserrat-Variable.ttf
             |-- Poppins-Bold.ttf
@@ -49,32 +50,155 @@
             |-- dawn-lake-warm.jpg
             |-- graphite-swirl.jpg
             |-- indigo-wave.jpg
-            |-- midnight-coil.jpg
             |-- navy-petals.jpg
             |-- windows-blue.jpg
     |-- features
+        |-- account
+            |-- AccountView.tsx
+            |-- hooks
+                |-- useLocalProfile.ts
+        |-- automations
+            |-- AutomationsView.tsx
+            |-- components
+                |-- NewRuleForm.tsx
+                |-- RuleCard.tsx
+            |-- hooks
+                |-- useAutomationEngine.ts
+                |-- useAutomationRules.ts
+            |-- lib
+                |-- rulesStore.ts
+                |-- runRule.ts
+                |-- types.ts
         |-- calendar
             |-- CalendarView.tsx
+        |-- clipboard-manager
+            |-- ClipboardManagerView.tsx
+            |-- components
+            |-- hooks
+                |-- useClipboardHistory.ts
+                |-- useClipboardShortcut.ts
         |-- creativity
             |-- CreativityView.tsx
+            |-- dj-board
+                |-- components
+                    |-- Deck.tsx
+                    |-- EffectsRack.tsx
+                    |-- Fader.tsx
+                    |-- HotCues.tsx
+                    |-- Knob.tsx
+                    |-- LoopControls.tsx
+                    |-- MiniPlayer.tsx
+                    |-- Mixer.tsx
+                    |-- PeakMeter.tsx
+                    |-- PresetsPanel.tsx
+                    |-- ShortcutsOverlay.tsx
+                    |-- TrackLibrary.tsx
+                |-- DjBoardView.tsx
+                |-- hooks
+                    |-- useDjBoard.ts
+                    |-- useTrackLibrary.ts
+                |-- lib
+                    |-- audioEngine.ts
+                    |-- boardEngineStore.ts
+                    |-- boardSession.ts
+                    |-- presets.ts
+                    |-- types.ts
+            |-- image-editor
+                |-- components
+                    |-- AdjustmentSlider.tsx
+                    |-- AssetBrowser.tsx
+                    |-- BatchPanel.tsx
+                    |-- CanvasPreview.tsx
+                |-- hooks
+                    |-- useAssetFolder.ts
+                    |-- useImageEditor.ts
+                |-- ImageEditorView.tsx
+                |-- lib
+                    |-- batchOps.ts
+                    |-- imageOps.ts
+            |-- music-player
+                |-- components
+                    |-- PlayerControls.tsx
+                    |-- PlaylistPanel.tsx
+                |-- hooks
+                    |-- useAudioPlayer.ts
+                    |-- usePlaylist.ts
+                |-- MusicPlayerView.tsx
+            |-- video-editor
+                |-- components
+                    |-- ClipLibrary.tsx
+                    |-- ExportPanel.tsx
+                    |-- PreviewPane.tsx
+                    |-- Timeline.tsx
+                |-- lib
+                    |-- types.ts
+                    |-- useVideoAssetFolder.ts
+                    |-- useVideoEditorState.ts
+                |-- VideoEditorView.tsx
         |-- general-chat
             |-- components
                 |-- ChatMessage.tsx
                 |-- Composer.tsx
+                |-- MessageText.tsx
                 |-- modes.ts
-                |-- ModeSessionPanel.tsx
             |-- GeneralChatView.tsx
             |-- hooks
                 |-- useGeneralChat.ts
                 |-- useMicTranscription.ts
+                |-- useStickyScroll.ts
             |-- lib
-                |-- router.ts
+        |-- global-search
+            |-- components
+                |-- SearchResultsDropdown.tsx
+            |-- hooks
+                |-- useGlobalSearch.ts
+            |-- lib
+                |-- fuzzyMatch.ts
+                |-- searchIndex.ts
+                |-- types.ts
+        |-- integrations-status
+            |-- IntegrationsView.tsx
+        |-- model-dashboard
+            |-- ModelDashboardView.tsx
+        |-- notifications
+            |-- hooks
+                |-- useNotifications.ts
+            |-- lib
+                |-- notificationStore.ts
+            |-- NotificationsView.tsx
+        |-- pdf-tool
+            |-- components
+                |-- StampPanel.tsx
+            |-- hooks
+                |-- usePdfTool.ts
+            |-- PdfToolView.tsx
         |-- schedule
             |-- components
                 |-- WeatherWidget.tsx
+            |-- ManageEventsView.tsx
             |-- ScheduleView.tsx
         |-- school
+            |-- knowledge-base
+                |-- README.md
+                |-- structure-templates.md
+                |-- tone-guides.md
+                |-- writing-style-guide.md
             |-- SchoolView.tsx
+            |-- study-generator
+                |-- components
+                    |-- ReliabilityOutput.tsx
+                |-- hooks
+                    |-- useStudyGenerator.ts
+                |-- lib
+                    |-- promptBuilder.ts
+                    |-- reliabilityMarkers.ts
+                |-- StudyGeneratorView.tsx
+        |-- screenshot-tool
+            |-- components
+                |-- RegionSelector.tsx
+            |-- hooks
+                |-- useScreenshotTool.ts
+            |-- ScreenshotToolView.tsx
         |-- sessions
             |-- components
                 |-- NewTaskForm.tsx
@@ -84,31 +208,105 @@
             |-- hooks
                 |-- useClaudeCodeTasks.ts
             |-- SessionsView.tsx
+        |-- splash
+            |-- SplashScreen.css
+            |-- SplashScreen.tsx
+        |-- system-health
+            |-- SystemHealthView.tsx
         |-- work
+            |-- client-tracker
+                |-- ClientTrackerView.tsx
+                |-- components
+                    |-- ContactDetail.tsx
+                    |-- ContactList.tsx
+                    |-- FollowUpsPanel.tsx
+                |-- hooks
+                    |-- useContactNotes.ts
+                    |-- useContacts.ts
+                    |-- useFollowUps.ts
+            |-- proposal-generator
+                |-- components
+                |-- hooks
+                    |-- useTemplateLibrary.ts
+                |-- lib
+                    |-- fillTemplate.ts
+                    |-- starterTemplates.ts
+                |-- ProposalGeneratorView.tsx
             |-- WorkView.tsx
     |-- integrations
+        |-- asset-library
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- audio-library
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
         |-- claude-code
             |-- client.ts
             |-- index.ts
             |-- parseStreamLine.ts
             |-- types.ts
+        |-- client-tracker
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- clipboard-manager
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- folder-watcher
+            |-- client.ts
+            |-- index.ts
+        |-- general-chat
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
         |-- local-model
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- pdf-tool
             |-- client.ts
             |-- index.ts
             |-- types.ts
         |-- README.md
         |-- schedule
+            |-- client.ts
+            |-- index.ts
+            |-- localModelQuery.ts
+            |-- scheduleActions.ts
             |-- scheduleStore.ts
+            |-- types.ts
+        |-- screenshot-tool
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- system-health
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
+        |-- template-library
+            |-- client.ts
+            |-- index.ts
+            |-- types.ts
         |-- weather
             |-- weatherClient.ts
     |-- main.tsx
     |-- shared
         |-- components
+            |-- AddEventModal.tsx
+            |-- AddSourceButtons.tsx
             |-- AmbientBackground.tsx
+            |-- DatePicker.tsx
             |-- GlassPanel.tsx
             |-- PlaceholderView.tsx
             |-- Sidebar.tsx
+            |-- TimePicker.tsx
             |-- TopBar.tsx
+            |-- ui
+                |-- button.tsx
+                |-- dropdown-menu.tsx
             |-- WallpaperPicker.tsx
             |-- Wordmark.tsx
         |-- hooks
@@ -117,6 +315,7 @@
         |-- icons
             |-- index.tsx
         |-- lib
+            |-- cn.ts
     |-- styles
         |-- fonts.css
         |-- theme.css
@@ -152,18 +351,46 @@
         |-- Square89x89Logo.png
         |-- StoreLogo.png
     |-- src
+        |-- asset_library
+            |-- mod.rs
+        |-- audio_library
+            |-- mod.rs
         |-- claude_code
             |-- exe.rs
             |-- mod.rs
             |-- runner.rs
             |-- store.rs
             |-- vscode.rs
+        |-- client_tracker
+            |-- mod.rs
+            |-- store.rs
+        |-- clipboard_manager
+            |-- mod.rs
+            |-- store.rs
+        |-- folder_watcher
+            |-- mod.rs
+        |-- general_chat
+            |-- mod.rs
+            |-- store.rs
         |-- lib.rs
         |-- local_model
             |-- mod.rs
             |-- transcribe.py
             |-- transcribe.rs
         |-- main.rs
+        |-- pdf_tool
+            |-- mod.rs
+        |-- schedule
+            |-- mod.rs
+            |-- store.rs
+        |-- screenshot_tool
+            |-- mod.rs
+        |-- system_health
+            |-- mod.rs
+        |-- template_library
+            |-- mod.rs
+            |-- store.rs
+        |-- webview_permissions.rs
     |-- tauri.conf.json
 |-- test-results
     |-- .last-run.json

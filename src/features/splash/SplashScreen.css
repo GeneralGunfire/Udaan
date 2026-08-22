@@ -1,0 +1,458 @@
+/**
+ * Splash intro — isolated stylesheet, not part of the shared token system.
+ * Only `transform` and `opacity` are keyframed (cheap on integrated GPUs);
+ * `filter: blur` is static per-element rather than animated.
+ */
+
+.splash-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #05070b;
+  overflow: hidden;
+}
+
+.splash-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Smoke/liquid blobs ---- */
+
+.splash-blob-field {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform, opacity;
+}
+
+/*
+ * Each blob is a two-layer transform: an outer "orbit" element spins around
+ * the center (rotate + oscillating radius via nested translate), and an inner
+ * "shape" element holds the actual gradient blob offset from that center.
+ * Rotating the offset — rather than rotating the blob in place — is what
+ * reads as tendrils sweeping around a point instead of a blob pulsing in place.
+ *
+ * While loading, the orbit/blob-spin animations loop indefinitely (duration
+ * is unknown up front — it's however long the real app takes to become
+ * paint-ready). The `--resolved` modifier swaps to a one-shot keyframe that
+ * spins the radius down to zero once, coalescing the smoke into the mark.
+ */
+.splash-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  animation: splash-orbit-loop-a 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.splash-blob {
+  position: absolute;
+  border-radius: 42% 58% 61% 39% / 45% 40% 60% 55%;
+  filter: blur(26px);
+  mix-blend-mode: screen;
+  transform-origin: center;
+  animation: splash-blob-spin-loop-a 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.splash-orbit--1 {
+  animation-name: splash-orbit-loop-a;
+}
+.splash-orbit--2 {
+  animation-name: splash-orbit-loop-b;
+  animation-delay: 0.3s;
+}
+.splash-orbit--3 {
+  animation-name: splash-orbit-loop-c;
+  animation-delay: 0.6s;
+}
+.splash-orbit--4 {
+  animation-name: splash-orbit-loop-d;
+  animation-delay: 0.15s;
+}
+
+.splash-blob--1 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle at 35% 35%, var(--splash-cyan, #37b4c8), transparent 70%);
+  animation-name: splash-blob-spin-loop-a;
+}
+
+.splash-blob--2 {
+  width: 230px;
+  height: 230px;
+  background: radial-gradient(circle at 60% 40%, var(--splash-blue, #185fa5), transparent 70%);
+  animation-name: splash-blob-spin-loop-b;
+  animation-delay: 0.3s;
+}
+
+.splash-blob--3 {
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle at 45% 55%, var(--splash-teal, #7fe0d0), transparent 70%);
+  animation-name: splash-blob-spin-loop-c;
+  animation-delay: 0.6s;
+}
+
+.splash-blob--4 {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle at 50% 50%, var(--splash-blue, #185fa5), transparent 72%);
+  animation-name: splash-blob-spin-loop-d;
+  animation-delay: 0.15s;
+}
+
+/* Looping: orbit radius breathes in and out, opacity stays present — smoke that keeps drifting while we wait. */
+@keyframes splash-orbit-loop-a {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) translateX(20px);
+  }
+  15% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.75;
+    transform: rotate(180deg) translateX(70px);
+  }
+  85% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(360deg) translateX(20px);
+  }
+}
+
+@keyframes splash-orbit-loop-b {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) translateX(24px);
+  }
+  15% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.7;
+    transform: rotate(-190deg) translateX(88px);
+  }
+  85% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-360deg) translateX(24px);
+  }
+}
+
+@keyframes splash-orbit-loop-c {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) translateX(16px);
+  }
+  15% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.85;
+    transform: rotate(160deg) translateX(56px);
+  }
+  85% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(360deg) translateX(16px);
+  }
+}
+
+@keyframes splash-orbit-loop-d {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) translateX(12px);
+  }
+  15% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.45;
+    transform: rotate(-160deg) translateX(40px);
+  }
+  85% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-360deg) translateX(12px);
+  }
+}
+
+@keyframes splash-blob-spin-loop-a {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05) rotate(220deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(440deg);
+  }
+}
+
+@keyframes splash-blob-spin-loop-b {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1) rotate(-200deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(-400deg);
+  }
+}
+
+@keyframes splash-blob-spin-loop-c {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1) rotate(180deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(360deg);
+  }
+}
+
+@keyframes splash-blob-spin-loop-d {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(0.95) rotate(-160deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(-320deg);
+  }
+}
+
+/* Resolved: one-shot, radius spins down to zero — smoke coalescing into the mark. */
+.splash-blob-field--resolved .splash-orbit {
+  animation-name: splash-orbit-resolve;
+  animation-duration: 0.65s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: 1;
+  animation-delay: 0s;
+}
+
+.splash-blob-field--resolved .splash-blob {
+  animation-name: splash-blob-resolve;
+  animation-duration: 0.65s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: 1;
+  animation-delay: 0s;
+}
+
+@keyframes splash-orbit-resolve {
+  0% {
+    opacity: 0.6;
+  }
+  40% {
+    opacity: 0.7;
+    transform: rotate(120deg) translateX(10px);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(220deg) translateX(0px);
+  }
+}
+
+@keyframes splash-blob-resolve {
+  0% {
+    transform: translate(-50%, -50%) scale(0.85) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.3) rotate(140deg);
+  }
+}
+
+/* ---- Seed point of light (holds steady while loading; fades once resolved) ---- */
+
+.splash-seed {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #bdf3ff;
+  box-shadow: 0 0 18px 6px rgba(120, 220, 230, 0.9);
+  animation: splash-seed-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes splash-seed-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.splash-blob-field--resolved .splash-seed {
+  animation: splash-seed-vanish 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes splash-seed-vanish {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+/* ---- Logo mark: hidden while loading, resolves in once the --resolved class lands ---- */
+
+.splash-mark {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(0.4);
+  filter: drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
+}
+
+.splash-mark--resolved {
+  animation: splash-mark-resolve 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes splash-mark-resolve {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+    filter: blur(10px) drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+    filter: blur(0px) drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0px) drop-shadow(0 0 16px rgba(55, 180, 200, 0.45));
+  }
+}
+
+/* ---- Wordmark + tagline ---- */
+
+.splash-wordmark {
+  margin-top: 18px;
+  font-family: var(--font-display, 'Poppins', sans-serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.96);
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.splash-wordmark--resolved {
+  animation: splash-fade-up 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
+  animation-delay: 0.4s;
+}
+
+.splash-tagline {
+  margin-top: 8px;
+  font-family: var(--font-sans, 'Montserrat', sans-serif);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.splash-tagline--resolved {
+  animation: splash-fade-up 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
+  animation-delay: 0.6s;
+}
+
+@keyframes splash-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Skip hint ---- */
+
+.splash-skip-hint {
+  position: absolute;
+  bottom: 32px;
+  font-family: var(--font-sans, 'Montserrat', sans-serif);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.32);
+  opacity: 0;
+  animation: splash-fade-up 0.5s ease forwards;
+  animation-delay: 1s;
+}
+
+/* ---- Reduced motion: near-instant fallback ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-blob,
+  .splash-seed {
+    display: none;
+  }
+
+  .splash-mark,
+  .splash-mark--resolved {
+    animation: splash-fade-simple 0.25s ease forwards;
+    animation-delay: 0s;
+    filter: none;
+  }
+
+  .splash-wordmark,
+  .splash-wordmark--resolved {
+    animation: splash-fade-simple 0.25s ease forwards;
+    animation-delay: 0.1s;
+  }
+
+  .splash-tagline,
+  .splash-tagline--resolved {
+    animation: splash-fade-simple 0.25s ease forwards;
+    animation-delay: 0.15s;
+  }
+
+  .splash-skip-hint {
+    display: none;
+  }
+}
+
+@keyframes splash-fade-simple {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -80,16 +80,20 @@
 }
 
 :root {
-  /* ---- Color: Udaan brand ramp (deep navy -> blue -> cyan -> light teal) ---- */
+  /* ---- Color: Udaan brand — one fixed electric blue (Vercel/Linear-style),
+     used everywhere: buttons, active states, gradients. Not derived per-
+     wallpaper (tried and reverted this session — mismatched hues per image
+     read as broken, not intentional). --color-brand-cyan/-teal are kept as
+     aliases of the same blue family so every existing consumer across the
+     app still resolves correctly without a rename pass. */
   --color-brand-navy: #0b1e3a;
-  --color-brand-blue: #185fa5;
-  --color-brand-cyan: #37b4c8;
-  --color-brand-teal: #7fe0d0;
+  --color-brand-blue: #2563eb;
+  --color-brand-cyan: #3b82f6;
+  --color-brand-teal: #60a5fa;
   --gradient-brand: linear-gradient(
     135deg,
     var(--color-brand-blue) 0%,
-    var(--color-brand-cyan) 55%,
-    var(--color-brand-teal) 100%
+    var(--color-brand-cyan) 100%
   );
 
   /* ---- Color: semantic ---- */

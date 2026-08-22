@@ -147,6 +147,9 @@ export function Sidebar({
               </SidebarRow>
 
               {/* Channels — each independently expandable */}
+              <div className="text-text-tertiary mt-3 mb-1 px-2.5 text-[12px] font-semibold tracking-[0.06em] uppercase">
+                Channels
+              </div>
               {CATEGORIES.map((category) => {
                 const isActive = category.id === activeCategory
                 const isExpanded = expandedCategory === category.id
@@ -174,7 +177,7 @@ export function Sidebar({
                         }}
                       />
                       <span className="min-w-0 flex-1 truncate">{category.label}</span>
-                      <span className="text-text-tertiary shrink-0 truncate text-[10px] font-normal">
+                      <span className="text-text-tertiary shrink-0 truncate text-[12px] font-normal">
                         {category.descriptor}
                       </span>
                       <motion.span
@@ -278,7 +281,7 @@ function SidebarRow({
 
 function CountBadge({ value }: { value: string }) {
   return (
-    <span className="bg-brand-cyan/20 text-text-primary min-w-4.5 rounded-md px-1.5 py-0.5 text-center text-[10.5px] font-semibold tabular-nums">
+    <span className="bg-brand-cyan/20 text-text-primary min-w-4.5 rounded-md px-1.5 py-0.5 text-center text-[12px] font-semibold tabular-nums">
       {value}
     </span>
   )

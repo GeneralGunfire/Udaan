@@ -95,6 +95,15 @@ impl Queue {
       .arg("--include-partial-messages")
       .arg("--no-session-persistence")
       .current_dir(cwd_path)
+      // The Tauri process (and this dev-mode child) can inherit an
+      // ANTHROPIC_API_KEY from whatever shell/IDE launched it (e.g. a VS
+      // Code extension). The Claude CLI prefers that key over a stored
+      // `claude login` OAuth session even when the key is stale/invalid
+      // for this use, which surfaces as an opaque "Anthropic key" auth
+      // error despite the user being logged in with a Pro/Max plan. Strip
+      // it so the CLI falls through to the OAuth session, matching what
+      // happens when the user runs `claude` from a clean terminal.
+      .env_remove("ANTHROPIC_API_KEY")
       .stdin(Stdio::null())
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())

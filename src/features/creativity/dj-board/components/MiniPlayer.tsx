@@ -28,20 +28,19 @@ export function MiniPlayer({ onOpenDjBoard }: MiniPlayerProps) {
       type="button"
       onClick={onOpenDjBoard}
       title="Open DJ Board"
-      className="glass-surface flex h-11 shrink-0 items-center gap-2 rounded-full px-3 backdrop-blur-2xl transition-transform duration-100 hover:scale-[1.02]"
-      style={{ boxShadow: 'var(--shadow-composer)' }}
+      className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-transparent px-2 transition-[background-color,border-color] duration-150 hover:border-white/10 hover:bg-white/10"
     >
       <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white"
         style={{ background: accent }}
       >
-        <DiscIcon width={12} height={12} />
+        <DiscIcon width={11} height={11} />
       </span>
       <div className="flex min-w-0 flex-col items-start">
-        <span className="text-text-primary max-w-32 truncate text-[10.5px] font-medium">
+        <span className="text-text-primary max-w-32 truncate text-[12px] font-medium">
           {state.track?.fileName ?? 'No track'}
         </span>
-        <span className="text-text-tertiary text-[9px] tabular-nums">
+        <span className="text-text-tertiary text-[12px] tabular-nums">
           {formatTime(state.currentTime)} / {formatTime(state.duration)}
         </span>
       </div>
@@ -52,7 +51,7 @@ export function MiniPlayer({ onOpenDjBoard }: MiniPlayerProps) {
         }}
         role="button"
         aria-label={state.isPlaying ? 'Pause' : 'Play'}
-        className="text-text-secondary hover:text-text-primary hover:bg-glass-hover flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-100"
+        className="text-text-secondary hover:text-text-primary hover:bg-white/10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors duration-100"
       >
         {state.isPlaying ? <PauseIcon width={12} height={12} /> : <PlayIcon width={12} height={12} />}
       </span>

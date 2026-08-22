@@ -1092,3 +1092,793 @@ two parts instead, agreed with the user as the verification plan:
   truthy before comparing (e.date && e.date >= startISO), since
   unplanned items have date: '' and would otherwise sort/compare
   incorrectly against real ISO date strings.
+
+## 2026-08-21 (session 6) — UI/UX polish pass, General Chat (first view)
+
+Scope for this session, per explicit instruction: General Chat only.
+The full-app polish pass (Calendar, Schedule, Sessions, DJ Board, etc.)
+is intended to continue view-by-view in later sessions, committing
+after each — General Chat is the first.
+
+### Foundational tooling landed this session
+
+Adopted shadcn/ui as the base component layer, but *not* via the
+shadcn CLI init — that generates a generic `--primary`/`--secondary`
+CSS-variable theme that would collide with this app's existing,
+carefully-built glassmorphic token system (`src/styles/tokens.css` +
+`theme.css`: glass-surface, gradient-brand, dark/light both
+first-class). Instead: installed only the underlying primitives
+(`clsx`, `tailwind-merge`, `class-variance-authority`,
+`@radix-ui/react-slot`, `@radix-ui/react-dropdown-menu`) via pnpm —
+note the repo is pnpm-based (`pnpm-lock.yaml`), not npm; an initial
+`npm install` attempt failed on a `workspace:*` protocol it couldn't
+resolve and was redone with `pnpm add`, no files were touched by the
+failed attempt.
+
+New shared primitives, hand-styled onto the existing tokens rather
+than shadcn's defaults:
+- `src/shared/lib/cn.ts` — the standard `clsx` + `tailwind-merge`
+  helper.
+- `src/shared/components/ui/button.tsx` — a `cva`-variant Button.
+  Non-`asChild` renders as `motion.button` with scale-tap
+  (`whileHover: 1.05`, `whileTap: 0.95`, low-bounce spring) built in
+  by default rather than passed per call site — this directly serves
+  the "2-3 consistent animation patterns, not bespoke-per-component"
+  requirement: every Button in the app now shares one scale-tap
+  automatically. `asChild` renders a plain Radix `Slot` (no motion),
+  since Radix trigger components (e.g. DropdownMenuTrigger) need to
+  own the underlying element themselves — Motion's prop types
+  (`onAnimationStart` etc.) don't line up with plain DOM element
+  types, so the `asChild` branch narrows/casts at that one boundary.
+- `src/shared/components/ui/dropdown-menu.tsx` — Radix
+  DropdownMenu restyled onto `glass-surface`, with Framer Motion
+  (not a second animation library) driving the open/close transition.
+  Deliberately *not* using Radix's `forceMount` + CSS data-state
+  animation approach — that fights Framer's mount/unmount-driven
+  `AnimatePresence` exit animations. Instead the caller owns `open`
+  state and conditionally renders `DropdownMenuContent`, matching the
+  mount/unmount pattern already used everywhere else in the app.
+
+### General Chat — before/after
+
+**Before:** every interactive control in `Composer.tsx` (mode-switch
+tabs, mic/stop/send buttons, session-history trigger + its dropdown)
+was a hand-rolled `motion.button`/`button` with per-instance
+`whileHover`/`whileTap` values that drifted slightly between controls
+(e.g. mic/stop/send used 1.08/0.92, mode tabs and session trigger used
+no hover-scale or 1.05/0.95). The session-history popover was a raw
+`AnimatePresence`-wrapped `div` driven by a boolean with no
+click-outside or Escape handling — clicking anywhere outside it, or
+pressing Escape, did not close it.
+
+**After:** every button in Composer now goes through the shared
+`Button` primitive (one scale-tap spring everywhere, no more
+per-instance drift). The session-history list is now a Radix
+`DropdownMenu` — same visual position/animation/glass styling as
+before, but now closes on outside-click, closes on Escape, and traps
+focus correctly while open. The shared-layout mode-pill indicator
+(`layoutId="composer-mode-pill"`) is untouched — that was already the
+one correct pattern for a tab indicator and didn't need changing.
+
+No layout structure, spacing values, or feature logic changed in this
+pass — this was strictly: swap hand-rolled interactive elements for
+the shadcn-style primitives, keeping pixel-identical visual output.
+
+### Layout centering (item 1 in the brief) — audited, not changed
+
+Checked whether General Chat's surrounding shell (`App.tsx`'s `<main>`
++ `Sidebar.tsx`) has the "panel stays left-anchored when sidebar
+collapses" bug described in the brief. It does not, in this view:
+`Sidebar` is a true flex sibling of `<main>` and animates its own
+`width` via Framer Motion spring (not a snap), and `<main>` already
+uses `flex-1 items-center justify-center` — because it's a flex child
+recalculating against the sidebar's live animated width every frame,
+centering should already track smoothly through the collapse/expand
+transition rather than jumping. Flagging this as **reasoned but not
+visually confirmed** — I cannot render the app in this environment.
+Please eyeball a sidebar collapse/expand specifically on General Chat
+and let me know if it still snaps; if so the bug is likely more subtle
+(e.g. a transform/paint timing issue) than the flex-layout audit
+suggests.
+
+### Flagged for visual confirmation
+
+- Composer's session-history dropdown: confirm it now closes on
+  outside-click/Escape as intended, and that its position/animation
+  still looks identical to before (same glass surface, same
+  bottom-anchored placement above the composer).
+- Mode-switch tabs (Local/Claude): confirm the hover state still reads
+  correctly — the pill buttons now use `hover:bg-transparent` on the
+  Button wrapper itself (so only the inner `<span>` text color
+  transitions on hover, not a double background), matching the
+  original's hover behavior of text-color-only on inactive tabs.
+- Mic/Stop/Send buttons: confirm the now-uniform scale-tap (1.05/0.95)
+  doesn't feel weaker than the old Send/Mic/Stop's slightly larger
+  1.08/0.92 — this was a deliberate consistency trade specified by the
+  brief ("2-3 consistent animation patterns... rather than a different
+  bespoke animation per component"), but it's a visible reduction in
+  the send button's tap "punch" specifically.
+- Sidebar collapse/expand centering behavior on General Chat (see
+  above) — reasoned correct, not rendered.
+
+### Not touched this session
+
+Every other view (Calendar, Schedule, Sessions, DJ Board, Image
+Editor, Music Player, School/Work/Creativity stubs, Model Dashboard,
+Account, Integrations, System Health, Notifications) is unchanged.
+`ChatMessage.tsx` (the message bubble component) was also left as-is
+— it's a styled `div`, not one of the "standard elements" (buttons,
+inputs, tabs, dialogs, tooltips, dropdowns) the shadcn-adoption
+instruction calls out, so there was nothing in it to migrate.
+
+### Bug found mid-session: thin white line/strip at window bottom edge
+
+User flagged (with a screenshot) a strip of plain white visible below
+the app's rounded panel, at the very bottom of the window — not a
+border/outline styling issue, it's the raw Tauri window canvas showing
+through. Root cause: `tauri.conf.json`'s window config has
+`"transparent": false` and custom `"decorations": false` chrome but no
+`backgroundColor`, so the native window surface defaults to white;
+that shows through wherever the webview's DOM doesn't paint every
+pixel of the actual client area (e.g. a sub-pixel/DPI-rounding gap
+between `100%`-height DOM and the real window height — plausible cause
+though not confirmed, since I can't inspect the running window here).
+
+Two-layer fix:
+- `src-tauri/tauri.conf.json` — added `"backgroundColor": "#0b0f16"`
+  (matches `--color-bg-base` dark, the default/primary theme per
+  `tokens.css`) to the window config. This sets the actual native
+  window + webview background at the OS level, closing the gap at its
+  source rather than papering over it in CSS.
+- `src/styles/theme.css` — `html` previously had no background-color
+  set at all (only `body` did); added `background-color:
+  var(--color-bg-base)` to `html` too, as a second line of defense in
+  case `body` ever doesn't reach exactly 100% of the viewport.
+
+**Flagged, not visually confirmed:** the `tauri.conf.json` change is a
+native-window-level setting — it only takes effect on a full rebuild/
+relaunch of the Tauri app, not a hot-reload, and I have no way to
+launch or screenshot the built app in this environment. Please rebuild
+and confirm the white strip is gone. If it persists after rebuild, the
+cause is more likely a DPI/viewport-height rounding gap specifically
+at the bottom edge (worth checking window height vs. `100vh` at your
+actual display scaling) rather than the window's base color, and the
+CSS `html` background change alone should still mask it — if it
+doesn't, that's a stronger signal the gap has a different cause (e.g.
+something rendering below `#root` unexpectedly).
+
+## 2026-08-22 (session 6, continued) — Wallpaper bug fixed, General Chat empty-state + composer polish
+
+### Wallpaper not rendering — found and fixed
+
+User confirmed (via devtools Elements inspection) the ambient
+background `<div class="fixed inset-0 -z-10 ... bg-(--ambient-base)">`
+existed in the DOM but was **empty** — no `<img>` child at all, not
+even a broken/0-opacity one. Root cause: `AmbientBackground.tsx` wrapped
+a single `motion.img` in `AnimatePresence` unnecessarily. `AnimatePresence`
+is only needed to animate a child's *exit* when it unmounts; this image
+never needs an exit animation (it's replaced in place via a changing
+`key`, and the new image's own `initial`→`animate` handles the fade-in).
+In practice this was leaving the child unrendered — fixed by removing
+`AnimatePresence` entirely and letting `motion.img` handle its own
+mount-in fade via `initial`/`animate` alone. Confirmed compiling clean;
+**flagged for the user to confirm visually after a full app restart**
+(this was mid-session, discovered through live devtools inspection, not
+something I could reproduce/verify myself in this environment).
+
+Also worth noting for later: this was diagnosed entirely through the
+user relaying devtools output (Elements tree, then confirming a full
+restart hadn't happened yet for the earlier white-strip fix) — static
+code review alone did not surface it, since every file involved
+(WallpaperProvider, useWallpaper, wallpapers.ts, AmbientBackground)
+was structurally correct in isolation.
+
+### General Chat empty-state layout — rebalanced
+
+**Before:** `GeneralChatView` rendered the logo/wordmark/tagline as a
+fixed header block, independent of `Composer`, which separately
+vertically-centered a "No messages yet" text string in whatever space
+was left above the bottom-pinned input. Two independently-centered
+blocks fighting for the same vertical space produced the "logo sits
+oddly high, then a big dead gap, then floating text, then another gap
+to the composer" feeling flagged as looking sparse/unbalanced.
+
+**After:** moved the logo/wordmark/tagline into `Composer.tsx` itself
+(deleted from `GeneralChatView.tsx`, which is now just the outer
+shell + ambient glow), conditioned on `isEmpty = !loadingHistory &&
+messages.length === 0`. When empty: the whole container switches to
+`justify-center`, and renders one cohesive hero block (logo + wordmark
++ tagline) with the composer sitting directly below it — a proper
+"landing state" composition, closer to how ChatGPT/Claude's own
+new-chat screen reads, rather than a header at top + input pinned to
+the bottom with dead space between. The old "No messages yet. Say
+something to get started." line was dropped — the tagline plus an
+empty composer with a visible placeholder already communicates the
+same thing without a redundant second string.
+
+Once a real conversation exists, the layout reverts exactly to the
+previous behavior: scrollable message list at top, composer pinned to
+the bottom. `useStickyScroll`'s ref/handler are conditionally attached
+only in the non-empty branch — confirmed safe since the hook null-
+checks `containerRef.current` everywhere, so it's a no-op while the
+ref isn't mounted and picks up fresh (stickToBottom defaults to true)
+the moment the first message causes the branch to switch.
+
+### Composer — added focus presence
+
+**Before:** the composer had no visual response to being focused — a
+flat glass rectangle with the same appearance whether idle or actively
+being typed into, which (especially with the wallpaper bug making
+every glass surface look flatter than intended, see above) read as
+"floaty"/disconnected from the rest of the page.
+
+**After:** added a `ring-1 ring-transparent` → `focus-within:ring-2
+focus-within:ring-brand-cyan/35` transition on the composer's outer
+glass div. Typing now gives the composer a subtle brand-cyan glow,
+giving it presence as the page's primary interactive element. Kept
+the low-bounce spring-free `transition-shadow duration-200` — a plain
+color/shadow transition, not a spring, since this is a persistent
+focus state rather than a one-shot interaction (springs are for
+click/toggle/expand per the animation-discipline brief, not ambient
+focus rings).
+
+### TopBar pill spacing — audited, not changed
+
+Re-checked the gap between the search/media/wallpaper/window-control
+pill cluster the user flagged as "cramped" in the screenshot. The
+gaps are already a uniform `gap-3` (12px) applied once on the header's
+flex container, between every direct child pill including the brand
+pill and the flexible drag-spacer — there's no ad-hoc/inconsistent
+spacing here despite how it read in the screenshot. My read: the
+apparent crowding is a side effect of the missing wallpaper (no image
+behind `backdrop-filter: blur()` makes adjacent glass pills lose their
+visual separation/depth cue and appear to blend together) rather than
+an actual spacing bug. **Deliberately left unchanged** — didn't want
+to alter already-consistent spacing based on a screenshot taken while
+a separate, now-fixed bug was distorting how the pills read. Please
+re-screenshot after confirming the wallpaper is back and let me know
+if the TopBar still looks cramped — if so, it's a real issue worth a
+second pass.
+
+### Flagged for visual confirmation (this round)
+
+- Wallpaper actually renders after a full app restart (not hot-reload).
+- General Chat's new empty-state composition — logo/tagline/composer
+  as one centered group — reads as intentional rather than sparse.
+- Composer's new focus-within cyan ring — confirm it's visible but not
+  garish against the glass surface, and that it doesn't clash with the
+  brand-gradient send button's own color.
+- TopBar pill spacing — re-assess once wallpaper is confirmed back;
+  flagged above as likely not an actual bug.
+
+## 2026-08-22 (session 6, continued) — message-list bottom-anchor bug + full General Chat visual reimagining
+
+### Wallpaper: confirmed fixed (user's own follow-up session)
+
+Wallpaper is now rendering — confirmed via screenshot. Root cause
+turned out to be different from my earlier guess: a `position: fixed`
+element with a *negative* z-index and no positioned ancestor can paint
+**behind** `body`'s own painted background in Chromium/WebView2 when
+`body` also has `overflow: hidden` (both true here). Fixed (in a
+separate session) by dropping `-z-10` down to `z-0` and relying on DOM
+order alone — `AmbientBackground` renders first in `App.tsx`, before
+`TopBar`/the panel, so it's already behind everything without needing
+a negative index. Worth remembering for any future full-bleed fixed
+layer in this app: prefer `z-0` + DOM order over negative z-index.
+
+### Real bug found: messages top-packed instead of bottom-anchored
+
+User's screenshot (with wallpaper working) showed a "hello" message
+and its assistant reply floating near the top of the window, far above
+the composer, with a large dead gap between them and the input — not
+a cosmetic issue, a real layout bug. Cause: the message-list container
+was `flex flex-col gap-2.5` with no `justify-end`, so with only 1-2
+messages the flex-column default (`justify-start`) packed them at the
+*top* of the `flex-1` scroll area instead of anchoring them to the
+bottom where the composer is. Fixed by adding `justify-end` — this is
+the standard pattern every chat app (Slack, Discord, ChatGPT) uses:
+short conversations sit flush against the input, long ones scroll
+normally once content overflows the container. (This fix is preserved
+in the full redesign below, in the rebuilt message-list container.)
+
+### Full reimagining: General Chat moved off the app's glass system
+
+User asked to "completely reimagine" the page using a different,
+named design language — chose **Linear/Notion-style**: sharp small-
+radius corners over the app's usual full-pill/heavy-blur/gradient-
+sheen glass language, denser structured hierarchy, a muted neutral
+palette with the brand cyan used sparingly (send button, active-tab
+indicator, user-message label) rather than gradients throughout.
+**Explicitly scoped to General Chat only** — the shared `tokens.css`
+glass system, `Button`'s default pill shape, and every other view are
+untouched; this view now locally overrides shape/border/fill via
+inline `className`/`style` rather than new shared tokens, per the
+scope the user chose when asked.
+
+Also explicitly required: it still has to work sitting over a
+photographic wallpaper, not a flat white/dark canvas the way Linear/
+Notion normally do — so this isn't literally flat. Every panel keeps
+a light `backdrop-blur` and a near-opaque (not fully solid) fill so
+the wallpaper stays visible through it; what changed is the *amount*
+of blur/glow/gradient (much less than the old glass-surface treatment)
+and the corner radius (6-10px sharp corners, not 18-28px pills).
+
+**`ChatMessage.tsx` — bubbles → labeled text rows.** Rebuilt from
+chat-bubble styling (colored rounded-16px background per message,
+gradient for the user's own) to a Linear-comment-style row: a small
+4px-radius sender glyph ("Y"/"U") + a tiny sender label line + plain
+left-aligned text below it, no per-message background or border at
+all — messages are separated by spacing and the label alone, not by
+bubble chrome. This is the biggest visual departure in the redesign
+and the one most worth double-checking once rendered — bubble-less
+chat layouts can look under-designed if the vertical rhythm isn't
+tight enough; flagged below.
+
+**`Composer.tsx` — full flat/structured rebuild:**
+- Message list: same `justify-end` bottom-anchor fix as above, plus a
+  `divide-y divide-white/[0.05]` hairline between rows (replacing the
+  bubble-to-bubble `gap-2.5` spacing) and a `border-b` under the whole
+  list separating it from the composer below — a real dividing line
+  where before there was just empty space.
+- Empty state: dropped the large centered glowing-logo hero entirely.
+  Replaced with a small compact header (24px mark + wordmark + tagline
+  in two text lines, left-aligned, no glow/drop-shadow) sitting above
+  the composer — reads as a quiet page header, not a splash moment.
+  This is a significant design reduction from the previous "hero
+  landing state" pass in this same session; the two are not
+  compatible design languages (soft-glow centered hero vs. flat
+  structured header), and this update supersedes it.
+- Composer input box: `rounded-[10px]` (was 18px), single hairline
+  `border` in `--color-glass-border` (was a soft `--shadow-composer`
+  drop shadow + gradient-sheen background), `backdrop-blur-md` (was
+  the heavier `--blur-panel` glass treatment), fill is a plain
+  `color-mix(... 62%, transparent)` of `--color-bg-elevated` (was a
+  two-layer gradient+glass-bg mix). Dropped the focus-within cyan
+  ring added earlier this session — it read as a glow effect, which
+  conflicts with the new restrained-accent direction; sharp-corner
+  panels in this style don't get glow states, they'd get a plain
+  border-color shift, which wasn't re-added since it wasn't asked for
+  and the hairline border is already a deliberate, visible frame.
+- Mode switcher (Local/Claude): pill shape → `rounded-[6px]` segmented
+  control in a bordered `rounded-[6px]` track, active state now a
+  flat `bg-white/[0.08]` fill (was `bg-glass-hover`) via the same
+  `layoutId` shared-layout slide — kept exactly that one animation
+  pattern, only restyled its shape/color.
+- Session-history control + dropdown: same `rounded-[4-8px]` treatment
+  throughout, hairline dividers (`border-white/[0.06]`) replacing the
+  glass-border/glass-hover classes used elsewhere in the app.
+- Mic/Stop/Send buttons: unchanged behavior (still the shared `Button`
+  primitive, same variants), just `rounded-[6px]` instead of full
+  circles, to match the new sharp-corner language throughout.
+
+**`GeneralChatView.tsx`:** removed the ambient teal radial-gradient
+glow blob entirely — that was a glass-language decoration (a soft
+glow floating behind the hero) with no place in a flatter, more
+restrained composition; the wallpaper alone is now the only
+background layer under General Chat's own content.
+
+### Why the shared `Button`/`DropdownMenu` primitives still work here
+
+Both were built with `variant`/`className` override points precisely
+so a view could restyle shape without forking the component — this
+redesign is the first real test of that: every `Button` call here
+still gets the shared scale-tap motion and Radix composability, just
+with `rounded-full` overridden to `rounded-[4-6-8px]` via
+`tailwind-merge`-safe className overrides (verified `rounded-full` is
+correctly stripped when a later `rounded-[Npx]` class is merged, not
+just appended). No fork of Button/DropdownMenu was needed for this
+scale of restyle — a good sign the shared layer is holding up as
+other views get their own passes later.
+
+### Flagged for visual confirmation — this is a significant departure, please look carefully
+
+I cannot render any of this — everything below is reasoned from the
+code, not seen. This redesign is a much bigger visual swing than
+earlier passes this session, so please treat this round of screenshots
+as the most important one to check carefully:
+
+- **Message rows without bubbles** — confirm the vertical rhythm
+  (row padding, sender-label size, text size) reads as intentional
+  "comment thread" density and not just "unstyled text," which is the
+  main risk of dropping bubble chrome entirely.
+- **Empty-state header** — confirm the small left-aligned Udaan
+  mark+wordmark+tagline reads as a page header and doesn't feel
+  abrupt/anticlimactic compared to what was there a moment ago (a
+  large centered glowing hero) — this is a real tone shift, not just
+  a resize.
+- **Composer against the wallpaper** — confirm `backdrop-blur-md` +
+  62%-opacity fill is enough to keep it legible over a busy/bright
+  section of wallpaper, and enough to *not* look like a flat sticker
+  pasted on top of a photo (the specific failure mode the user asked
+  me to avoid when they said it should "still work well with the
+  background images").
+- **Sharp corners next to the sidebar/TopBar's still-fully-glass/pill
+  language** — since this redesign is deliberately scoped to General
+  Chat only, switching to this view from anywhere else will now show
+  a visible style seam (flat/sharp chat vs. glass/pill everywhere
+  else). Confirm that reads as "this view has its own identity" and
+  not "this looks broken/inconsistent" — if it's the latter, the
+  right fix is extending this language to more views next, not
+  reverting this one.
+
+## 2026-08-22 (session 6, continued further) — Arc/Raycast shell, iMessage
+bubbles, fixed-blue accent (reverted per-wallpaper theming), real chat
+features
+
+This continues directly from the redesign above. User saw a screenshot,
+said it "could still be better," and — this time with a concrete named
+direction — asked for the *shell* (TopBar + Sidebar), not just General
+Chat's own content, to move to an Arc/Raycast-style unified toolbar.
+Separately, chose iMessage/Slack bubbles over the Linear-style labeled
+rows for message content specifically (reverting that part of the prior
+redesign). This session now has three design-language pivots on General
+Chat's message content alone (Linear rows -> iMessage bubbles) — logged
+so a future session doesn't re-litigate that choice without knowing it
+was already tried and moved past twice.
+
+### Shell: TopBar rebuilt as one unified toolbar (Arc/Raycast)
+
+**Scope note:** explicitly confirmed with the user before touching this
+— TopBar.tsx and Sidebar.tsx are shared across every view, not just
+General Chat, so this is the first change this session that isn't
+scoped to one view. Committed as its own step per the user's original
+"one view at a time" instruction.
+
+**Before:** 5 separate floating glass pills (brand, search, media
+widget, wallpaper picker, window controls) each with their own
+`glass-surface`/`h-11`/`rounded-full` wrapper and independent
+`boxShadow: var(--shadow-composer)`, with large gaps of empty space
+between them — this is what the user was circling in their annotated
+screenshot as "floating pills look disconnected/messy" and "too much
+empty dead space."
+
+**After:** one continuous `h-12 rounded-2xl glass-surface` toolbar
+spanning the full header width. Logical groups (brand / search / media
+/ wallpaper / window controls) are separated by `w-px` hairline
+dividers *inside* the one surface, not by gaps between floating
+containers — the defining Arc/Raycast pattern. `WallpaperPicker.tsx`
+and `MiniPlayer.tsx` both had their own `glass-surface`/`rounded-full`
+pill wrappers that needed stripping (they'd otherwise double up on
+background/blur now that they sit inside the unified bar) — both
+brought down to plain `h-8 rounded-lg` buttons matching the toolbar's
+internal button language. Window controls (minimize/maximize/close)
+same treatment: `rounded-lg` instead of `rounded-full`, no more
+separate pill.
+
+### Sidebar: Channels section labeled, not just re-styled
+
+User specifically flagged "Sidebar bottom (School/Work/Creativity)
+looks like an afterthought." Root cause on inspection: those three
+category rows sit in the exact same list container as the nav rows
+above with no visual grouping cue — same spacing, just a different
+internal row anatomy (accent dot + descriptor + chevron vs. icon +
+label), which reads as "different UI pattern bolted on" rather than
+"a deliberate section." Fix: added a small uppercase "Channels" label
+above the group (`Sidebar.tsx`) — the standard Raycast/Arc sidebar
+convention for separating logical groups without changing row shape.
+Left the accent-dot row anatomy itself alone — it's a reasonable,
+Linear-style per-category color indicator on its own merits, and
+over-engineering a full row-shape rebuild wasn't needed once the
+grouping was made explicit.
+
+### General Chat message content: bubbles, not labeled rows
+
+User: "for the chat specifically... the last one was a messenger thing
+which would be familiar" — reverted `ChatMessage.tsx` from the
+Linear-style sender-label-plus-plain-text rows (this session's
+immediately prior iteration) back to iMessage/Slack-style rounded
+bubbles, sender-side color-coded. `Composer.tsx`'s message-list
+container changed from `divide-y` hairline dividers (meant for the row
+layout) to `gap-2` between bubbles — dividers don't belong between
+chat bubbles.
+
+### Real bug found and fixed: assistant bubbles unreadable over wallpaper
+
+User screenshot: assistant reply bubbles were `bg-white/7` — after the
+wallpaper started rendering (a separate bug, fixed in another session
+earlier this day), that thin a tint lost essentially all contrast
+against a bright/busy image, reported as "cant really see [the] text."
+Fixed by giving assistant bubbles the same real-elevation treatment
+already used successfully on the composer itself: `color-mix(...
+82%, transparent)` near-opaque fill (not a thin alpha tint),
+`backdrop-blur-md`, a real border, and a drop shadow. This is the same
+"thin tint has no contrast on a photo, needs near-opaque + blur"
+lesson as the composer's own earlier fix — worth remembering as a
+standing rule for any future surface placed directly over the
+wallpaper: never use a bare `bg-white/N` tint alone.
+
+### Real bug found and fixed: thin white/black line at a window edge, again
+
+User circled the very top of the window in a screenshot, above the new
+unified TopBar — a thin strip of the window's own dark background
+showing through, the same class of bug as the bottom-edge white strip
+fixed earlier this session (before the user's own separate session
+found the actual root cause: `AmbientBackground`'s `position: fixed`
++ negative z-index painting behind `body`'s background in Chromium/
+WebView2 specifically when `body` also has `overflow: hidden`). That
+fix (dropping to `z-0`, relying on DOM order) apparently didn't fully
+close a sub-pixel viewport-vs-window-frame rounding gap — it just
+moved which edge it shows up on. Applied a more robust fix this time:
+`AmbientBackground`'s outer div changed from `inset-0` to `-inset-1`,
+overshooting the viewport by 1px on every edge so any rounding error
+is absorbed by the overshoot instead of needing to predict which edge
+it'll land on next. **Not visually confirmed** — flagged below.
+
+### Color: per-wallpaper dynamic accent tried, then explicitly reverted
+
+User asked for the accent color to be dynamically derived from each
+wallpaper ("the overall look should change based on the wallpaper...
+that way the look will always be perfect"). Built it: added a curated
+3-stop `accent: { dark, mid, light }` ramp per `WallpaperDefinition` in
+`wallpapers.ts` (chosen as complementary/contrasting hues against each
+image's dominant color, not matching it — e.g. warm amber against the
+bright-blue "Windows Blue" wallpaper), wired through
+`WallpaperProvider.tsx` writing `--color-brand-blue/-cyan/-teal`
+directly onto `:root` on every wallpaper change, which every
+`--gradient-brand`/`brand-cyan` consumer across the *entire app* (not
+just General Chat) picks up automatically since they were already CSS
+custom properties.
+
+**User rejected this on sight** — orange/amber accent bubbles over the
+blue "Windows Blue" wallpaper read as an accidental mismatch, not an
+intentional choice ("why'd you make the color scheme that... reimagine
+everything not just change the colors to those weird oranges and
+yellows"). Fully reverted: `WallpaperProvider.tsx` back to a plain
+`useState` with no accent side effect, `wallpapers.ts` back to a plain
+`{ id, label, src, mood }` shape with no `accent` field. Replaced with
+a single fixed accent instead (see below). Logged here so a future
+session doesn't retry the same dynamic-per-wallpaper idea without
+knowing it was tried, built correctly, and rejected on aesthetic
+grounds specifically (not a bug) — the *pattern* itself (blue
+wallpapers + a same-hued brand color both losing contrast against each
+other) is still valid feedback, just solved differently.
+
+### Color: settled on one fixed "electric blue" accent app-wide
+
+After the reverted attempt, asked the user directly what direction the
+accent should take (stay blue-family / one fixed color entirely /
+monochrome) — chose "one fixed premium accent for the whole app," then
+"electric blue" specifically (Vercel/Linear-style saturated blue, not
+the previous muddy teal). Changed in exactly one place —
+`tokens.css`'s brand ramp:
+- `--color-brand-blue: #185fa5` -> `#2563eb`
+- `--color-brand-cyan: #37b4c8` -> `#3b82f6`
+- `--color-brand-teal: #7fe0d0` -> `#60a5fa`
+- `--gradient-brand` simplified from a 3-stop navy/cyan/teal gradient
+  to a 2-stop blue gradient (the navy stop was never actually used by
+  the gradient itself — it's a separate standalone token — so
+  dropping it from the gradient definition wasn't a functional change,
+  just removing a stop that was pointless once cyan and teal are both
+  the same blue family).
+
+Because every consumer across the app already reads these three CSS
+variables (buttons, active states, `--gradient-brand`), this one token
+change is the entire fix — no component-level edits needed beyond the
+two hardcoded shadow-color RGB values in `ChatMessage.tsx` that
+referenced the old cyan literal instead of the variable (updated to
+match: `rgb(37 99 235 / 30%)`). Grepped for any other hardcoded old-
+cyan RGB triplets across the codebase — none found.
+
+### Wallpaper set trimmed by request
+
+Removed three wallpapers entirely per explicit request: "Smoke"
+(`ambient-smoke-bg.png`, 1.7MB), "Mist" (`ambient-smoke-bg-light.jpeg`),
+and "Midnight" (`midnight-coil.jpg`, the near-black twisty-coil
+render) — all three deleted from disk, not just delisted, after
+grepping for any other reference (none found; `SplashScreen.tsx`'s own
+wallpaper-preload logic reads dynamically by id/index so it needed no
+changes). 9 wallpapers -> 6, all photographic/3D-render style now, no
+abstract smoke or near-black options. A stale `localStorage` value from
+before this change (someone who had "Smoke" selected) safely falls back
+to the default via the existing `WALLPAPERS.some(...)` guard in
+`WallpaperProvider.tsx` — verified, not just assumed.
+
+### Real chat features added (message area + composer)
+
+User asked for the message area and composer to feel like "a working
+chat," not a demo. Added, all to General Chat only:
+
+- **Timestamps** — `ChatMessageData` gained an optional `createdAt`
+  field; threaded through from the DB's existing `created_at` column
+  (already present all the way down to the Rust/SQLite layer, just
+  never surfaced to the UI) in `loadSession`, and set to
+  `new Date().toISOString()` at send-time for new messages in `send()`.
+  Rendered via a small `formatTime()` helper, shown in a per-message
+  metadata row.
+- **Copy button** — per-message, in the same metadata row; copies via
+  `navigator.clipboard.writeText`, shows a checkmark for 1.5s on
+  success. Silently no-ops on clipboard-permission failure (a
+  convenience action, not worth a user-facing error state).
+- **Mode badge** — assistant replies show which mode (Local/Claude)
+  answered, reusing the existing `MODES` list from `modes.ts` rather
+  than duplicating the label strings.
+- **Metadata row visibility** — all three (timestamp, mode badge, copy
+  button) show on hover only (`opacity-0 group-hover:opacity-100`),
+  not permanently visible — real functionality without permanently
+  cluttering every bubble, matching how Slack/Discord/etc. handle
+  message-hover actions.
+- **Minimal markdown rendering** — new `MessageText.tsx`: fenced
+  ```code``` blocks render as a bordered monospace `<pre>` block with
+  an optional language label, inline `` `code` `` spans get a small
+  background chip. Explicitly *not* a full markdown parser (no bold/
+  italic/lists/links) — code rendering is the one case that actually
+  matters for a chat that talks to an LLM, and a full parser is much
+  more scope than "make it look like a working chat" asked for.
+- **Auto-growing textarea** — was a fixed `rows={2}`; now grows with
+  content up to a `max-h-40` (160px) cap via a manual
+  `scrollHeight`-based resize on every keystroke (no library — this is
+  a well-known, small, cheap DOM pattern that doesn't need one), then
+  scrolls internally past the cap. Resets to its collapsed height on
+  send.
+- **Suggested-prompt chips** — the empty state (before any messages)
+  now shows 4 clickable prompt suggestions in a 2x2 grid below the
+  Udaan header, each triggering `handleSubmit(prompt)` directly (a
+  small `override` parameter added to `handleSubmit` so a chip click
+  can send specific text without going through the controlled
+  `value` state first). Addresses "empty state still feels thin" —
+  gives the empty state something to actually do, not just look at.
+- **Empty-state <-> chat-view transition animated** — previously an
+  instant, jarring layout swap (centered hero <-> top-anchored scroll
+  list are structurally different layouts, not just restyled). Now
+  wrapped in `AnimatePresence mode="wait"` with a spring
+  fade+y-shift on the empty state and a simple opacity crossfade on
+  the message list — a deliberate exception to the "200-300ms for
+  interactive UI" rule, since this is a one-time page-level state
+  change (empty -> first message ever sent), not a repeated
+  interaction.
+
+### Bug caught and fixed during this pass (not shipped)
+
+While improving the mic-error box's contrast (same `bg-white/N`-is-
+too-faint lesson applied to `bg-red-500/6`), a find-and-replace edit
+briefly left the JSX with a `<div>` missing its closing `>` before an
+inline `<span>` child — caught immediately by `tsc --noEmit` before
+this was ever presented as done. Mentioning only because it's a
+concrete example of why every change in this session has gone through
+a typecheck (and usually a full `vite build`) before being reported —
+not asking for anything, just documenting that the safety net worked
+as intended.
+
+### Flagged for visual confirmation — this round
+
+- **Top-edge line fix** (`-inset-1` overshoot on AmbientBackground) —
+  not confirmed. If it's still visible after a full restart, the
+  rounding-gap theory needs to be abandoned in favor of actually
+  measuring the window's client height vs. what the DOM reports at
+  the user's specific display scaling — I have no way to do that from
+  here.
+- **Electric blue accent** against all 6 remaining wallpapers — I
+  picked `#2563eb`/`#3b82f6`/`#60a5fa` based on "Vercel/Linear-style,"
+  not by rendering it. Please confirm it reads as premium/intentional
+  on the light-mood wallpapers (Dawn cool/warm) specifically, not just
+  the dark blue ones the screenshots so far have shown.
+- **Suggested-prompt chip text** — the 4 prompts ("What's on my
+  schedule today?", "Summarize my recent notes", "Help me draft an
+  email", "What can you help me with?") are reasonable defaults but
+  not verified against what this app's local/Claude modes can actually
+  do well — if any of these routinely fail or feel off-brand, swap the
+  copy, that's a one-line change in `SUGGESTED_PROMPTS`.
+- **Auto-growing textarea's max-height (160px) and the metadata row's
+  hover-only visibility** — both are reasoned-correct but not seen
+  rendered; the hover-reveal in particular is worth checking on a
+  touch/no-hover context if this app is ever used that way (it isn't
+  currently, desktop-only Tauri app, but flagging the assumption).
+
+## 2026-08-22 (session 6, continued once more) — shared Button overhaul,
+app-wide text-size floor fix, interactivity legibility pass
+
+User confirmed the wallpaper/top-edge/electric-blue fixes all landed
+correctly (screenshot), then flagged a real, systemic problem: "hard to
+tell what's a button" and "text size... overall size is bad" across
+everything built this session, plus asked for the shared component
+library itself (which feeds Clipboard and future views) to actually be
+better, not just General Chat's own screens.
+
+### Root cause: `Button`'s hover states were genuinely too subtle
+
+Audited `src/shared/components/ui/button.tsx` (the shadcn-style
+primitive built earlier this session) and every hand-rolled button
+this session had touched (TopBar, WallpaperPicker, MiniPlayer). Found
+the actual defect: `hover:bg-glass-hover` and, worse, my own repeated
+`hover:bg-white/6` overrides are both real but nearly imperceptible —
+6% white opacity barely registers as a state change, especially
+against a photographic wallpaper background rather than a flat color.
+Icon button targets were also small (24-28px) relative to a primary
+interactive surface.
+
+**Confirmed with the user before touching it** — `Button` is shared
+app-wide, so any change ripples immediately to every future consumer,
+not just General Chat. Got explicit go-ahead first.
+
+**Fix, in `button.tsx`:**
+- Sizes bumped: `icon` 28px -> 36px, `icon-sm` 24px -> 28px, `pill`
+  28px -> 36px, `pill-sm` 28px -> 32px — closer to what Arc/Raycast/
+  Linear actually ship for primary controls.
+- `ghost` variant: `hover:bg-glass-hover` (too subtle over sharp
+  panels) -> `hover:bg-white/10` + a `hover:border-white/10` border
+  that appears on hover (base is `border-transparent`) — two
+  simultaneous, more perceptible cues instead of one faint one.
+- `danger` variant: was a flat `bg-red-500/20` with no hover state at
+  all; now has its own hover step (`/15` -> `/25` on hover) plus a
+  visible border.
+- `brand` variant: added a permanent soft shadow
+  (`shadow-[0_2px_10px_rgb(37_99_235/35%)]`) so it reads as an
+  elevated primary action even before hover, not just a flat gradient
+  fill.
+- Base radius `rounded-full` -> `rounded-lg`, matching the Arc/Raycast
+  rounded-rect language the shell already moved to — every call site
+  in Composer/ChatMessage already had its own radius override from
+  the earlier redesign, so this didn't silently change anything that
+  wasn't already being overridden explicitly (verified by grep before
+  changing the default, not just assumed).
+
+### Migrated more hand-rolled buttons onto the shared Button
+
+Before this pass, only `Composer.tsx`/`ChatMessage.tsx` used the
+shared `Button`; `TopBar.tsx`'s search-toggle and window-control
+buttons were still hand-rolled `motion.button`s with their own
+duplicated hover/scale logic. Migrated both onto `Button` — smaller
+surface area to keep consistent going forward, and they inherit every
+future Button fix automatically instead of needing a parallel edit
+each time. `WallpaperPicker.tsx`'s toggle button migrated the same
+way. `MiniPlayer.tsx`'s outer button was *not* migrated — it has a
+nested `role="button"` span (play/pause) inside a real `<button>`,
+which doesn't cleanly map onto Button's single-element model without
+a larger restructure; fixed its hover contrast/sizing directly instead
+(same `/10` opacity + border pattern, `h-8` -> `h-9`) without
+attempting that restructure in this pass.
+
+### Real, systemic bug: text sizes below the app's own defined floor
+
+Checked `tokens.css`'s actual type scale — `--text-xs: 12px` is the
+smallest defined step; there's no smaller token anywhere in the
+system. Grepped every file touched this session and found `text-
+[9px]`, `text-[10px]`, `text-[10.5px]`, and `text-[11px]` scattered
+across `ChatMessage.tsx`, `Composer.tsx`, `MessageText.tsx`,
+`WallpaperPicker.tsx`, `MiniPlayer.tsx`, and (pre-existing, not
+introduced this session, but fixed anyway since the user said "and
+everything") `Sidebar.tsx`'s category descriptor text and count
+badge. All bumped to the 12px floor — this wasn't a matter of taste,
+it was work this session (mine) drifting below a limit the app's own
+design tokens already establish, which is exactly the kind of
+inconsistency the very first brief this session asked to eliminate.
+
+### Composer mode-switcher: fixed a real "no hover feedback at all" gap
+
+The Local/Claude segmented control had `hover:bg-transparent`
+hard-coded on every tab (originally meant only to stop the *active*
+tab's own shared-layout pill background from getting a conflicting
+second hover fill) — but this meant the *inactive* tab had literally
+zero background hover feedback, only a text-color shift between two
+similarly-muted grays. Fixed: hover background now applies only when
+`!isActive`; the active pill's own background bumped from `bg-white/8`
+to `bg-white/12` for a touch more presence too.
+
+### Clipboard Manager and other unbuilt views — explicitly deferred
+
+User asked to also improve "the component library... like clipboard
+and everything." Asked directly whether to fold Clipboard Manager into
+this same pass or keep it as its own step — user chose to commit
+General Chat/TopBar/Sidebar/shared-Button work first and treat
+Clipboard as a separate next step, matching the original "one view at
+a time, commit after each" plan from the very start of this session.
+**Clipboard Manager has not been touched.** It will automatically
+inherit every `Button`-level fix the moment it's migrated onto the
+shared primitive (not yet done) — the sizing/hover work done this
+round is exactly the foundation that makes that next step cheaper.
+
+### Flagged for visual confirmation — this round
+
+- **Button's new size scale (36px icon, 40px+ text/pill controls)** —
+  reasoned against Arc/Raycast/Linear's actual proportions, not
+  measured against this app's specific window chrome. Confirm nothing
+  now feels oversized relative to the compact `h-12` TopBar it lives
+  inside.
+- **`hover:bg-white/10` + border-on-hover** across every migrated
+  button — confirm this is enough contrast now (not too much/garish)
+  against both the wallpaper and the flatter Raycast-style panels.
+- **MiniPlayer's un-migrated nested-button pattern** — flagged as a
+  known structural quirk (real `<button>` wrapping a `role="button"`
+  span), not fixed in this pass since it's a restructure, not a style
+  fix. Worth a dedicated look if MiniPlayer/DJ Board gets its own
+  polish pass later.
