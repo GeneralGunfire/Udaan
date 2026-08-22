@@ -3,6 +3,7 @@ import type { Adjustments } from '../lib/imageOps'
 import { runBatch, type BatchJobResult } from '../lib/batchOps'
 import { pickAssetFolder } from '@/integrations/asset-library'
 import { LayersIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
 
 interface BatchPanelProps {
   selectedPaths: string[]
@@ -60,13 +61,9 @@ export function BatchPanel({ selectedPaths, adjustments }: BatchPanelProps) {
       </p>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={pickOutput}
-          className="border-glass-border hover:bg-glass-hover text-text-secondary rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150"
-        >
+        <Button type="button" variant="surface" size="pill-sm" onClick={pickOutput} className="rounded-md">
           {outputFolder ? 'Change output folder' : 'Pick output folder'}
-        </button>
+        </Button>
         {outputFolder && (
           <span className="text-text-tertiary truncate text-[10px]" title={outputFolder}>
             {outputFolder}
@@ -89,7 +86,7 @@ export function BatchPanel({ selectedPaths, adjustments }: BatchPanelProps) {
           value={width}
           disabled={!resizeEnabled}
           onChange={(e) => setWidth(Number(e.target.value))}
-          className="border-glass-border bg-glass text-text-primary w-16 rounded-md border px-2 py-1 text-[11px] tabular-nums disabled:opacity-40"
+          className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 w-16 rounded-md border px-2 py-1 text-[11px] tabular-nums outline-none focus-visible:ring-2 disabled:opacity-40"
         />
         <span className="text-text-tertiary text-[11px]">×</span>
         <input
@@ -97,7 +94,7 @@ export function BatchPanel({ selectedPaths, adjustments }: BatchPanelProps) {
           value={height}
           disabled={!resizeEnabled}
           onChange={(e) => setHeight(Number(e.target.value))}
-          className="border-glass-border bg-glass text-text-primary w-16 rounded-md border px-2 py-1 text-[11px] tabular-nums disabled:opacity-40"
+          className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 w-16 rounded-md border px-2 py-1 text-[11px] tabular-nums outline-none focus-visible:ring-2 disabled:opacity-40"
         />
         <label className="text-text-secondary ml-auto flex items-center gap-1.5 text-[11px]">
           Suffix
@@ -105,22 +102,23 @@ export function BatchPanel({ selectedPaths, adjustments }: BatchPanelProps) {
             type="text"
             value={suffix}
             onChange={(e) => setSuffix(e.target.value)}
-            className="border-glass-border bg-glass text-text-primary w-20 rounded-md border px-2 py-1 text-[11px]"
+            className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 w-20 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
           />
         </label>
       </div>
 
-      <button
+      <Button
         type="button"
+        variant="brand"
+        size="pill"
         onClick={run}
         disabled={running || !outputFolder || selectedPaths.length === 0}
-        className="text-white transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40"
-        style={{ background: 'var(--gradient-brand)', borderRadius: 'var(--radius-md)', padding: '8px 14px', fontSize: '11.5px', fontWeight: 600 }}
+        className="w-full rounded-md text-[11.5px]"
       >
         {running
           ? `Processing ${progress?.done ?? 0}/${progress?.total ?? selectedPaths.length}...`
           : `Run batch on ${selectedPaths.length} image${selectedPaths.length === 1 ? '' : 's'}`}
-      </button>
+      </Button>
 
       {results && (
         <div className="border-glass-border max-h-32 overflow-y-auto rounded-md border p-2">

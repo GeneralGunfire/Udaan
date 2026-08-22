@@ -67,7 +67,7 @@ export function AssetBrowser({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search images..."
-            className="text-text-primary placeholder:text-text-tertiary min-w-0 flex-1 bg-transparent text-[11px] outline-none"
+            className="text-text-primary placeholder:text-text-tertiary focus-visible:ring-brand-cyan/60 min-w-0 flex-1 bg-transparent text-[11px] outline-none focus-visible:ring-2"
           />
         </div>
       )}

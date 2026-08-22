@@ -1,5 +1,7 @@
 import type { ExportFormat, ExportResolution, ExportSettings } from '../lib/types'
 import { DownloadIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
+import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 
 interface ExportPanelProps {
   settings: ExportSettings
@@ -17,6 +19,7 @@ const RESOLUTIONS: ExportResolution[] = ['720p', '1080p', '4k']
  */
 export function ExportPanel({ settings, onChange, hasClips }: ExportPanelProps) {
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="glass-surface flex flex-col gap-3 rounded-xl p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
@@ -33,7 +36,7 @@ export function ExportPanel({ settings, onChange, hasClips }: ExportPanelProps) 
         <select
           value={settings.format}
           onChange={(e) => onChange({ ...settings, format: e.target.value as ExportFormat })}
-          className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px] uppercase"
+          className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] uppercase outline-none focus-visible:ring-2"
         >
           {FORMATS.map((f) => (
             <option key={f} value={f}>
@@ -48,7 +51,7 @@ export function ExportPanel({ settings, onChange, hasClips }: ExportPanelProps) 
         <select
           value={settings.resolution}
           onChange={(e) => onChange({ ...settings, resolution: e.target.value as ExportResolution })}
-          className="border-glass-border bg-glass text-text-primary rounded-md border px-2 py-1 text-[11px]"
+          className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 rounded-md border px-2 py-1 text-[11px] outline-none focus-visible:ring-2"
         >
           {RESOLUTIONS.map((r) => (
             <option key={r} value={r}>
@@ -58,26 +61,22 @@ export function ExportPanel({ settings, onChange, hasClips }: ExportPanelProps) 
         </select>
       </div>
 
-      <button
-        type="button"
-        disabled
-        title="Not implemented — needs a real video engine (see NOTES.md)"
-        className="text-white opacity-40"
-        style={{
-          background: 'var(--gradient-brand)',
-          borderRadius: 'var(--radius-md)',
-          padding: '9px 14px',
-          fontSize: '11.5px',
-          fontWeight: 600,
-        }}
-      >
-        Export {hasClips ? '' : '(add clips first)'}
-      </button>
+      <Tooltip content="Not implemented — needs a real video engine (see NOTES.md)">
+        {/* Tooltip wraps a span, not the disabled button directly — disabled
+            native elements don't reliably dispatch the pointer events a
+            hover tooltip needs. */}
+        <span className="inline-block w-fit">
+          <Button type="button" disabled variant="brand" size="pill-sm" className="rounded-md opacity-40">
+            Export {hasClips ? '' : '(add clips first)'}
+          </Button>
+        </span>
+      </Tooltip>
 
       <p className="text-text-tertiary text-[10px] leading-relaxed">
         TODO: real encode pipeline — likely an ffmpeg sidecar process invoked from Rust, chosen once
         hardware constraints are confirmed.
       </p>
     </div>
+    </TooltipProvider>
   )
 }

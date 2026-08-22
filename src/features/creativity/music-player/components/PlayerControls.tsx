@@ -1,6 +1,8 @@
 import type { AudioTrack } from '@/integrations/audio-library'
 import type { RepeatMode } from '../hooks/useAudioPlayer'
 import { PlayIcon, PauseIcon, DiscIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
+import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 
 interface PlayerControlsProps {
   track: AudioTrack | null
@@ -45,6 +47,7 @@ export function PlayerControls({
   onCycleRepeat,
 }: PlayerControlsProps) {
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="glass-surface flex flex-col gap-3 rounded-xl p-4">
       <div className="flex items-center gap-3">
         <div
@@ -80,50 +83,56 @@ export function PlayerControls({
           type="button"
           onClick={onToggleShuffle}
           aria-pressed={shuffle}
-          title="Shuffle"
-          className={`text-[11px] font-semibold transition-colors duration-150 ${
+          className={`focus-visible:ring-brand-cyan/60 rounded-sm text-[11px] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 ${
             shuffle ? 'text-accent-creativity' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           SHUF
         </button>
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={!track}
-          aria-label="Previous track"
-          className="text-text-secondary hover:text-text-primary disabled:opacity-40"
-        >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6 4v12h2V4H6zm10 0L8 10l8 6V4z" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={onTogglePlay}
-          disabled={!track && isLoading === false}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-transform duration-150 hover:scale-105 active:scale-95"
-          style={{ background: 'var(--gradient-brand)' }}
-        >
-          {isPlaying ? <PauseIcon width={18} height={18} /> : <PlayIcon width={18} height={18} />}
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!track}
-          aria-label="Next track"
-          className="text-text-secondary hover:text-text-primary disabled:opacity-40"
-        >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M14 4v12h-2V4h2zM4 4l8 6-8 6V4z" />
-          </svg>
-        </button>
+        <Tooltip content="Previous track">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onPrev}
+            disabled={!track}
+            aria-label="Previous track"
+          >
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6 4v12h2V4H6zm10 0L8 10l8 6V4z" />
+            </svg>
+          </Button>
+        </Tooltip>
+        <Tooltip content={isPlaying ? 'Pause' : 'Play'}>
+          <Button
+            type="button"
+            variant="brand"
+            onClick={onTogglePlay}
+            disabled={!track && isLoading === false}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className="h-11 w-11 rounded-full"
+          >
+            {isPlaying ? <PauseIcon width={18} height={18} /> : <PlayIcon width={18} height={18} />}
+          </Button>
+        </Tooltip>
+        <Tooltip content="Next track">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onNext}
+            disabled={!track}
+            aria-label="Next track"
+          >
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M14 4v12h-2V4h2zM4 4l8 6-8 6V4z" />
+            </svg>
+          </Button>
+        </Tooltip>
         <button
           type="button"
           onClick={onCycleRepeat}
-          title="Repeat"
-          className={`text-[11px] font-semibold transition-colors duration-150 ${
+          className={`focus-visible:ring-brand-cyan/60 rounded-sm text-[11px] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 ${
             repeat !== 'off' ? 'text-accent-creativity' : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
@@ -145,5 +154,6 @@ export function PlayerControls({
         />
       </div>
     </div>
+    </TooltipProvider>
   )
 }

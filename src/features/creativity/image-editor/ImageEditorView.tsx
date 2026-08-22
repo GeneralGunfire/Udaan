@@ -7,6 +7,8 @@ import { AdjustmentSlider } from './components/AdjustmentSlider'
 import { BatchPanel } from './components/BatchPanel'
 import type { AssetEntry } from '@/integrations/asset-library'
 import { ImageIcon, PencilIcon } from '@/shared/icons'
+import { Button } from '@/shared/components/ui/button'
+import { TooltipProvider } from '@/shared/components/ui/tooltip'
 
 /**
  * Image Editor — crop/resize/adjustments over a real Canvas 2D pipeline
@@ -62,6 +64,7 @@ export function ImageEditorView() {
   const displayHeight = editor.targetSize?.height ?? editor.crop?.height ?? editor.image?.height ?? 0
 
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="flex h-full w-full max-w-[1400px] flex-col gap-3 overflow-y-auto py-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -98,17 +101,15 @@ export function ImageEditorView() {
                 <p className="text-text-secondary truncate text-[11px] font-medium">
                   {editor.image.fileName}
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant={cropMode ? 'brand' : 'ghost'}
+                  size="pill-sm"
                   onClick={() => setCropMode((c) => !c)}
-                  className={`rounded-md px-2 py-1 text-[10.5px] font-medium transition-colors duration-150 ${
-                    cropMode
-                      ? 'bg-accent-creativity text-white'
-                      : 'text-text-secondary hover:bg-glass-hover'
-                  }`}
+                  className="rounded-md"
                 >
                   {cropMode ? 'Drag to crop' : 'Crop'}
-                </button>
+                </Button>
               </div>
               <div className="min-h-0 flex-1">
                 <CanvasPreview
@@ -167,7 +168,7 @@ export function ImageEditorView() {
                 placeholder={String(displayWidth || 'W')}
                 value={widthInput}
                 onChange={(e) => setWidthInput(e.target.value)}
-                className="border-glass-border bg-glass text-text-primary w-full rounded-md border px-2 py-1.5 text-[11px]"
+                className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 w-full rounded-md border px-2 py-1.5 text-[11px] outline-none focus-visible:ring-2"
               />
               <span className="text-text-tertiary text-[11px]">×</span>
               <input
@@ -175,42 +176,35 @@ export function ImageEditorView() {
                 placeholder={String(displayHeight || 'H')}
                 value={heightInput}
                 onChange={(e) => setHeightInput(e.target.value)}
-                className="border-glass-border bg-glass text-text-primary w-full rounded-md border px-2 py-1.5 text-[11px]"
+                className="border-glass-border bg-glass text-text-primary focus-visible:ring-brand-cyan/60 w-full rounded-md border px-2 py-1.5 text-[11px] outline-none focus-visible:ring-2"
               />
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="surface"
+                size="pill-sm"
                 onClick={applyResize}
-                className="border-glass-border hover:bg-glass-hover text-text-secondary flex-1 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150"
+                className="flex-1 rounded-md"
               >
                 Apply
-              </button>
-              <button
-                type="button"
-                onClick={editor.resetSize}
-                className="text-text-tertiary hover:text-text-secondary rounded-md px-2.5 py-1.5 text-[11px]"
-              >
+              </Button>
+              <Button type="button" variant="ghost" size="pill-sm" onClick={editor.resetSize} className="rounded-md">
                 Reset
-              </button>
+              </Button>
             </div>
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="brand"
+            size="pill"
             onClick={handleExport}
             disabled={!editor.image || editor.exporting}
-            className="text-white transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40"
-            style={{
-              background: 'var(--gradient-brand)',
-              borderRadius: 'var(--radius-md)',
-              padding: '10px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
+            className="w-full rounded-md text-[12px]"
           >
             {editor.exporting ? 'Exporting...' : 'Export Image'}
-          </button>
+          </Button>
 
           {editor.error && <p className="text-danger text-[11px]">{editor.error}</p>}
         </div>
@@ -218,5 +212,6 @@ export function ImageEditorView() {
 
       <BatchPanel selectedPaths={Array.from(selectedPaths)} adjustments={editor.adjustments} />
     </div>
+    </TooltipProvider>
   )
 }
