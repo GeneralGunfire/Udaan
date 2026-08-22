@@ -26,22 +26,15 @@ function formatHour(iso: string): string {
   return iso.slice(11, 16)
 }
 
-export async function fetchWeather(
-  city: string,
+async function fetchForecast(
+  latitude: number,
+  longitude: number,
+  locationLabel: string,
   signal?: AbortSignal,
 ): Promise<WeatherSnapshot> {
-  const geoRes = await fetch(
-    `${GEOCODE_URL}?name=${encodeURIComponent(city)}&count=1`,
-    { signal },
-  )
-  if (!geoRes.ok) throw new Error('Geocoding request failed')
-  const geoData = await geoRes.json()
-  const place = geoData.results?.[0]
-  if (!place) throw new Error(`No location found for "${city}"`)
-
   const params = new URLSearchParams({
-    latitude: String(place.latitude),
-    longitude: String(place.longitude),
+    latitude: String(latitude),
+    longitude: String(longitude),
     current: 'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m',
     hourly: 'temperature_2m',
     daily: 'sunrise,sunset',
@@ -62,9 +55,7 @@ export async function fetchWeather(
     .slice(nowHour, nowHour + 6)
 
   return {
-    locationLabel: [place.name, place.admin1, place.country]
-      .filter(Boolean)
-      .join(', '),
+    locationLabel,
     temperatureC: Math.round(data.current.temperature_2m),
     feelsLikeC: Math.round(data.current.apparent_temperature),
     humidityPct: Math.round(data.current.relative_humidity_2m),
@@ -73,6 +64,58 @@ export async function fetchWeather(
     sunset: formatHour(data.daily.sunset[0]),
     hourly,
   }
+}
+
+export async function fetchWeather(
+  city: string,
+  signal?: AbortSignal,
+): Promise<WeatherSnapshot> {
+  const geoRes = await fetch(
+    `${GEOCODE_URL}?name=${encodeURIComponent(city)}&count=1`,
+    { signal },
+  )
+  if (!geoRes.ok) throw new Error('Geocoding request failed')
+  const geoData = await geoRes.json()
+  const place = geoData.results?.[0]
+  if (!place) throw new Error(`No location found for "${city}"`)
+
+  return fetchForecast(
+    place.latitude,
+    place.longitude,
+    [place.name, place.admin1, place.country].filter(Boolean).join(', '),
+    signal,
+  )
+}
+
+/**
+ * Real device location via the browser Geolocation API (works the same in
+ * a Tauri webview as a normal browser — no native plugin needed) rather
+ * than a hardcoded city. Skips the geocoding round trip entirely since
+ * Open-Meteo's forecast endpoint accepts raw coordinates; the location
+ * label is generic ("Your location") since Open-Meteo has no reverse-
+ * geocoding endpoint to turn coordinates back into a place name.
+ */
+export function fetchWeatherAtCurrentLocation(signal?: AbortSignal): Promise<WeatherSnapshot> {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new Error('Geolocation is not available in this environment.'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        fetchForecast(
+          position.coords.latitude,
+          position.coords.longitude,
+          'Your location',
+          signal,
+        )
+          .then(resolve)
+          .catch(reject)
+      },
+      (err) => reject(new Error(`Could not get your location: ${err.message}`)),
+      { timeout: 8000, maximumAge: 10 * 60 * 1000 },
+    )
+  })
 }
 
 /**

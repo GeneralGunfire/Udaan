@@ -3,11 +3,13 @@ import { GlassPanel } from '@/shared/components/GlassPanel'
 import { SunIcon, GlobeIcon } from '@/shared/icons'
 import {
   fetchWeather,
+  fetchWeatherAtCurrentLocation,
   type WeatherSnapshot,
 } from '@/integrations/weather/weatherClient'
 
-// No location/settings system yet — hardcoded default until one exists.
-const DEFAULT_CITY = 'Cape Town'
+// Fallback only — used when the user denies/lacks geolocation, since a
+// forecast still needs *some* coordinates to query.
+const FALLBACK_CITY = 'Cape Town'
 
 export function WeatherWidget() {
   const [snapshot, setSnapshot] = useState<WeatherSnapshot | null>(null)
@@ -15,10 +17,18 @@ export function WeatherWidget() {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchWeather(DEFAULT_CITY, controller.signal)
+    fetchWeatherAtCurrentLocation(controller.signal)
       .then(setSnapshot)
       .catch((err) => {
-        if (err.name !== 'AbortError') setError('Weather unavailable')
+        if (err.name === 'AbortError') return
+        // Geolocation denied/unavailable — fall back to a default city
+        // rather than showing an error for what's a very common,
+        // non-fatal case (permission prompt dismissed, etc.).
+        fetchWeather(FALLBACK_CITY, controller.signal)
+          .then(setSnapshot)
+          .catch((fallbackErr) => {
+            if (fallbackErr.name !== 'AbortError') setError('Weather unavailable')
+          })
       })
     return () => controller.abort()
   }, [])
