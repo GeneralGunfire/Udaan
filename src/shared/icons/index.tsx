@@ -1,10 +1,14 @@
-import type { SVGProps } from 'react'
+import type { ComponentType, SVGProps } from 'react'
 
 /**
  * Minimal inline icon set — no external icon library dependency.
  * All icons share a 20x20 viewBox, 1.5px stroke, currentColor.
  */
 type IconProps = SVGProps<SVGSVGElement>
+
+/** Shared type for anywhere an icon is passed around as a value (e.g. a
+ *  catalog entry), rather than used directly as JSX. */
+export type IconComponent = ComponentType<IconProps>
 
 const base = {
   width: 20,
@@ -40,6 +44,15 @@ export function CompassIcon(props: IconProps) {
     <svg {...base} {...props}>
       <circle cx="10" cy="10" r="7.5" />
       <path d="M12.5 7.5l-1.8 4.2-4.2 1.8 1.8-4.2z" />
+    </svg>
+  )
+}
+
+export function BookOpenIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 5.5C8.5 4.3 6.3 3.7 4 3.7v10.6c2.3 0 4.5.6 6 1.8 1.5-1.2 3.7-1.8 6-1.8V3.7c-2.3 0-4.5.6-6 1.8z" />
+      <path d="M10 5.5v10.6" />
     </svg>
   )
 }
@@ -383,6 +396,24 @@ export function PauseIcon(props: IconProps) {
   )
 }
 
+export function SkipForwardIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 4.5v11l7.5-5.5z" fill="currentColor" stroke="none" />
+      <rect x="14.5" y="4.5" width="1.8" height="11" rx="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function SkipBackIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M14 4.5v11l-7.5-5.5z" fill="currentColor" stroke="none" />
+      <rect x="3.7" y="4.5" width="1.8" height="11" rx="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export function EjectIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -613,6 +644,220 @@ export function TremoloIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
       <path d="M2.5 10a2 2 0 1 1 4 0 2 2 0 1 1 4 0 2 2 0 1 1 4 0 2 2 0 1 1 3 0" />
+    </svg>
+  )
+}
+
+export function RecordIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="6" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function MuteIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8v4h3l4 3.5v-11L7 8H4z" />
+      <path d="M14 8l4 4M18 8l-4 4" />
+    </svg>
+  )
+}
+
+export function SoloIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8v4h3l4 3.5v-11L7 8H4z" />
+      <path d="M14.5 7.5a4 4 0 010 5M16.8 5.5a7 7 0 010 9" />
+    </svg>
+  )
+}
+
+export function PianoKeysIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="4" width="15" height="12" rx="1" />
+      <path d="M6.5 4v7.5M10 4v7.5M13.5 4v7.5" />
+    </svg>
+  )
+}
+
+export function BassIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7" cy="14.5" r="3" />
+      <path d="M9.2 12.5L15 4.5M15 4.5l2 1.2M15 4.5l1.2 2" />
+    </svg>
+  )
+}
+
+export function DrumsIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <ellipse cx="10" cy="7" rx="6.5" ry="2.5" />
+      <path d="M3.5 7v5c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5V7" />
+      <path d="M4.5 4l-2-2.5M15.5 4l2-2.5" />
+    </svg>
+  )
+}
+
+export function SynthIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="5" width="15" height="10" rx="1" />
+      <circle cx="6.5" cy="9" r="1.4" />
+      <circle cx="10" cy="9" r="1.4" />
+      <circle cx="13.5" cy="9" r="1.4" />
+      <path d="M5 13.5h10" />
+    </svg>
+  )
+}
+
+export function UploadIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 13V4M6.5 7.5L10 4l3.5 3.5" />
+      <path d="M4 14v1.5a1 1 0 001 1h10a1 1 0 001-1V14" />
+    </svg>
+  )
+}
+
+export function StringsIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 3c0 5-2.5 6-2.5 10a3.5 3.5 0 007 0V4" />
+      <path d="M9.5 3.2c.3 4.6-2 5.8-2 9.6" />
+      <circle cx="9.5" cy="4" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M13 6l5-1.5v9a2 2 0 11-1-1.7V7.2l-4 1.2" />
+    </svg>
+  )
+}
+
+export function PdfFileIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2.5h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+      <path d="M12 2.5V6h3" />
+      <path d="M6.8 14.5v-4h1.1a1.1 1.1 0 0 1 0 2.2H6.8M9.8 14.5v-4h1a1.3 1.3 0 0 1 0 4h-1z" strokeWidth="1.2" />
+      <path d="M12.8 10.5h1.6M12.8 12.3h1.4" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
+export function GenericFileIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2.5h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+      <path d="M12 2.5V6h3" />
+    </svg>
+  )
+}
+
+export function GridStepIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="2.5" width="4" height="4" rx="0.6" />
+      <rect x="8" y="2.5" width="4" height="4" rx="0.6" />
+      <rect x="13.5" y="2.5" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
+      <rect x="2.5" y="8" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
+      <rect x="8" y="8" width="4" height="4" rx="0.6" />
+      <rect x="13.5" y="8" width="4" height="4" rx="0.6" />
+      <rect x="2.5" y="13.5" width="4" height="4" rx="0.6" />
+      <rect x="8" y="13.5" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
+      <rect x="13.5" y="13.5" width="4" height="4" rx="0.6" />
+    </svg>
+  )
+}
+
+export function GuitarIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7" cy="13.5" r="4" />
+      <path d="M9.5 10.5L15 4M15 4l-3 .5M15 4l-.5 3" />
+      <path d="M6 13.5h2M6 15h2" opacity="0.5" />
+    </svg>
+  )
+}
+
+export function HarpIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 3c-1.5 4-1.5 10 0 14M15 3c1.5 4 1.5 10 0 14" />
+      <path d="M6 3.5h8M6.3 17.5h7.4" />
+      <path d="M7.5 5v11M9.5 4.5v12M11.5 4.5v12M13.5 5v11" opacity="0.6" />
+    </svg>
+  )
+}
+
+export function XylophoneIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="4" width="3" height="10" rx="1" />
+      <rect x="6.7" y="5.2" width="2.6" height="8.6" rx="1" />
+      <rect x="10.4" y="6.4" width="2.4" height="7.2" rx="1" />
+      <rect x="13.9" y="7.4" width="2.2" height="6.2" rx="1" />
+      <rect x="17.1" y="8.2" width="1" height="5.6" rx="0.5" opacity="0.6" />
+    </svg>
+  )
+}
+
+export function BatteryIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="6.5" width="13" height="7" rx="1.5" />
+      <path d="M17 8.5v3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function BatteryChargingIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="6.5" width="13" height="7" rx="1.5" />
+      <path d="M17 8.5v3" strokeLinecap="round" />
+      <path d="M10.5 7.5L8 10.5h2.5L8.5 13" />
+    </svg>
+  )
+}
+
+export function WifiIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8a8.5 8.5 0 0112 0" opacity="0.4" />
+      <path d="M6.5 10.8a5 5 0 017 0" opacity="0.7" />
+      <path d="M9 13.5a2 2 0 012 0" />
+      <circle cx="10" cy="15.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function WifiOffIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8a8.5 8.5 0 0112 0" opacity="0.3" />
+      <path d="M6.5 10.8a5 5 0 017 0" opacity="0.5" />
+      <circle cx="10" cy="15.5" r="1" fill="currentColor" stroke="none" />
+      <path d="M2.5 2.5l15 15" />
+    </svg>
+  )
+}
+
+export function VolumeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8v4h3l4 3.5v-11L7 8H4z" />
+      <path d="M13 7.5a4 4 0 010 5" opacity="0.7" />
+      <path d="M15.3 5.5a7.5 7.5 0 010 9" opacity="0.4" />
+    </svg>
+  )
+}
+
+export function VolumeMuteIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8v4h3l4 3.5v-11L7 8H4z" />
+      <path d="M14 8l4 4M18 8l-4 4" />
     </svg>
   )
 }

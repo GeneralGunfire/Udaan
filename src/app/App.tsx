@@ -1,320 +1,267 @@
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { AmbientBackground } from '@/shared/components/AmbientBackground'
 import { TopBar } from '@/shared/components/TopBar'
-import { Sidebar } from '@/shared/components/Sidebar'
+import { Sidebar, type SidebarView } from '@/shared/components/Sidebar'
+import { Launchpad } from '@/shared/components/Launchpad'
 import { GeneralChatView } from '@/features/general-chat/GeneralChatView'
-import { PlaceholderView } from '@/shared/components/PlaceholderView'
-import { SchoolView } from '@/features/school/SchoolView'
-import { WorkView } from '@/features/work/WorkView'
-import { CreativityView } from '@/features/creativity/CreativityView'
-import { DjBoardView } from '@/features/creativity/dj-board/DjBoardView'
-import { ImageEditorView } from '@/features/creativity/image-editor/ImageEditorView'
-import { StudyGeneratorView } from '@/features/school/study-generator/StudyGeneratorView'
-import { VideoEditorView } from '@/features/creativity/video-editor/VideoEditorView'
-import { MusicPlayerView } from '@/features/creativity/music-player/MusicPlayerView'
-import { ProposalGeneratorView } from '@/features/work/proposal-generator/ProposalGeneratorView'
-import { ClientTrackerView } from '@/features/work/client-tracker/ClientTrackerView'
 import { CalendarView } from '@/features/calendar/CalendarView'
-import { ScheduleView } from '@/features/schedule/ScheduleView'
-import { ManageEventsView } from '@/features/schedule/ManageEventsView'
-import {
-  hydrateScheduleCache,
-  onScheduleChange,
-} from '@/integrations/schedule/scheduleStore'
-import { SessionsView } from '@/features/sessions/SessionsView'
-import { ModelDashboardView } from '@/features/model-dashboard/ModelDashboardView'
-import { IntegrationsView } from '@/features/integrations-status/IntegrationsView'
-import { SystemHealthView } from '@/features/system-health/SystemHealthView'
-import { NotificationsView } from '@/features/notifications/NotificationsView'
-import { PdfToolView } from '@/features/pdf-tool/PdfToolView'
-import type { SearchResult } from '@/features/global-search/lib/types'
-import { ChevronRightIcon, PlusIcon } from '@/shared/icons'
-import { AddEventModal } from '@/shared/components/AddEventModal'
-import type { CategoryId } from './categories'
+import { registerStudioLauncher, registerFileExplorerLauncher, registerDocumentReaderLauncher } from '@/app/apps'
+import { hydrateScheduleCache } from '@/integrations/schedule'
+import { listen } from '@tauri-apps/api/event'
+import { activateUdaanTaskbar } from '@/shared/lib/udaanTaskbarMode'
+import { TASKBAR_RESERVED_HEIGHT_PX } from '@/shared/lib/taskbarGeometry'
+
+// Lazy: Studio's audio-engine module graph (Web Audio setup, sample
+// loading) is real weight that only the small fraction of sessions which
+// ever open Studio need — no reason to ship or evaluate it on every cold
+// start of the main chat/calendar app.
+const StudioApp = lazy(() => import('@/apps/studio').then((m) => ({ default: m.StudioApp })))
+
+// Lazy for the same reason as Studio — File Explorer's directory-listing/
+// preview code only matters to sessions that actually open it.
+const FileExplorerView = lazy(() =>
+  import('@/features/file-explorer/FileExplorerView').then((m) => ({ default: m.FileExplorerView })),
+)
+
+// Lazy for the same reason — pdfjs-dist/mammoth/marked are real weight only
+// sessions that actually open a document need to pay for.
+const DocumentReaderView = lazy(() =>
+  import('@/features/document-reader/DocumentReaderView').then((m) => ({ default: m.DocumentReaderView })),
+)
 
 /**
- * Any navigable destination. There is no standalone "dashboard" — the app
- * opens directly on General Chat, which doubles as home.
+ * The app has two destinations — General Chat and Calendar — switched via
+ * the sidebar icon rail (see Sidebar.tsx). TopBar, Sidebar, and the active
+ * view all live inside one glass panel (top bar as its top strip, sidebar
+ * as its left strip) rather than as separate floating surfaces.
+ *
+ * The Launchpad and Studio are launched as overlays above this panel —
+ * Studio has no route/window of its own yet, so it's just conditionally
+ * mounted full-screen here.
  */
-export type View =
-  | { kind: 'general-chat' }
-  | { kind: 'category'; id: CategoryId }
-  | { kind: 'calendar' }
-  | { kind: 'schedule' }
-  | { kind: 'manage-events' }
-  | { kind: 'sessions' }
-  | { kind: 'model-dashboard' }
-  | { kind: 'integrations' }
-  | { kind: 'system-health' }
-  | { kind: 'notifications' }
-  | { kind: 'pdf-tool' }
-  | { kind: 'dj-board' }
-  | { kind: 'image-editor' }
-  | { kind: 'study-generator' }
-  | { kind: 'video-editor' }
-  | { kind: 'music-player' }
-  | { kind: 'proposal-generator' }
-  | { kind: 'client-tracker' }
-  | { kind: 'placeholder'; id: string; label: string }
-
-/** Maps a non-placeholder, non-category view to the sidebar row id it should highlight. */
-const SIDEBAR_ID_BY_VIEW_KIND: Partial<Record<View['kind'], string>> = {
-  calendar: 'calendar',
-  schedule: 'schedule',
-  'general-chat': 'general-chat',
-  sessions: 'task-queue',
-  'model-dashboard': 'model-dashboard',
-  integrations: 'integrations',
-  'system-health': 'system-health',
-  notifications: 'notification',
-  'pdf-tool': 'pdf-tool',
-  'dj-board': 'creativity-dj-mixer',
-  'image-editor': 'creativity-image-editor',
-  'study-generator': 'school-study-generator',
-  'video-editor': 'creativity-video-editor',
-  'music-player': 'creativity-music-player',
-  'proposal-generator': 'work-proposal-generator',
-  'client-tracker': 'work-client-tracker',
-}
-
-function activeViewIdFor(view: View): string | null {
-  if (view.kind === 'placeholder') return view.id
-  return SIDEBAR_ID_BY_VIEW_KIND[view.kind] ?? null
-}
-
 export default function App() {
-  const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null)
-  const [view, setView] = useState<View>({ kind: 'general-chat' })
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  // Bumped whenever schedule data changes (create/edit/delete/status), so
-  // Calendar/Schedule remount and pick up fresh data — those view files
-  // read a synchronous in-memory cache and have no subscription of their
-  // own, by design (see scheduleStore.ts).
-  const [scheduleVersion, setScheduleVersion] = useState(0)
-  const [addEventOpen, setAddEventOpen] = useState(false)
+  const [activeView, setActiveView] = useState<SidebarView>('chat')
+  const [launchpadOpen, setLaunchpadOpen] = useState(false)
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [fileExplorerOpen, setFileExplorerOpen] = useState(false)
+  const [documentReaderOpen, setDocumentReaderOpen] = useState(false)
+  const [documentReaderFilePath, setDocumentReaderFilePath] = useState<string | undefined>(undefined)
+  // Owned here (not just inside TopBar) because it changes how much this
+  // root container floats above the desktop — see the comment on the root
+  // div below for why.
+  const [udaanTaskbarOn, setUdaanTaskbarOn] = useState(false)
 
   useEffect(() => {
-    hydrateScheduleCache()
-    return onScheduleChange(() => setScheduleVersion((v) => v + 1))
+    registerStudioLauncher(() => setStudioOpen(true))
+    registerFileExplorerLauncher(() => setFileExplorerOpen(true))
+    registerDocumentReaderLauncher((filePath) => {
+      setDocumentReaderFilePath(filePath)
+      setDocumentReaderOpen(true)
+    })
   }, [])
 
-  function selectCategory(id: CategoryId) {
-    setActiveCategory(id)
-    setView({ kind: 'category', id })
-  }
+  // Udaan's own taskbar is the default, always-on experience now — not
+  // something the user has to re-enable by hand every session via
+  // TopBar's toggle. Activated once on startup; the toggle button still
+  // exists for the rare case of wanting Explorer's taskbar back.
+  useEffect(() => {
+    let cancelled = false
+    activateUdaanTaskbar()
+      .then(() => {
+        if (!cancelled) setUdaanTaskbarOn(true)
+      })
+      .catch((err) => {
+        console.error('Failed to activate Udaan taskbar on startup:', err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  function selectPlaceholder(id: string, label: string) {
-    setActiveCategory(null)
-    if (id === 'calendar') {
-      setView({ kind: 'calendar' })
-      return
-    }
-    if (id === 'schedule') {
-      setView({ kind: 'schedule' })
-      return
-    }
-    if (id === 'task-queue') {
-      setView({ kind: 'sessions' })
-      return
-    }
-    if (id === 'model-dashboard') {
-      setView({ kind: 'model-dashboard' })
-      return
-    }
-    if (id === 'integrations') {
-      setView({ kind: 'integrations' })
-      return
-    }
-    if (id === 'system-health') {
-      setView({ kind: 'system-health' })
-      return
-    }
-    if (id === 'notification') {
-      setView({ kind: 'notifications' })
-      return
-    }
-    if (id === 'pdf-tool') {
-      setView({ kind: 'pdf-tool' })
-      return
-    }
-    if (id === 'creativity-dj-mixer') {
-      setView({ kind: 'dj-board' })
-      return
-    }
-    if (id === 'creativity-image-editor') {
-      setView({ kind: 'image-editor' })
-      return
-    }
-    if (id === 'school-study-generator') {
-      setView({ kind: 'study-generator' })
-      return
-    }
-    if (id === 'creativity-video-editor') {
-      setView({ kind: 'video-editor' })
-      return
-    }
-    if (id === 'creativity-music-player') {
-      setView({ kind: 'music-player' })
-      return
-    }
-    if (id === 'work-proposal-generator') {
-      setView({ kind: 'proposal-generator' })
-      return
-    }
-    if (id === 'work-client-tracker') {
-      setView({ kind: 'client-tracker' })
-      return
-    }
-    setView({ kind: 'placeholder', id, label })
-  }
+  // Populates General Chat's schedule-assistant cache at startup. Calendar
+  // itself reads/writes SQLite directly (see features/calendar/hooks/useEvents.ts)
+  // and refreshes this same cache after its own mutations, so both surfaces
+  // stay in sync now that they share one schedule_events table.
+  useEffect(() => {
+    hydrateScheduleCache().catch((err) => {
+      console.error('[schedule] Failed to hydrate schedule cache on startup:', err)
+    })
+  }, [])
 
-  function selectGeneralChat() {
-    setActiveCategory(null)
-    setView({ kind: 'general-chat' })
-  }
+  // The taskbar (a separate window — see src/features/taskbar/TaskbarWindow.tsx)
+  // has no Launchpad/Calendar UI of its own; its Start button and clock
+  // just emit these events for the main window to act on, since the main
+  // window is what actually owns Launchpad and the Calendar view.
+  useEffect(() => {
+    let unlistenLaunchpad: (() => void) | undefined
+    let unlistenCalendar: (() => void) | undefined
+    let cancelled = false
 
-  /** Global search results have no per-item detail view yet — navigate to the closest list view that shows them. */
-  function navigateToSearchResult(result: SearchResult) {
-    setActiveCategory(null)
-    switch (result.navTarget.kind) {
-      case 'task':
-        setView({ kind: 'sessions' })
-        return
-      case 'notification':
-        setView({ kind: 'notifications' })
-        return
-      case 'document':
-        setView({ kind: 'category', id: 'school' })
-        setActiveCategory('school')
-        return
+    async function bringMainWindowToFront() {
+      if (!('__TAURI_INTERNALS__' in window)) return
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      const win = getCurrentWindow()
+      await win.unminimize()
+      await win.setFocus()
     }
-  }
 
-  function renderView() {
-    if (view.kind === 'general-chat') return <GeneralChatView />
-    if (view.kind === 'calendar')
-      return (
-        <CalendarView
-          key={scheduleVersion}
-          onAddEvent={() => setAddEventOpen(true)}
-        />
-      )
-    if (view.kind === 'schedule')
-      return <ScheduleView key={scheduleVersion} />
-    if (view.kind === 'manage-events')
-      return <ManageEventsView key={scheduleVersion} />
-    if (view.kind === 'sessions') return <SessionsView />
-    if (view.kind === 'model-dashboard') return <ModelDashboardView />
-    if (view.kind === 'integrations') return <IntegrationsView />
-    if (view.kind === 'system-health') return <SystemHealthView />
-    if (view.kind === 'notifications') return <NotificationsView />
-    if (view.kind === 'pdf-tool') return <PdfToolView />
-    if (view.kind === 'dj-board') return <DjBoardView />
-    if (view.kind === 'image-editor') return <ImageEditorView />
-    if (view.kind === 'study-generator') return <StudyGeneratorView />
-    if (view.kind === 'video-editor') return <VideoEditorView />
-    if (view.kind === 'music-player') return <MusicPlayerView />
-    if (view.kind === 'proposal-generator') return <ProposalGeneratorView />
-    if (view.kind === 'client-tracker') return <ClientTrackerView />
-    if (view.kind === 'placeholder')
-      return <PlaceholderView label={view.label} />
-
-    switch (view.id) {
-      case 'school':
-        return <SchoolView />
-      case 'work':
-        return <WorkView />
-      case 'creativity':
-        return <CreativityView />
-      case 'general':
-        return <GeneralChatView />
+    async function init() {
+      unlistenLaunchpad = await listen('taskbar:open-launchpad', () => {
+        void bringMainWindowToFront()
+        setLaunchpadOpen(true)
+      })
+      unlistenCalendar = await listen('taskbar:open-calendar', () => {
+        void bringMainWindowToFront()
+        setActiveView('calendar')
+      })
+      if (cancelled) {
+        unlistenLaunchpad()
+        unlistenCalendar()
+      }
     }
-  }
+    void init()
+
+    return () => {
+      cancelled = true
+      unlistenLaunchpad?.()
+      unlistenCalendar?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.code === 'Space') {
+        e.preventDefault()
+        setLaunchpadOpen((prev) => !prev)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  // System-wide Start Menu trigger — registered as a real OS global
+  // shortcut in src-tauri/src/lib.rs (Ctrl+Space) so it opens Launchpad
+  // even when Udaan isn't the focused window, matching how the real Start
+  // Menu opens regardless of what currently has focus. The bare Windows
+  // key itself is NOT achievable this way — the underlying global-hotkey
+  // crate has no support for registering it standalone — documented gap,
+  // Ctrl+Space is the real working trigger both here and as the
+  // in-window-only listener above.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    let cancelled = false
+
+    async function init() {
+      unlisten = await listen('global-shortcut:open-launchpad', () => {
+        setLaunchpadOpen((prev) => !prev)
+      })
+      if (cancelled) unlisten()
+    }
+    void init()
+
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
 
   return (
-    <div className="relative flex h-screen w-screen flex-col p-6 md:p-10">
+    // The floating-card padding (gap on every side, revealing
+    // AmbientBackground behind the panel) only makes sense when this
+    // window is sized to the OS work area under Explorer's own taskbar —
+    // that's the normal case the padding was designed for. Once Udaan's
+    // own taskbar is active, the main window is deliberately resized to
+    // the FULL monitor bounds (see udaanTaskbarMode's fillMonitorBounds)
+    // since Udaan's taskbar is a floating overlay with no work-area
+    // reservation of its own.
+    //
+    // The bottom inset in that mode is NOT zero, though — it's exactly
+    // TASKBAR_RESERVED_HEIGHT_PX (the floating dock's own height plus its
+    // margin off the true screen edge, shared from taskbarGeometry.ts so
+    // this can never drift out of sync with the dock's real size). Zeroing
+    // it entirely let the panel run flush to the true bottom of the
+    // screen, underneath/behind where the dock floats — this reserves
+    // just enough space for the dock to sit in its own clear strip below
+    // the panel, the same way Explorer's taskbar naturally gets its own
+    // strip via the OS work area.
+    <div
+      className="relative flex h-screen w-screen flex-col px-16 pt-16 pb-11 md:px-32 md:pt-24 md:pb-20"
+      style={udaanTaskbarOn ? { paddingBottom: TASKBAR_RESERVED_HEIGHT_PX } : undefined}
+    >
       <AmbientBackground />
 
-      <TopBar
-        onNavigateToSearchResult={navigateToSearchResult}
-        onOpenDjBoard={() => selectPlaceholder('creativity-dj-mixer', 'DJ / Music Mixer')}
-      />
-
       <div
-        className="border-glass-border relative mt-4 flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border"
+        className="glass-surface border-glass-border relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border"
         style={{
           boxShadow: 'var(--shadow-panel)',
+          // Darker and more opaque than the shared `.glass-surface` default
+          // (which is tuned for transient popovers/dropdowns) — this is the
+          // app's main shell, so it should read as a solid surface rather
+          // than a light frosted one. `background-color` is a longhand of
+          // `.glass-surface`'s `background` shorthand, so this inline value
+          // overrides just the color while keeping its highlight gradient.
+          backgroundColor: 'rgb(4 6 10 / 97%)',
         }}
       >
+        <TopBar udaanTaskbarOn={udaanTaskbarOn} onUdaanTaskbarOnChange={setUdaanTaskbarOn} />
+
         <div className="relative flex min-h-0 flex-1">
           <Sidebar
-            activeCategory={activeCategory}
-            onSelectCategory={selectCategory}
-            activeViewId={activeViewIdFor(view)}
-            onSelectPlaceholder={selectPlaceholder}
-            onSelectGeneralChat={selectGeneralChat}
-            collapsed={sidebarCollapsed}
-            onCollapsedChange={setSidebarCollapsed}
+            activeView={activeView}
+            onSelectView={setActiveView}
+            onOpenLaunchpad={() => setLaunchpadOpen(true)}
           />
 
-          <AnimatePresence>
-            {sidebarCollapsed && (
-              <motion.button
-                type="button"
-                onClick={() => setSidebarCollapsed(false)}
-                aria-label="Expand sidebar"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                className="glass-surface text-text-secondary hover:text-text-primary hover:bg-glass-hover absolute top-3 left-3 z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full backdrop-blur-xl transition-colors duration-150"
-              >
-                <ChevronRightIcon width={14} height={14} />
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          <main
-            className={`relative flex min-w-0 flex-1 p-8 ${
-              view.kind === 'general-chat' || view.kind === 'dj-board'
-                ? 'items-stretch justify-stretch overflow-hidden'
-                : 'items-center justify-center overflow-y-auto'
-            }`}
-          >
-            {renderView()}
-
-            {(view.kind === 'calendar' ||
-              view.kind === 'schedule' ||
-              view.kind === 'manage-events') && (
-              <div className="absolute right-6 bottom-6 flex flex-col items-end gap-2">
-                {view.kind !== 'manage-events' && (
-                  <button
-                    type="button"
-                    onClick={() => setView({ kind: 'manage-events' })}
-                    className="glass-surface text-text-secondary hover:text-text-primary rounded-full px-3 py-2 text-[12px] font-medium"
-                  >
-                    Manage events
-                  </button>
-                )}
-                <button
-                  type="button"
-                  aria-label="Add event"
-                  onClick={() => setAddEventOpen(true)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg"
-                  style={{ background: 'var(--gradient-brand)' }}
-                >
-                  <PlusIcon width={18} height={18} />
-                </button>
-              </div>
-            )}
+          <main className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            {/* Both views stay mounted and are toggled with `hidden` rather
+                than conditionally rendered — switching tabs used to unmount
+                GeneralChatView every time, which restarted its chat-history
+                fetch and briefly rendered its loading layout (different
+                from the empty/populated layout) before settling, reading as
+                a jump/reflow on every tab switch. Keeping both mounted
+                avoids that remount entirely, and preserves scroll position
+                and any in-progress state (e.g. an unsent draft) per tab. */}
+            <div className={`absolute inset-0 p-8 ${activeView === 'chat' ? '' : 'hidden'}`}>
+              <GeneralChatView />
+            </div>
+            <div className={`absolute inset-0 overflow-y-auto p-8 ${activeView === 'calendar' ? '' : 'hidden'}`}>
+              <CalendarView />
+            </div>
           </main>
         </div>
+
+        {studioOpen && (
+          <div className="bg-bg-base absolute inset-0 z-30">
+            <Suspense fallback={null}>
+              <StudioApp onClose={() => setStudioOpen(false)} />
+            </Suspense>
+          </div>
+        )}
+
+        {fileExplorerOpen && (
+          <div className="bg-bg-base absolute inset-0 z-30">
+            <Suspense fallback={null}>
+              <FileExplorerView onClose={() => setFileExplorerOpen(false)} />
+            </Suspense>
+          </div>
+        )}
+
+        {documentReaderOpen && (
+          <div className="bg-bg-base absolute inset-0 z-30">
+            <Suspense fallback={null}>
+              <DocumentReaderView
+                initialFilePath={documentReaderFilePath}
+                onClose={() => {
+                  setDocumentReaderOpen(false)
+                  setDocumentReaderFilePath(undefined)
+                }}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
 
-      {addEventOpen && (
-        <AddEventModal onClose={() => setAddEventOpen(false)} />
-      )}
+      <Launchpad open={launchpadOpen} onOpenChange={setLaunchpadOpen} />
     </div>
   )
 }

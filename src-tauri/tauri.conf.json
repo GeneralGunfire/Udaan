@@ -22,6 +22,21 @@
         "transparent": false,
         "decorations": false,
         "backgroundColor": "#0b0f16"
+      },
+      {
+        "label": "taskbar",
+        "title": "Udaan Taskbar",
+        "url": "index.html?window=taskbar",
+        "width": 760,
+        "height": 76,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
       }
     ],
     "security": {
@@ -38,6 +53,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "resources/piper": "resources/piper",
+      "resources/voices": "resources/voices"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
