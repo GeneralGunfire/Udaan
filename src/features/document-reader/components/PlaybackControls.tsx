@@ -6,10 +6,13 @@ import {
   SkipBackIcon,
   VolumeIcon,
 } from '@/shared/icons'
+import { Select } from '@/shared/components/ui/select'
+import { Slider } from '@/shared/components/ui/slider'
 import type { TtsVoice } from '@/integrations/local-model/client'
 import type { PlaybackStatus } from '../lib/playbackEngine'
 
 const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2]
+const SPEED_OPTIONS = SPEED_STEPS.map((s) => ({ value: String(s), label: `${s}x` }))
 
 interface PlaybackControlsProps {
   status: PlaybackStatus
@@ -117,42 +120,24 @@ export function PlaybackControls({
 
       <span className="text-text-tertiary text-xs tabular-nums">{progressLabel}</span>
 
-      <div className="ml-auto flex items-center gap-4">
-        <select
+      <div className="ml-auto flex items-center gap-3">
+        <Select
+          size="sm"
           value={voiceId}
-          onChange={(e) => onVoiceChange(e.target.value)}
-          className="border-glass-border bg-glass-bg text-text-primary rounded-md border px-2 py-1 text-xs"
-        >
-          {voices.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.label}
-            </option>
-          ))}
-        </select>
+          options={voices.map((v) => ({ value: v.id, label: v.label }))}
+          onChange={onVoiceChange}
+        />
 
-        <select
-          value={speed}
-          onChange={(e) => onSpeedChange(Number(e.target.value))}
-          className="border-glass-border bg-glass-bg text-text-primary rounded-md border px-2 py-1 text-xs"
-        >
-          {SPEED_STEPS.map((s) => (
-            <option key={s} value={s}>
-              {s}x
-            </option>
-          ))}
-        </select>
+        <Select
+          size="sm"
+          value={String(speed)}
+          options={SPEED_OPTIONS}
+          onChange={(v) => onSpeedChange(Number(v))}
+        />
 
         <div className="flex items-center gap-2">
-          <VolumeIcon width={15} height={15} className="text-text-tertiary" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volume}
-            onChange={(e) => onVolumeChange(Number(e.target.value))}
-            className="w-20"
-          />
+          <VolumeIcon width={15} height={15} className="text-text-tertiary shrink-0" />
+          <Slider value={volume} min={0} max={1} step={0.05} onChange={onVolumeChange} className="w-20" />
         </div>
       </div>
     </div>

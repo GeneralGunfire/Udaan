@@ -396,6 +396,22 @@ export function PauseIcon(props: IconProps) {
   )
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 7.5l5.5 5.5 5.5-5.5" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 10.5l3.5 3.5 7.5-8.5" />
+    </svg>
+  )
+}
+
 export function SkipForwardIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

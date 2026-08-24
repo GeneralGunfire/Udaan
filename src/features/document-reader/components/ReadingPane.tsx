@@ -78,7 +78,7 @@ export function ReadingPane({
   return (
     <div
       ref={scrollRef}
-      className="h-full w-full overflow-y-auto px-6 py-10 md:px-16"
+      className="doc-reader-scroll h-full w-full overflow-y-auto px-6 py-10 md:px-16"
       style={{ backgroundColor: 'var(--color-bg-base)' }}
     >
       <div
