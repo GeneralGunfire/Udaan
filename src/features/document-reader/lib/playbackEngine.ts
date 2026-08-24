@@ -33,6 +33,13 @@ export class PlaybackEngine {
   private destroyed = false
   private synthGeneration = 0
   private callbacks: PlaybackEngineCallbacks
+  /** Serializes Piper calls to one at a time. Each call spawns its own
+   * process and loads a ~60MB ONNX model independently — running several
+   * concurrently (the original lookahead did up to 3) can exceed available
+   * memory on a low-RAM machine, causing synthesis to hang or fail rather
+   * than just being slower, which made playback look like it never starts
+   * at all instead of just taking longer to buffer. */
+  private synthQueue: Promise<void> = Promise.resolve()
 
   constructor(callbacks: PlaybackEngineCallbacks, voiceId: string, speed: number, volume: number) {
     this.callbacks = callbacks
@@ -174,18 +181,29 @@ export class PlaybackEngine {
     if (!sentence) return
 
     this.pendingSynthesis.add(index)
-    try {
-      const buffer = await synthesizeSpeech(sentence.text, this.voiceId, this.speed)
+    // Chain onto the shared queue rather than firing the Piper call
+    // directly — see the field doc on `synthQueue` for why this can't run
+    // concurrently with other sentences.
+    const run = this.synthQueue.then(async () => {
       if (this.destroyed || generation !== this.synthGeneration) return
-      this.audioCache.set(index, buffer)
-    } catch (err) {
-      if (this.destroyed) return
-      this.callbacks.onError(
-        `Couldn't synthesize speech for a sentence: ${err instanceof Error ? err.message : String(err)}`,
-      )
-    } finally {
-      this.pendingSynthesis.delete(index)
-    }
+      try {
+        const buffer = await synthesizeSpeech(sentence.text, this.voiceId, this.speed)
+        if (this.destroyed || generation !== this.synthGeneration) return
+        this.audioCache.set(index, buffer)
+      } catch (err) {
+        if (this.destroyed) return
+        this.callbacks.onError(
+          `Couldn't synthesize speech for a sentence: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      } finally {
+        this.pendingSynthesis.delete(index)
+      }
+    })
+    // Swallow the error here so one failed synthesis doesn't break the
+    // chain for everything queued after it — `run`'s own catch already
+    // reported it via onError.
+    this.synthQueue = run.catch(() => {})
+    await run
   }
 
   private async ensureSynthesized(fromIndex: number): Promise<void> {
@@ -193,7 +211,8 @@ export class PlaybackEngine {
     const targets = [fromIndex, fromIndex + 1, fromIndex + 2].filter((i) => i >= 0 && i < this.sentences.length)
     // Synthesize the current sentence first and await it (playback can't
     // start without it); kick off the rest of the lookahead in the
-    // background so they overlap with playback rather than serializing.
+    // background so it's ready by the time playback catches up, but they
+    // still run one-at-a-time (see synthQueue) rather than in parallel.
     await this.synthesizeOne(fromIndex, generation)
     for (const i of targets.slice(1)) {
       void this.synthesizeOne(i, generation)

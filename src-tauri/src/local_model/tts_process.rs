@@ -116,10 +116,24 @@ pub async fn synthesize(text: &str, voice_id: &str, speed: f32) -> Result<Vec<u8
     .map_err(|e| format!("Failed to write text to piper: {e}"))?;
   drop(stdin);
 
-  let output = child
-    .wait_with_output()
-    .await
-    .map_err(|e| format!("Failed waiting for piper: {e}"))?;
+  // On a slow/low-memory machine, model load + inference can take far
+  // longer than the ~1.5-2.5s measured on a normal machine, or the process
+  // can hang outright under memory pressure. Without a timeout, a stuck
+  // synthesis call leaves the frontend waiting on this promise forever —
+  // it reads as "nothing happens when I hit play" with no error, rather
+  // than a slow-but-working system. 30s is generous for one sentence even
+  // on constrained hardware; a real hang should fail loudly well before
+  // then rather than block the playback queue indefinitely.
+  let wait_result = tokio::time::timeout(std::time::Duration::from_secs(30), child.wait_with_output()).await;
+
+  let output = match wait_result {
+    Ok(result) => result.map_err(|e| format!("Failed waiting for piper: {e}"))?,
+    Err(_) => {
+      return Err(
+        "Speech synthesis timed out after 30s — this can happen on a slow or memory-constrained machine. Try closing other apps, or pick a shorter chunk of text.".into(),
+      );
+    }
+  };
 
   if !output.status.success() {
     let stderr = String::from_utf8_lossy(&output.stderr);
