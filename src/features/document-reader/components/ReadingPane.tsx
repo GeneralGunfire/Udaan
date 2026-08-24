@@ -16,10 +16,14 @@ interface ReadingPaneProps {
  * text), highlights the paragraph currently being read, and turns a click
  * anywhere in the text into a seek to that paragraph's first sentence.
  *
- * A light "page" card sits inside the dark app chrome (document content
- * keeps its own native colors — black text on a white page — rather than
- * being forced into the dark theme), matching how PDF viewers typically
- * frame a light page against a dark surrounding UI.
+ * The "page" itself is dark (not a light page-on-dark-chrome look) —
+ * formatted text (docx/md/txt) gets a dark background + white foreground
+ * regardless of the source document's own colors, since headings/bold/etc.
+ * are just DOM structure at that point and easy to recolor. PDF pages are
+ * literal rendered pixels (baked-in white background), so those get a CSS
+ * invert+hue-rotate filter instead — the standard "dark mode PDF viewer"
+ * trick that flips luminance (white page → dark, black text → light) while
+ * roughly preserving photo/image colors.
  */
 export function ReadingPane({
   document: parsedDocument,
@@ -83,7 +87,12 @@ export function ReadingPane({
     >
       <div
         className="mx-auto max-w-3xl rounded-xl px-10 py-12 shadow-2xl"
-        style={{ backgroundColor: '#ffffff', color: '#1a1a1a', minHeight: '60vh' }}
+        style={{
+          backgroundColor: '#1c2029',
+          color: '#f2f3f5',
+          minHeight: '60vh',
+          border: '1px solid rgb(255 255 255 / 8%)',
+        }}
         onClick={handleClick}
       >
         {parsedDocument.format === 'pdf' && parsedDocument.pdfBytes ? (

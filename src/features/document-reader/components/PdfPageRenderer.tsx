@@ -58,13 +58,17 @@ export function PdfPageRenderer({
           pageWrapper.style.marginBottom = '24px'
           pageWrapper.style.cursor = 'pointer'
 
+          const surface = window.document.createElement('div')
+          surface.className = 'doc-reader-pdf-page-surface'
+
           const canvas = window.document.createElement('canvas')
           canvas.width = viewport.width
           canvas.height = viewport.height
           canvas.style.display = 'block'
           canvas.style.width = '100%'
           canvas.style.height = 'auto'
-          pageWrapper.appendChild(canvas)
+          surface.appendChild(canvas)
+          pageWrapper.appendChild(surface)
 
           const ctx = canvas.getContext('2d')
           if (ctx) {

@@ -2,6 +2,29 @@
   font-family: Georgia, 'Times New Roman', serif;
   line-height: 1.7;
   font-size: 17px;
+  color: #f2f3f5;
+}
+
+/* mammoth/marked output can carry its own inline colors (e.g. a docx run
+   with an explicit font color, or marked's default link color) — force
+   every descendant back to the dark-theme palette rather than trusting
+   the source document's colors, which is the whole point of this pass:
+   "dark and white regardless of how it was made". */
+.doc-reader-content * {
+  color: inherit !important;
+  background-color: transparent !important;
+  border-color: rgb(255 255 255 / 15%) !important;
+}
+
+.doc-reader-content a {
+  color: #7dd3fc !important;
+  text-decoration: underline;
+}
+
+.doc-reader-content code,
+.doc-reader-content pre {
+  background-color: rgb(255 255 255 / 8%) !important;
+  border-radius: 4px;
 }
 
 .doc-reader-content h1,
@@ -11,6 +34,14 @@
   font-weight: 600;
   margin-top: 1.4em;
   margin-bottom: 0.5em;
+}
+
+.doc-reader-content table,
+.doc-reader-content th,
+.doc-reader-content td {
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-collapse: collapse;
+  padding: 6px 10px;
 }
 
 .doc-reader-content p,
@@ -23,23 +54,37 @@
 
 .doc-reader-content p:hover,
 .doc-reader-content li:hover {
-  background-color: rgb(0 0 0 / 4%);
+  background-color: rgb(255 255 255 / 6%) !important;
 }
 
 .doc-reader-highlight {
-  background-color: rgb(255 213 79 / 55%) !important;
-  box-shadow: 0 0 0 2px rgb(255 179 0 / 40%);
+  background-color: rgb(255 213 79 / 30%) !important;
+  color: #1a1a1a !important;
+  box-shadow: 0 0 0 2px rgb(255 179 0 / 50%);
 }
 
 .doc-reader-pdf-page {
-  border: 1px solid rgb(0 0 0 / 10%);
+  border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 6px;
   overflow: hidden;
   transition: box-shadow 150ms ease;
 }
 
+/* Dark-mode PDF trick: invert luminance so the source's white page becomes
+   dark and black text becomes light, then hue-rotate 180° to undo the hue
+   shift invert() introduces so colored images/highlights don't come out
+   looking like photo negatives. Not perfect for every PDF (a page that's
+   already dark inverts the wrong way), but far more readable than a
+   blinding white rectangle in an otherwise dark app.
+   Applied to an inner wrapper (not .doc-reader-pdf-page itself) because
+   `filter` also recolors box-shadow — the active-page highlight below
+   needs to sit on the un-inverted outer element to render its real color. */
+.doc-reader-pdf-page-surface {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
 .doc-reader-pdf-page:hover {
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 15%);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 20%);
 }
 
 .doc-reader-pdf-page-active {
