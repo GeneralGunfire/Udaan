@@ -1,7 +1,7 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring, prefersReducedMotion } from '@/shared/lib/motion'
+import { spring, zIndex, prefersReducedMotion } from '@/shared/lib/motion'
 
 /**
  * Thin restyle of Radix's popover onto the app's glass tokens — same
@@ -28,11 +28,14 @@ export function PopoverContent({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.97 }}
           transition={spring.standard}
-          className={cn(
-            'glass-surface border-glass-border z-40 rounded-2xl border outline-none',
-            className,
-          )}
-          style={{ boxShadow: 'var(--shadow-panel)' }}
+          data-overlay-scroll
+          className={cn('rounded-xl border outline-none', className)}
+          style={{
+            background: 'var(--surface-overlay)',
+            borderColor: 'var(--border-hairline)',
+            boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-overlay)',
+            zIndex: zIndex.overlayPanel,
+          }}
         >
           {children}
         </motion.div>

@@ -18,10 +18,25 @@
   --color-text-secondary: var(--color-text-secondary);
   --color-text-tertiary: var(--color-text-tertiary);
 
+  /* Surface ladder — bg-surface-canvas / -base / -raised / -overlay. */
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+
+  /* Borders — border-hairline / border-strong. */
+  --color-hairline: var(--border-hairline);
+  --color-strong: var(--border-strong);
+
   --color-brand-navy: var(--color-brand-navy);
   --color-brand-blue: var(--color-brand-blue);
   --color-brand-cyan: var(--color-brand-cyan);
   --color-brand-teal: var(--color-brand-teal);
+
+  /* Functional accent — text-accent, bg-accent, ring-accent, border-accent. */
+  --color-accent: var(--color-accent);
+  --color-accent-muted: var(--color-accent-muted);
+  --color-accent-alt: var(--color-accent-alt);
 
   --color-accent-school: var(--color-accent-school);
   --color-accent-work: var(--color-accent-work);
@@ -36,10 +51,27 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
 
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+
+  /* Type scale — text-2xs … text-2xl. */
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+
+  /* Elevation — shadow-raised / -overlay / -modal / -brand. */
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-brand: var(--shadow-brand);
 
   --shadow-panel: var(--shadow-panel);
   --shadow-sidebar: var(--shadow-sidebar);
@@ -68,11 +100,100 @@
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: var(--text-base);
+    /* Medium (500), not regular: on dark surfaces a 400 weight loses
+       perceived stroke density and is a large part of what reads as
+       "washed out". Medium restores presence without going bold. */
+    font-weight: var(--weight-body);
+    line-height: var(--leading-body);
+    font-feature-settings:
+      'calt' 1,
+      'kern' 1,
+      'liga' 1;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
     overflow: hidden; /* app shell owns scrolling per-panel, not the window */
     transition:
       background-color var(--duration-base) var(--ease-standard),
       color var(--duration-base) var(--ease-standard);
+  }
+
+  /* Headings get tighter leading and balanced wrapping so a title never
+     leaves a single orphaned word on its last line. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    line-height: var(--leading-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Any run of digits that a user compares or watches update (clocks,
+     counters, durations) uses tabular figures so it stops jittering as
+     values change. */
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Interaction defaults required by the Web Interface Guidelines:
+     suppress the 300ms double-tap delay and make the tap highlight an
+     intentional choice rather than the platform's default blue flash. */
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Scrolling containers keep their overscroll to themselves, so a
+     dropdown or drawer never chains its scroll into the panel behind it. */
+  [data-overlay-scroll] {
+    overscroll-behavior: contain;
+  }
+
+  /* Global reduced-motion safety net. Components that animate through
+     Framer already branch on prefersReducedMotion() and should keep
+     doing so — this catches CSS transitions/animations anywhere in the
+     app that were written without thinking about it, so honouring the
+     setting is the default rather than something each author has to
+     remember. Values are near-zero rather than `none` so animation
+     end/transition-end callbacks still fire and nothing hangs waiting
+     on an event that never arrives. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* The taskbar is a SEPARATE Tauri window declared `transparent: true`
+     (see tauri.conf.json's "taskbar" entry) specifically so only its own
+     rounded pill shape is visible and everything else is see-through
+     desktop — main.tsx stamps this attribute on <html> only for that
+     window. Without this override, the html/body opaque background-color
+     above (correct for the main app window) paints a solid rectangle
+     across the ENTIRE taskbar window's client area, showing as a visible
+     backing rect/strip behind the floating pill instead of true
+     transparency. */
+  html[data-taskbar-window] {
+    background-color: transparent;
+  }
+
+  html[data-taskbar-window] body {
+    background-color: transparent;
   }
 
   * {
@@ -81,19 +202,87 @@
 }
 
 @layer components {
-  /* Base glass surface — sidebar, composer, chips all compose this.
-     Saturate is intentionally mild: at 140% it amplified whatever bright
-     wallpaper color showed through, fighting the text sitting on top. */
+  /* Base raised surface — sidebar tiles, composer, chips, cards.
+     Elevation comes from the ladder step plus a hairline border and the
+     inset top highlight, not from a drop shadow. The backdrop blur that
+     used to sit here has been removed: the surface underneath is opaque,
+     so the filter cost real GPU work every frame while being visually
+     inert. Genuinely translucent layers (modal scrims, the Launchpad
+     backdrop) opt into blur explicitly via .glass-translucent below. */
   .glass-surface {
     background:
-      linear-gradient(155deg, var(--color-glass-highlight) 0%, transparent 40%),
-      var(--color-glass-bg);
-    border: 1px solid var(--color-glass-border);
+      linear-gradient(155deg, var(--highlight-inset) 0%, transparent 40%),
+      var(--surface-raised);
+    border: 1px solid var(--border-hairline);
     box-shadow:
-      inset 0 1px 0 var(--color-glass-highlight),
-      0 1px 2px var(--color-glass-inner-shadow);
+      inset 0 1px 0 var(--highlight-inset),
+      var(--shadow-raised);
+  }
+
+  /* Loading placeholder sweep. One compositor-driven gradient animation
+     regardless of how many skeletons are on screen — a JS-driven pulse
+     per element would cost a frame callback each. Animates background
+     position only, so it never triggers layout or paint of siblings. */
+  @keyframes skeleton-sweep {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .skeleton-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--highlight-inset) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer {
+      animation: none;
+    }
+  }
+
+  /* For layers that actually sit over the wallpaper and are meant to be
+     see-through. Blur is expensive; it belongs only here. */
+  .glass-translucent {
+    background: color-mix(in srgb, var(--surface-overlay) 82%, transparent);
+    border: 1px solid var(--border-hairline);
+    box-shadow:
+      inset 0 1px 0 var(--highlight-inset),
+      var(--shadow-overlay);
     backdrop-filter: blur(var(--blur-panel)) saturate(110%);
     -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(110%);
+  }
+
+  /* General Chat's composer — the single most-used control on that
+     screen. Idle state carries a bare 1px shadow (barely elevated);
+     focus-within replaces it with real lift (brighter accent border,
+     a genuine shadow with spread, tiny scale) rather than a thin
+     outline ring, so "you're typing here" reads as the whole surface
+     physically coming forward. */
+  .composer-surface {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  }
+  .composer-surface:focus-within {
+    border-color: color-mix(in srgb, var(--color-brand-blue) 55%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-brand-blue) 30%, transparent),
+      0 8px 24px -6px color-mix(in srgb, var(--color-brand-blue) 35%, transparent),
+      0 2px 8px rgb(0 0 0 / 25%);
+    transform: translateY(-1px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .composer-surface:focus-within {
+      transform: none;
+    }
   }
 }
 
@@ -181,5 +370,62 @@
   *::-webkit-scrollbar-thumb:hover {
     background-color: var(--color-text-tertiary);
     background-clip: padding-box;
+  }
+
+  /* Opt-out for a handful of panels that need overflow as a pure safety
+     net (content should always fit at rest) but where a visible scrollbar
+     track reads as a stray sliver of chrome rather than a real, expected
+     affordance — e.g. Private Player's Now Playing view. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Staggered content-reveal for a freshly rendered list of items (e.g.
+     News Brief's story blocks) — a plain CSS keyframe + animation-delay
+     per item, not a Framer Motion instance per item. Giving every item in
+     a long list its own JS-driven motion component was measurable
+     overhead that compounded with any other animated ancestor and showed
+     up as sluggish scrolling; this composites on the GPU with nothing
+     driving it per frame. */
+  @keyframes report-story-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-report-story-in {
+    animation: report-story-in 0.3s cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  /* The DJ board's turntable platters — a plain CSS spin (not the earlier
+     Framer Motion rotate() the single-deck version used) since the
+     two-deck redesign runs TWO of these simultaneously; a JS-driven
+     rotation loop per platter is exactly the kind of stacked-animation
+     cost that showed up as real performance problems elsewhere in this
+     panel (see DjKnob.tsx's rAF-throttle fix). A CSS animation composites
+     on the GPU with nothing driving it per frame regardless of how many
+     platters are spinning at once. */
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow linear infinite;
   }
 }

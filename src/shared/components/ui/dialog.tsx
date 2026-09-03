@@ -1,7 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring, prefersReducedMotion } from '@/shared/lib/motion'
+import { spring, duration, zIndex, prefersReducedMotion } from '@/shared/lib/motion'
 
 /**
  * Thin restyle of Radix's dialog onto the app's glass tokens — same
@@ -33,11 +33,15 @@ export function DialogContent({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reduced ? 0 : 0.15 }}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          transition={{ duration: reduced ? 0 : duration.backdrop }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          style={{ zIndex: zIndex.overlay }}
         />
       </DialogPrimitive.Overlay>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 flex items-center justify-center p-4"
+        style={{ zIndex: zIndex.overlayPanel }}
+      >
         <DialogPrimitive.Content asChild forceMount {...props}>
           <motion.div
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
@@ -45,10 +49,27 @@ export function DialogContent({
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }}
             transition={spring.panel}
             className={cn(
-              'glass-surface w-full max-w-sm rounded-2xl p-5 outline-none',
+              // max-h + overflow-y-auto: without this, a dialog whose
+              // content grows taller than the viewport (a long error
+              // message, a multi-step confirm flow like
+              // ShellSafetyPanel's) had nowhere to go but off the top/
+              // bottom of the screen — same "cut off, can't reach the
+              // button" symptom as the taskbar popup's unclamped
+              // position, just vertical overflow instead of off-screen
+              // placement. The dialog is centered via the wrapper's own
+              // flex/p-4, so this only ever kicks in once content
+              // actually exceeds the available height.
+              'flex max-h-[calc(100vh-2rem)] w-full max-w-sm flex-col overflow-y-auto rounded-2xl border p-5 outline-none',
               className,
             )}
-            style={{ boxShadow: 'var(--shadow-panel)' }}
+            style={{
+              // A modal is the one layer that genuinely floats free of the
+              // app surface, so it keeps the heaviest shadow in the scale.
+              background: 'var(--surface-overlay)',
+              borderColor: 'var(--border-hairline)',
+              boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-modal)',
+            }}
+            data-overlay-scroll
           >
             {children}
           </motion.div>

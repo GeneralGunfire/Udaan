@@ -37,7 +37,14 @@ export function Select<T extends string>({ value, options, onChange, className, 
         <button
           type="button"
           className={cn(
-            'border-glass-border bg-glass-bg text-text-primary hover:bg-glass-bg-hover flex items-center gap-1.5 rounded-lg border transition-colors outline-none',
+            'text-text-primary flex items-center gap-1.5 rounded-md border',
+            'border-(--border-hairline) bg-(--surface-raised)',
+            'shadow-[inset_0_1px_0_var(--highlight-inset)]',
+            'transition-[background-color,border-color,transform] duration-150 ease-out',
+            'hover:bg-(--surface-overlay) hover:border-(--border-strong) hover:-translate-y-px',
+            'active:translate-y-0 active:bg-(--surface-raised)',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            'motion-reduce:transform-none',
             size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-sm',
             className,
           )}
@@ -60,15 +67,21 @@ export function Select<T extends string>({ value, options, onChange, className, 
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 6, scale: 0.97 }}
                 transition={spring.standard}
-                className="glass-surface border-glass-border flex max-h-72 min-w-[9rem] flex-col overflow-y-auto rounded-xl border p-1"
-                style={{ boxShadow: 'var(--shadow-panel)', zIndex: zIndex.dropdown }}
+                data-overlay-scroll
+                className="flex max-h-72 min-w-36 flex-col overflow-y-auto rounded-xl border p-1"
+                style={{
+                  background: 'var(--surface-overlay)',
+                  borderColor: 'var(--border-hairline)',
+                  boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-overlay)',
+                  zIndex: zIndex.dropdown,
+                }}
               >
                 {options.map((option) => (
                   <DropdownMenuPrimitive.Item
                     key={option.value}
                     onSelect={() => onChange(option.value)}
                     className={cn(
-                      'text-text-secondary hover:text-text-primary data-highlighted:bg-glass-hover data-highlighted:text-text-primary flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-[12px] outline-none transition-colors duration-150',
+                      'text-text-secondary hover:text-text-primary data-highlighted:bg-(--surface-raised) data-highlighted:text-text-primary flex cursor-pointer items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-100',
                       option.value === value && 'text-text-primary',
                     )}
                   >

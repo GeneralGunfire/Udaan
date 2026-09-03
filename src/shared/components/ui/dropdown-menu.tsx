@@ -1,7 +1,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring } from '@/shared/lib/motion'
+import { spring, zIndex } from '@/shared/lib/motion'
 
 /**
  * Thin restyle of Radix's dropdown-menu primitives onto this app's glass
@@ -32,11 +32,27 @@ export function DropdownMenuContent({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 6, scale: 0.97 }}
           transition={spring.standard}
+          data-overlay-scroll
           className={cn(
-            'glass-surface border-glass-border z-20 flex max-h-72 w-64 flex-col overflow-hidden rounded-2xl',
+            // overflow-y-auto, not overflow-hidden: a menu with more items
+            // than fit in max-h-72 was previously just silently clipped —
+            // the extra items existed in the DOM but had no way to be
+            // scrolled to or clicked, reading as "missing" items rather
+            // than a cut-off list (real reported bug, e.g. OpenInAppMenu
+            // with many installed apps, or a sound picker with a long
+            // library).
+            'flex max-h-72 w-64 flex-col overflow-y-auto rounded-xl border p-1',
             className,
           )}
-          style={{ boxShadow: 'var(--shadow-panel)' }}
+          style={{
+            // A menu floats one step above whatever opened it, so it takes
+            // `surface-overlay` and the matching overlay shadow — the
+            // heavier modal shadow it used before belongs to dialogs.
+            background: 'var(--surface-overlay)',
+            borderColor: 'var(--border-hairline)',
+            boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-overlay)',
+            zIndex: zIndex.dropdown,
+          }}
         >
           {children}
         </motion.div>
@@ -52,10 +68,64 @@ export function DropdownMenuItem({
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        'text-text-secondary hover:text-text-primary data-highlighted:bg-glass-hover data-highlighted:text-text-primary flex min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] outline-none transition-colors duration-150',
+        'text-text-secondary hover:text-text-primary data-highlighted:bg-(--surface-raised) data-highlighted:text-text-primary flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-100',
         className,
       )}
       {...props}
     />
+  )
+}
+
+/**
+ * Nested submenu (e.g. right-click item → "Open with" → app list). Same
+ * restyle approach as the top-level menu: Radix owns positioning/hover
+ * intent, Framer Motion owns enter/exit.
+ */
+export const DropdownMenuSub = DropdownMenuPrimitive.Sub
+
+export function DropdownMenuSubTrigger({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger>) {
+  return (
+    <DropdownMenuPrimitive.SubTrigger
+      className={cn(
+        'text-text-secondary hover:text-text-primary data-highlighted:bg-(--surface-raised) data-highlighted:text-text-primary data-[state=open]:bg-(--surface-raised) flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-100',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+export function DropdownMenuSubContent({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.SubContent asChild sideOffset={4} alignOffset={-4} {...props}>
+        <motion.div
+          initial={{ opacity: 0, x: -4, scale: 0.97 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: -4, scale: 0.97 }}
+          transition={spring.standard}
+          data-overlay-scroll
+          className={cn(
+            'flex max-h-72 w-56 flex-col overflow-y-auto rounded-xl border p-1',
+            className,
+          )}
+          style={{
+            background: 'var(--surface-overlay)',
+            borderColor: 'var(--border-hairline)',
+            boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-overlay)',
+            zIndex: zIndex.dropdown,
+          }}
+        >
+          {children}
+        </motion.div>
+      </DropdownMenuPrimitive.SubContent>
+    </DropdownMenuPrimitive.Portal>
   )
 }

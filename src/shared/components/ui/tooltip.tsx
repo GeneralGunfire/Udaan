@@ -1,7 +1,7 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { duration } from '@/shared/lib/motion'
+import { duration, zIndex } from '@/shared/lib/motion'
 
 /**
  * Thin restyle of Radix's tooltip onto the app's glass tokens. Radix owns
@@ -34,9 +34,17 @@ export function Tooltip({
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: duration.instant }}
             className={cn(
-              'glass-surface border-glass-border text-text-primary z-50 rounded-md border px-2 py-1 text-[11px] font-medium',
+              'text-text-primary rounded-md border px-2 py-1 text-2xs font-medium',
             )}
-            style={{ boxShadow: 'var(--shadow-panel)' }}
+            style={{
+              // A tooltip is the topmost transient layer, so it takes the
+              // lightest surface step — it should read as sitting above
+              // even an open dialog, not level with it.
+              background: 'var(--surface-overlay)',
+              borderColor: 'var(--border-hairline)',
+              boxShadow: 'var(--shadow-overlay)',
+              zIndex: zIndex.tooltip,
+            }}
           >
             {content}
           </motion.div>

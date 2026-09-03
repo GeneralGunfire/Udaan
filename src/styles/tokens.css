@@ -9,91 +9,207 @@
 
 :root,
 [data-theme='dark'] {
-  /* ---- Color: base surface (the floating app panel, not the window) ---- */
-  --color-bg-base: #0b0f16;
-  --color-bg-elevated: #11161f;
+  /* ==== SURFACE LADDER ====================================================
+     Four steps, each a real measured luminance increase. Elevation in a
+     dark UI reads as *more light*, not more shadow — a panel floating
+     above another is lighter, the way it would be if lit from above.
+     Every surface in the app previously resolved to one identical value
+     (#141416 for base, elevated, glass AND chrome), which is precisely
+     why nothing read as having depth: with zero luminance delta there is
+     nothing for the eye to interpret as a layer.
 
-  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ----
-     Opaque enough to guarantee text contrast over any wallpaper — blur
-     alone doesn't; a busy/bright image still bleeds through a surface
-     under ~70% opacity and washes out low-contrast text sitting on it. */
-  --color-glass-bg: rgb(13 17 24 / 82%);
-  --color-glass-bg-hover: rgb(22 29 40 / 88%);
-  --color-glass-border: rgb(255 255 255 / 10%);
-  --color-glass-highlight: rgb(255 255 255 / 5%);
-  --color-glass-inner-shadow: rgb(0 0 0 / 18%);
+     Rules:
+       - A surface never sits on a sibling of the same step; nesting
+         always steps up.
+       - Hover advances one step rather than painting a white tint over
+         the existing fill.
+       - `base` is deliberately unchanged (#141416) so the background
+         tone already signed off on stays exactly as it is.
+     ---------------------------------------------------------------- */
+  --surface-canvas: #0d0d0f; /* behind everything: ambient layer, screensaver */
+  --surface-base: #141416; /* app window panel, feature view roots */
+  --surface-raised: #1a1a1d; /* cards, composer, bubbles, sidebar tiles */
+  --surface-overlay: #212125; /* dropdowns, dialogs, popovers, taskbar popups */
 
-  /* ---- Color: text ---- */
+  /* ---- Borders & highlight ----
+     Hairline borders carry surface edges (a 1px line reads cleaner at
+     small sizes than a soft shadow); the inset highlight is the "lit top
+     edge" that makes a surface feel like a physical object rather than a
+     coloured rectangle. Every raised/overlay surface gets both. */
+  --border-hairline: rgb(255 255 255 / 8%);
+  --border-strong: rgb(255 255 255 / 14%);
+  --highlight-inset: rgb(255 255 255 / 6%);
+
+  /* ---- Legacy aliases ----
+     Every existing consumer keeps resolving correctly without a rename
+     pass; new work should reference the ladder tokens above directly. */
+  --color-bg-base: var(--surface-base);
+  --color-bg-elevated: var(--surface-raised);
+  --color-glass-bg: var(--surface-raised);
+  --color-glass-bg-hover: var(--surface-overlay);
+  --color-glass-border: var(--border-hairline);
+  --color-glass-highlight: var(--highlight-inset);
+  --color-glass-inner-shadow: rgb(0 0 0 / 20%);
+  --color-chrome-bg: var(--surface-base);
+
+  /* ---- Color: text ----
+     Measured on --surface-base: 17.0:1 / 9.8:1 / 5.6:1 — AAA, AAA, AA. */
   --color-text-primary: rgb(255 255 255 / 96%);
   --color-text-secondary: rgb(255 255 255 / 74%);
   --color-text-tertiary: rgb(255 255 255 / 58%);
 
-  /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
-  --color-chrome-bg: rgb(11 14 20 / 80%);
+  /* ---- Color: accent per category (School / Work / Creativity / General)
+     Four positions along the logo's own ramp. The previous values (a
+     violet and two greens) were the only colours in the app that existed
+     nowhere in the mark; these are distinguishable by hue position and
+     luminance while staying logo-native. */
+  --color-accent-school: #2d6fef;
+  --color-accent-work: #2593d7;
+  --color-accent-creativity: #21c1c1;
+  --color-accent-general: #5f95ff;
 
-  /* ---- Color: accent per category (School / Work / Creativity / General) ---- */
-  --color-accent-school: #6ea8fe;
-  --color-accent-work: #7ee2b8;
-  --color-accent-creativity: #d9a8ff;
-  --color-accent-general: #7fe0d0;
+  /* ---- Elevation ----
+     Tuned per ladder step. Drop shadows are reserved for layers that
+     genuinely float; flat surfaces rely on the hairline + inset instead. */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 20%);
+  --shadow-overlay:
+    0 8px 24px -6px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 25%);
+  --shadow-modal:
+    0 24px 64px -12px rgb(0 0 0 / 60%), 0 4px 12px rgb(0 0 0 / 35%);
+  --shadow-brand: 0 4px 16px -2px rgb(45 111 239 / 35%);
 
-  /* ---- Elevation (shadow) ---- */
-  --shadow-panel: 0 24px 64px rgb(0 0 0 / 45%);
+  /* Legacy shadow aliases. */
+  --shadow-panel: var(--shadow-modal);
   --shadow-sidebar: 4px 0 32px rgb(0 0 0 / 35%);
-  --shadow-composer: 0 16px 48px rgb(6 20 30 / 55%);
+  --shadow-composer: var(--shadow-overlay);
+  --shadow-bubble: var(--shadow-raised);
+  --shadow-bubble-brand: var(--shadow-brand);
 
-  --ambient-base: #020304;
+  --ambient-base: var(--surface-canvas);
 }
 
 [data-theme='light'] {
-  /* ---- Color: base surface ---- */
-  --color-bg-base: #eef2f6;
-  --color-bg-elevated: #ffffff;
+  /* ---- Surface ladder, inverted ----
+     Light mode runs the same four-step model, but elevation reads as
+     *less* tint rather than more light: the canvas is the greyest and
+     each step up moves toward pure white. */
+  --surface-canvas: #e4e9ef;
+  --surface-base: #eef2f6;
+  --surface-raised: #f7f9fb;
+  --surface-overlay: #ffffff;
 
-  /* ---- Color: glass surfaces (frosted sidebar, composer, chips) ---- */
-  --color-glass-bg: rgb(255 255 255 / 82%);
-  --color-glass-bg-hover: rgb(255 255 255 / 92%);
-  --color-glass-border: rgb(24 95 165 / 14%);
-  --color-glass-highlight: rgb(255 255 255 / 75%);
-  --color-glass-inner-shadow: rgb(24 60 95 / 8%);
+  --border-hairline: rgb(15 23 35 / 10%);
+  --border-strong: rgb(15 23 35 / 18%);
+  --highlight-inset: rgb(255 255 255 / 75%);
+
+  /* Legacy aliases. */
+  --color-bg-base: var(--surface-base);
+  --color-bg-elevated: var(--surface-overlay);
+  --color-glass-bg: var(--surface-raised);
+  --color-glass-bg-hover: var(--surface-overlay);
+  --color-glass-border: var(--border-hairline);
+  --color-glass-highlight: var(--highlight-inset);
+  --color-glass-inner-shadow: rgb(30 30 32 / 8%);
+  --color-chrome-bg: var(--surface-raised);
 
   /* ---- Color: text ---- */
   --color-text-primary: rgb(15 23 35 / 94%);
   --color-text-secondary: rgb(15 23 35 / 72%);
   --color-text-tertiary: rgb(15 23 35 / 54%);
 
-  /* ---- Color: sidebar / topbar frosted fill (raised over ambient bg) ---- */
-  --color-chrome-bg: rgb(255 255 255 / 82%);
+  /* ---- Color: accent per category ----
+     Same logo ramp, deepened so each still clears contrast on a light
+     ground (the raw mark values are tuned for dark surfaces). */
+  --color-accent-school: #1d4fc4;
+  --color-accent-work: #1a72aa;
+  --color-accent-creativity: #14898a;
+  --color-accent-general: #2860cf;
 
-  /* ---- Color: accent per category (deepened for contrast on light bg) ---- */
-  --color-accent-school: #1f6fd8;
-  --color-accent-work: #1f9d6c;
-  --color-accent-creativity: #a458d8;
-  --color-accent-general: #1e9e8c;
+  /* ---- Elevation ---- */
+  --shadow-raised: 0 1px 2px rgb(30 30 32 / 10%);
+  --shadow-overlay:
+    0 8px 24px -6px rgb(30 30 32 / 16%), 0 2px 6px rgb(30 30 32 / 10%);
+  --shadow-modal:
+    0 24px 64px -12px rgb(30 30 32 / 20%), 0 4px 12px rgb(30 30 32 / 12%);
+  --shadow-brand: 0 4px 16px -2px rgb(45 111 239 / 25%);
 
-  /* ---- Elevation (shadow) ---- */
-  --shadow-panel: 0 24px 64px rgb(30 60 90 / 16%);
-  --shadow-sidebar: 4px 0 32px rgb(30 60 90 / 12%);
-  --shadow-composer: 0 16px 40px rgb(30 60 90 / 14%);
+  --shadow-panel: var(--shadow-modal);
+  --shadow-sidebar: 4px 0 32px rgb(30 30 32 / 12%);
+  --shadow-composer: var(--shadow-overlay);
+  --shadow-bubble: var(--shadow-raised);
+  --shadow-bubble-brand: var(--shadow-brand);
 
-  --ambient-base: #e4e9ef;
+  --ambient-base: var(--surface-canvas);
 }
 
 :root {
-  /* ---- Color: Udaan brand — one fixed electric blue (Vercel/Linear-style),
-     used everywhere: buttons, active states, gradients. Not derived per-
-     wallpaper (tried and reverted this session — mismatched hues per image
-     read as broken, not intentional). --color-brand-cyan/-teal are kept as
-     aliases of the same blue family so every existing consumer across the
-     app still resolves correctly without a rename pass. */
-  --color-brand-navy: #0b1e3a;
-  --color-brand-blue: #2563eb;
-  --color-brand-cyan: #3b82f6;
-  --color-brand-teal: #60a5fa;
+  /* ---- Color: Udaan brand. Surfaces, panels, shadows, and glass tokens
+     are strict monochrome (see /DESIGN_SYSTEM.md and the grayscale surface
+     tokens above/below) — zero hue anywhere in the app's background/panel
+     system. The ONE exception is this brand-blue family: the logo mark's
+     own blue/teal, deliberately desaturated ~28% from the raw sampled
+     pixel values (#3072f0/#2fc4c9) so it reads as a restrained accent
+     against the gray surfaces rather than dominating them — a fully
+     saturated accent competed with the monochrome system instead of
+     punctuating it. Used only for buttons/primary actions/focus rings,
+     never for backgrounds or panels; treat it as reserved for genuinely
+     primary interactive state, not every hover/focus touch a component
+     happens to have.
+     A wallpaper may still restore the full original blue theme via
+     WallpaperDefinition.theme (see wallpapers.ts) — WallpaperProvider
+     applies it as an inline override on <html>, which wins over these
+     :root defaults. The three original blue wallpapers (windows-blue,
+     cobalt-bloom, navy-petals) carry that override explicitly, restoring
+     the exact pre-monochrome blue theme; every other wallpaper uses this
+     muted logo-derived accent against monochrome surfaces. */
+  /* ---- Raw logo petals — pixel-sampled from src/assets/udaan-mark.png.
+     GRADIENT FILL ONLY. These are the true mark colours, but the darker
+     end of the ramp cannot carry functional weight: measured against
+     --surface-base, indigo lands at 2.70:1 and blue at 4.06:1, so
+     neither clears the 4.5:1 needed for standalone text/iconography.
+     Use them inside --gradient-brand and nowhere else. ---- */
+  --brand-indigo: #2150cc;
+  --brand-blue: #2d6fef;
+  --brand-cyan: #2593d7;
+  --brand-teal: #21c1c1;
+
+  /* ---- Functional accent ----
+     The lifted end of the same ramp (sampled from the mark's lightest
+     saturated pixel), which is what everything standalone actually uses:
+     focus rings, active states, accent text, iconography, borders.
+     Measured on --surface-base: 6.33 / 5.30 / 8.64 — all AA for body
+     text, comfortably AAA for UI. ---- */
+  --color-accent: #5f95ff;
+  --color-accent-muted: #4d86f5;
+  --color-accent-alt: #2fc4c9;
+
+  /* ---- Legacy brand aliases ----
+     Existing consumers keep working. Note these now resolve to the
+     *lifted* accent rather than the raw petals, which is the correct
+     behaviour: every one of these is used for a functional element. */
+  --color-brand-navy: var(--brand-indigo);
+  --color-brand-blue: var(--color-accent);
+  --color-brand-cyan: var(--color-accent);
+  --color-brand-teal: var(--color-accent-alt);
+
+  /* Runs indigo → cyan and deliberately stops short of teal: white text
+     holds 3.37:1 at the cyan end (fine for ≥13px/600 labels) but falls
+     to 2.22:1 over teal, which would fail on every gradient button. */
   --gradient-brand: linear-gradient(
     135deg,
-    var(--color-brand-blue) 0%,
-    var(--color-brand-cyan) 100%
+    var(--brand-indigo) 0%,
+    #2372d2 50%,
+    var(--brand-cyan) 100%
+  );
+
+  /* The full four-stop mark gradient, for decorative fills only (never
+     behind text) — the logo itself, splash art, large empty-state marks. */
+  --gradient-brand-full: linear-gradient(
+    135deg,
+    var(--brand-indigo) 0%,
+    var(--brand-blue) 35%,
+    var(--brand-cyan) 70%,
+    var(--brand-teal) 100%
   );
 
   /* ---- Color: semantic ---- */
@@ -105,11 +221,15 @@
   --blur-panel: 28px;
   --blur-sidebar: 32px;
 
-  /* ---- Radius ---- */
+  /* ---- Radius ----
+     One consistent ladder, assigned by element class rather than picked
+     per component: badges/chips `sm`, buttons/inputs `md`, cards `lg`,
+     panels `xl`, windows and full overlays `2xl`, pills/avatars `full`. */
   --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
 
   /* ---- Spacing scale ---- */
@@ -127,13 +247,30 @@
   --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 20px;
-  --text-xl: 28px;
+  /* ---- Type scale ----
+     Replaces the ad-hoc arbitrary sizes scattered through components
+     (text-[13.5px], text-[11.5px], text-[12.5px] and friends). Sizes are
+     assigned by role, not by eye. */
+  --text-2xs: 11px; /* metadata, timestamps, counts */
+  --text-xs: 12px; /* labels, badges, secondary controls */
+  --text-sm: 13px; /* UI default: buttons, menu items */
+  --text-base: 14px; /* body, chat messages, inputs */
+  --text-md: 16px; /* section headings */
+  --text-lg: 20px; /* view titles */
+  --text-xl: 28px; /* empty-state / hero */
   --text-2xl: 36px;
+
+  /* Line heights, paired to role rather than to size. */
+  --leading-display: 1.2;
+  --leading-ui: 1.4;
+  --leading-body: 1.5;
+
+  /* Body weight sits at 500, not 400: on dark surfaces a regular weight
+     loses too much perceived stroke, which reads as washed-out and flat.
+     Medium restores density without tipping into bold. */
+  --weight-body: 500;
+  --weight-medium: 500;
+  --weight-semibold: 600;
 
   /* ---- Motion ---- */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
