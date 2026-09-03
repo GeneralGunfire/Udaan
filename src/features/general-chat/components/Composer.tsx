@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import udaanMark from '@/assets/udaan-mark.png'
-import {
-  SendIcon,
-  MicIcon,
-  StopIcon,
-  PlayIcon,
-  PlusIcon,
-  ChevronRightIcon,
-  WindowCloseIcon,
-} from '@/shared/icons'
+import { SendIcon, StopIcon, PlusIcon, ChevronRightIcon, WindowCloseIcon, TrashIcon, NewspaperIcon, ChatBubbleIcon } from '@/shared/icons'
+import { openNewsBrief } from '@/app/apps'
 import { Button } from '@/shared/components/ui/button'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -19,15 +13,14 @@ import {
 } from '@/shared/components/ui/dropdown-menu'
 import { Tooltip, TooltipProvider } from '@/shared/components/ui/tooltip'
 import { spring, duration, prefersReducedMotion } from '@/shared/lib/motion'
-import { useWallpaper } from '@/shared/hooks/useWallpaper'
-import { getWallpaper } from '@/app/wallpapers'
 import { MODES, type ModeId } from './modes'
 import { ChatMessage } from './ChatMessage'
 import { ChatCommandPalette } from './ChatCommandPalette'
+import { WorkspacePanel } from './WorkspacePanel'
 import { useGeneralChat } from '../hooks/useGeneralChat'
-import { useMicTranscription } from '../hooks/useMicTranscription'
 import { useStickyScroll } from '../hooks/useStickyScroll'
-import { useOllamaControl } from '../hooks/useOllamaControl'
+import { useOmniRouteControl } from '../hooks/useOmniRouteControl'
+import { DaemonStatusControl } from './DaemonStatusControl'
 
 /**
  * Home composer. Arc/Raycast-style rounded-rect surface with a single
@@ -52,13 +45,13 @@ import { useOllamaControl } from '../hooks/useOllamaControl'
  * bottom and never moves as history grows. New messages auto-scroll the
  * list to bottom only while the user is already at (or near) the bottom.
  *
- * Local and Claude are separate conversation spaces (own session list,
- * own history) — switching the mode control switches which space you're
- * in, it never merges the two.
+ * General Chat talks to OmniRoute exclusively — the local Ollama-backed
+ * mode (and voice input, which ran through the same local runtime) was
+ * removed.
  */
 export function Composer() {
   const [value, setValue] = useState('')
-  const [activeMode, setActiveMode] = useState<ModeId>('local')
+  const [mode] = useState<ModeId>('omniroute')
   const [sessionListOpen, setSessionListOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const {
@@ -72,10 +65,10 @@ export function Composer() {
     newChat,
     switchSession,
     closeSession,
-  } = useGeneralChat(activeMode)
-  const mic = useMicTranscription()
-  const ollama = useOllamaControl()
-  const { containerRef, handleScroll } = useStickyScroll(messages)
+  } = useGeneralChat(mode)
+  const omniroute = useOmniRouteControl()
+  const [omniRouteDialogOpen, setOmniRouteDialogOpen] = useState(false)
+  const { containerRef, handleScroll } = useStickyScroll(messages, sessionId)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const MAX_TEXTAREA_HEIGHT = 192
@@ -93,19 +86,6 @@ export function Composer() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
-  async function handleMicClick() {
-    if (mic.recording) {
-      const text = await mic.stop()
-      if (text) setValue((v) => (v ? `${v} ${text}` : text))
-    } else {
-      try {
-        await mic.start()
-      } catch {
-        // useMicTranscription already set a user-visible error message.
-      }
-    }
-  }
-
   function handleNewChat() {
     newChat()
     setSessionListOpen(false)
@@ -118,12 +98,6 @@ export function Composer() {
 
   const isEmpty = !loadingHistory && messages.length === 0
   const reduced = prefersReducedMotion()
-  const { wallpaperId } = useWallpaper()
-  // Lighter wallpapers need a stronger localized veil to keep text/controls
-  // readable; darker ones need barely any — avoids a fixed-opacity overlay
-  // that either washes out on light art or looks unnecessarily heavy on
-  // dark art. Uses the wallpaper's own declared `mood`, not image analysis.
-  const veilStrength = getWallpaper(wallpaperId).mood === 'light' ? 1 : 0.55
 
   // Cmd/Ctrl+K opens the chat command palette from anywhere on this page —
   // the keyboard-first entry point the brief asks for, scoped to what
@@ -152,10 +126,8 @@ export function Composer() {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         sessions={sessions}
-        activeMode={activeMode}
         onNewChat={handleNewChat}
         onSwitchSession={handleSwitchSession}
-        onSwitchMode={setActiveMode}
         onFocusComposer={() => textareaRef.current?.focus()}
       />
 
@@ -169,53 +141,27 @@ export function Composer() {
             transition={reduced ? { duration: duration.instant } : spring.emphasis}
             className="relative mb-8 flex shrink-0 flex-col items-center gap-6 px-1"
           >
-            {/* Localized atmospheric contrast layer — a soft dark veil
-                sized to just this content block (logo + tagline + hint),
-                not a card and not the full panel. Tighter and stronger
-                than the first pass: that version (32%/14% radial +
-                text-shadow alone) still lost the tagline against a light
-                wallpaper — near-white-at-74%-opacity text has very little
-                margin to begin with, so the veil needs to do real work,
-                not just a hint of one. Strength still scales off the
-                wallpaper's own `mood` field. */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-[-18%] inset-y-[-22%] -z-10 transition-opacity duration-500"
-              style={{
-                opacity: veilStrength,
-                background:
-                  'radial-gradient(ellipse 60% 62% at 50% 42%, rgb(2 5 10 / 58%) 0%, rgb(2 5 10 / 30%) 50%, transparent 78%)',
-              }}
-            />
-
+            {/* The dark radial veil that used to sit here existed to keep
+                this text readable over a bright photographic wallpaper —
+                the panel's own flat gray background now provides that
+                contrast on its own, so the veil (and the heavy per-line
+                text-shadows/drop-shadows compensating for it) has been
+                removed entirely rather than tuned down; it was reading as
+                a literal dark smudge against the new flat surface. */}
             <div className="flex flex-col items-center gap-2.5 text-center">
-              <img
-                src={udaanMark}
-                alt=""
-                className="h-12 w-12 object-contain"
-                style={{ filter: 'drop-shadow(0 2px 12px rgb(0 0 0 / 75%))' }}
-              />
+              <img src={udaanMark} alt="" className="h-12 w-12 object-contain" />
               <div>
-                <div
-                  className="font-display text-[24px] font-semibold text-white"
-                  style={{ textShadow: '0 1px 3px rgb(0 0 0 / 90%), 0 2px 14px rgb(0 0 0 / 65%)' }}
-                >
-                  Udaan
-                </div>
-                <div
-                  className="font-display text-[14.5px] text-white/85"
-                  style={{ textShadow: '0 1px 3px rgb(0 0 0 / 85%), 0 2px 12px rgb(0 0 0 / 60%)' }}
-                >
-                  Your ideas, set in motion
-                </div>
+                <div className="font-display text-text-primary text-xl font-semibold">Udaan</div>
+                <div className="font-display text-text-secondary text-md">Your ideas, set in motion</div>
               </div>
             </div>
 
-            <div
-              className="flex items-center gap-1.5 text-[11.5px] text-white/70"
-              style={{ textShadow: '0 1px 3px rgb(0 0 0 / 80%)' }}
-            >
-              <kbd className="rounded border border-white/25 bg-black/20 px-1.5 py-0.5 font-mono text-[10.5px] text-white/85">
+            {/* Text shadows here were compensating for a photographic
+                wallpaper behind this text; on the flat panel surface they
+                only muddied it. The kbd now uses the surface ladder like
+                every other small chip in the app. */}
+            <div className="text-text-tertiary flex items-center gap-1.5 text-2xs">
+              <kbd className="rounded-sm border border-(--border-hairline) bg-(--surface-overlay) px-1.5 py-0.5 font-mono text-2xs text-text-secondary">
                 {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K
               </kbd>
               <span>for commands</span>
@@ -228,35 +174,60 @@ export function Composer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: duration.standard }}
-            ref={containerRef}
-            onScroll={handleScroll}
-            className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto px-1 pb-3"
+            className="flex min-h-0 flex-1 flex-col"
           >
-            {loadingHistory ? (
-              <div className="text-text-tertiary flex flex-1 items-center justify-center text-[13px]">
-                Loading history…
-              </div>
-            ) : (
-              messages.map((m) => <ChatMessage key={m.id} message={m} />)
-            )}
+            <WorkspacePanel />
+            <div
+              ref={containerRef}
+              onScroll={handleScroll}
+              className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto px-1 pb-3"
+            >
+              {loadingHistory ? (
+                // Shaped like the conversation that's about to land —
+                // alternating sides at bubble proportions — so the view
+                // settles into its final layout immediately instead of
+                // jumping when the real messages arrive.
+                <div className="flex flex-col gap-3 pb-2" role="status" aria-label="Loading conversation">
+                  {[
+                    { side: 'end', w: '45%', h: 38 },
+                    { side: 'start', w: '70%', h: 64 },
+                    { side: 'end', w: '35%', h: 38 },
+                    { side: 'start', w: '60%', h: 52 },
+                  ].map((row, i) => (
+                    <div key={i} className={`flex ${row.side === 'end' ? 'justify-end' : 'justify-start'}`}>
+                      <Skeleton
+                        className="rounded-lg"
+                        style={{ width: row.w, height: row.h }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                messages.map((m) => <ChatMessage key={m.id} message={m} />)
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {(mic.error || ollama.error) && (
+        {omniroute.error && (
           <motion.div
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, height: 0 }}
             transition={spring.standard}
-            className="mb-2 flex shrink-0 items-center justify-between gap-2 overflow-hidden rounded-xl border border-red-500/25 px-3 py-2 text-[12px] text-red-400 backdrop-blur-md"
-            style={{ background: 'color-mix(in srgb, var(--color-bg-elevated) 75%, rgb(239 68 68 / 15%))' }}
+            className="mb-2 flex shrink-0 items-center justify-between gap-2 overflow-hidden rounded-lg border px-3 py-2 text-xs"
+            style={{
+              background: 'color-mix(in srgb, var(--color-danger) 14%, var(--surface-raised))',
+              borderColor: 'color-mix(in srgb, var(--color-danger) 25%, transparent)',
+              color: 'var(--color-danger)',
+            }}
           >
-            <span>{mic.error || ollama.error}</span>
+            <span>{omniroute.error}</span>
             <Button
               type="button"
-              onClick={mic.error ? mic.clearError : ollama.clearError}
+              onClick={omniroute.clearError}
               aria-label="Dismiss"
               variant="ghost"
               size="icon-sm"
@@ -268,16 +239,24 @@ export function Composer() {
         )}
       </AnimatePresence>
 
+      {/* Focus state is a real elevation lift (brighter border, deeper
+          shadow, tiny scale) rather than a thin cyan outline ring — the
+          composer is the single most-used control on this screen, so
+          "you're typing here" should read as the surface itself coming
+          forward, not a generic focus-ring afterthought. Plain CSS
+          transitions (not Framer) since this is a pure :focus-within
+          state with no orchestration needs. */}
       <div
-        className="focus-within:ring-brand-cyan/40 focus-within:border-glass-border relative w-full shrink-0 rounded-2xl border p-3.5 backdrop-blur-md transition-colors duration-200 focus-within:ring-2"
+        className="composer-surface relative w-full shrink-0 rounded-xl border p-3.5 transition-[border-color,box-shadow,transform] duration-200 ease-out"
         style={{
-          borderColor: 'var(--color-glass-border)',
-          background: 'color-mix(in srgb, var(--color-bg-elevated) 74%, transparent)',
+          borderColor: 'var(--border-hairline)',
+          background: 'var(--surface-raised)',
         }}
       >
         <textarea
           ref={textareaRef}
           value={value}
+          disabled={responding}
           onChange={(e) => {
             setValue(e.target.value)
             autoGrow(e.target)
@@ -288,128 +267,73 @@ export function Composer() {
               handleSubmit()
             }
           }}
-          placeholder={
-            mic.transcribing ? 'Transcribing…' : 'Type something to build…'
-          }
-          disabled={mic.transcribing}
+          placeholder="What's on your mind?"
           rows={3}
-          className="text-text-primary placeholder:text-text-tertiary max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-[14px] leading-relaxed outline-none disabled:opacity-50"
+          className="text-text-primary placeholder:text-text-tertiary max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent text-base leading-relaxed outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         <div className="mt-2.5 flex items-center justify-between border-t border-white/6 pt-2.5">
           <div className="flex items-center gap-1.5">
-            <div
-              className="flex items-center gap-0.5 rounded-xl border p-0.5"
-              style={{ borderColor: 'var(--color-glass-border)' }}
-            >
-              {MODES.map((mode) => {
-                const isActive = mode.id === activeMode
-                return (
-                  <Button
-                    key={mode.id}
-                    type="button"
-                    variant="ghost"
-                    size="pill"
-                    onClick={() => {
-                      if (mode.id === activeMode) return
-                      setActiveMode(mode.id)
-                      setSessionListOpen(false)
-                      // Local and Claude are separate conversation spaces —
-                      // an unsent draft typed in one shouldn't silently
-                      // carry over into the other; switching mode should
-                      // feel like switching to a fresh input, not leaving
-                      // stale text sitting there unexplained.
-                      setValue('')
-                      if (textareaRef.current) textareaRef.current.style.height = 'auto'
-                    }}
-                    className={`relative rounded-lg px-2.5 py-1 ${isActive ? 'hover:bg-transparent' : 'hover:bg-white/8'}`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="composer-mode-pill"
-                        transition={spring.standard}
-                        className="absolute inset-0 rounded-lg bg-white/12"
-                      />
-                    )}
-                    <span
-                      className={`relative text-[12px] font-medium transition-colors duration-150 ${isActive ? 'text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
-                    >
-                      {mode.label}
-                    </span>
-                  </Button>
-                )
-              })}
-            </div>
+            {/* Not interactive — there's only ever one mode today — so it's
+                styled as a quiet badge (no border, tinted background)
+                rather than a bordered pill that visually competes with
+                the genuinely clickable DaemonStatusControl beside it. */}
+            <span className="text-text-tertiary bg-white/5 flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-medium">
+              {MODES[0].label}
+            </span>
+            <DaemonStatusControl
+              daemonLabel="OmniRoute"
+              startCommandLabel="omniroute serve --daemon --no-open"
+              historyDescription="OmniRoute runtime & chat history"
+              control={omniroute}
+              open={omniRouteDialogOpen}
+              onOpenChange={setOmniRouteDialogOpen}
+              sessions={sessions}
+              activeSessionId={sessionId}
+              onSwitchSession={handleSwitchSession}
+              onCloseSession={closeSession}
+              onNewChat={handleNewChat}
+            />
 
-            <AnimatePresence>
-              {activeMode === 'local' && (
-                <motion.div
-                  initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-                  transition={spring.micro}
-                >
-                  <Tooltip
-                    content={
-                      ollama.pending
-                        ? ollama.running
-                          ? 'Stopping Ollama…'
-                          : 'Starting Ollama…'
-                        : ollama.running
-                          ? ollama.startedByApp
-                            ? 'Stop Ollama'
-                            : 'Ollama is running (started outside Udaan)'
-                          : 'Start Ollama'
-                    }
-                  >
-                    <Button
-                      type="button"
-                      aria-label={ollama.running ? 'Stop Ollama' : 'Start Ollama'}
-                      variant="ghost"
-                      size="pill-sm"
-                      disabled={ollama.pending || (ollama.running && !ollama.startedByApp)}
-                      onClick={() => (ollama.running ? ollama.stop() : ollama.start())}
-                      className="gap-1.5 rounded-lg"
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-200 ${
-                          ollama.running ? 'bg-emerald-400' : 'bg-text-tertiary/50'
-                        } ${ollama.pending ? 'animate-pulse' : ''}`}
-                      />
-                      <span className="text-[12px]">
-                        {ollama.running ? 'Ollama' : 'Start Ollama'}
-                      </span>
-                      {ollama.running && ollama.startedByApp && (
-                        <StopIcon width={9} height={9} className="text-text-tertiary" />
-                      )}
-                      {!ollama.running && <PlayIcon width={9} height={9} className="text-text-tertiary" />}
-                    </Button>
-                  </Tooltip>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-white/10" />
+
+            <Tooltip content="Daily news brief">
+              <Button
+                type="button"
+                aria-label="Open daily news brief"
+                onClick={openNewsBrief}
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-lg"
+              >
+                <NewspaperIcon width={14} height={14} />
+              </Button>
+            </Tooltip>
 
             <DropdownMenu
               open={sessionListOpen}
               onOpenChange={setSessionListOpen}
             >
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  aria-label="Chat history"
-                  variant="ghost"
-                  size="pill-sm"
-                  className="rounded-lg"
-                >
-                  <span className="text-[12px]">{sessions.length}</span>
-                  <motion.span
-                    animate={{ rotate: sessionListOpen ? 90 : 0 }}
-                    transition={spring.micro}
-                    className="flex"
+              <Tooltip content="Chat history">
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    aria-label="Chat history"
+                    variant="ghost"
+                    size="pill-sm"
+                    className="rounded-lg"
                   >
-                    <ChevronRightIcon width={10} height={10} />
-                  </motion.span>
-                </Button>
-              </DropdownMenuTrigger>
+                    <ChatBubbleIcon width={12} height={12} />
+                    <span className="text-xs">{sessions.length}</span>
+                    <motion.span
+                      animate={{ rotate: sessionListOpen ? 90 : 0 }}
+                      transition={spring.micro}
+                      className="flex"
+                    >
+                      <ChevronRightIcon width={10} height={10} />
+                    </motion.span>
+                  </Button>
+                </DropdownMenuTrigger>
+              </Tooltip>
 
               <DropdownMenuContent
                 side="top"
@@ -418,27 +342,32 @@ export function Composer() {
               >
                 <DropdownMenuItem
                   onSelect={handleNewChat}
-                  className="text-text-primary rounded-none border-b border-white/6 px-3 py-2.5 text-[12.5px] font-medium"
+                  className="text-text-primary rounded-none border-b border-white/6 px-3 py-2.5 text-sm font-medium"
                 >
                   <PlusIcon width={13} height={13} />
                   New chat
                 </DropdownMenuItem>
                 <div className="flex flex-col overflow-y-auto">
                   {sessions.length === 0 ? (
-                    <div className="text-text-tertiary px-3 py-3 text-[12px]">
+                    <div className="text-text-tertiary px-3 py-3 text-xs">
                       No conversations yet.
                     </div>
                   ) : (
                     sessions.map((s) => (
                       <div
                         key={s.id}
-                        className={`group flex items-center gap-1 px-1.5 py-1 ${
-                          s.id === sessionId ? 'bg-white/5' : ''
-                        }`}
+                        className="group relative flex items-center gap-1 px-1.5 py-1"
                       >
+                        {s.id === sessionId && (
+                          <motion.div
+                            layoutId="active-session-row"
+                            transition={spring.standard}
+                            className="bg-accent/10 absolute inset-0 rounded-lg"
+                          />
+                        )}
                         <DropdownMenuItem
                           onSelect={() => handleSwitchSession(s.id)}
-                          className="min-w-0 flex-1 truncate rounded-lg"
+                          className="hover:bg-accent/8 relative min-w-0 flex-1 truncate rounded-lg transition-colors duration-100"
                         >
                           {s.title || 'Untitled chat'}
                         </DropdownMenuItem>
@@ -451,7 +380,7 @@ export function Composer() {
                             e.stopPropagation()
                             closeSession(s.id)
                           }}
-                          className="rounded-lg opacity-0 group-hover:opacity-100 hover:text-red-400"
+                          className="relative rounded-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 hover:text-red-400"
                         >
                           <WindowCloseIcon width={11} height={11} />
                         </Button>
@@ -464,45 +393,8 @@ export function Composer() {
           </div>
 
           <div className="flex items-center gap-1">
-            <Tooltip
-              content={
-                mic.transcribing
-                  ? 'Transcribing…'
-                  : mic.recording
-                    ? 'Stop recording'
-                    : 'Record voice message'
-              }
-            >
-              <Button
-                type="button"
-                aria-label={
-                  mic.transcribing
-                    ? 'Transcribing'
-                    : mic.recording
-                      ? 'Stop recording'
-                      : 'Record voice message'
-                }
-                onClick={handleMicClick}
-                disabled={mic.transcribing}
-                variant={mic.recording ? 'danger' : 'ghost'}
-                className="rounded-xl"
-              >
-                {mic.transcribing ? (
-                  <motion.span
-                    animate={reduced ? undefined : { rotate: 360 }}
-                    transition={reduced ? undefined : { duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                    className="border-text-tertiary h-3 w-3 rounded-full border-[1.5px] border-t-transparent"
-                  />
-                ) : mic.recording ? (
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
-                ) : (
-                  <MicIcon width={13} height={13} />
-                )}
-              </Button>
-            </Tooltip>
-
             <div className="relative">
-              <AnimatePresence mode="wait" initial={false}>
+              <AnimatePresence mode="popLayout" initial={false}>
                 {responding ? (
                   <motion.div
                     key="stop"
@@ -516,10 +408,11 @@ export function Composer() {
                         type="button"
                         aria-label="Stop response"
                         onClick={stop}
-                        variant="ghost"
-                        className="rounded-xl"
+                        variant="secondary"
+                        size="icon-lg"
+                        className="rounded-lg"
                       >
-                        <StopIcon width={12} height={12} />
+                        <StopIcon width={14} height={14} />
                       </Button>
                     </Tooltip>
                   </motion.div>
@@ -538,9 +431,10 @@ export function Composer() {
                         onClick={() => handleSubmit()}
                         disabled={value.trim().length === 0}
                         variant="brand"
-                        className="rounded-xl disabled:opacity-30"
+                        size="icon-lg"
+                        className="rounded-lg disabled:opacity-30"
                       >
-                        <SendIcon width={12} height={12} />
+                        <SendIcon width={15} height={15} />
                       </Button>
                     </Tooltip>
                   </motion.div>

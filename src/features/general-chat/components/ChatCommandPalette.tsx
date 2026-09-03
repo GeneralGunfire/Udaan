@@ -2,19 +2,16 @@ import { useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring, prefersReducedMotion } from '@/shared/lib/motion'
-import { SearchIcon, PlusIcon, ChatBubbleIcon, SparkleIcon } from '@/shared/icons'
-import { MODES, type ModeId } from './modes'
+import { spring, duration, zIndex, prefersReducedMotion } from '@/shared/lib/motion'
+import { SearchIcon, PlusIcon, ChatBubbleIcon } from '@/shared/icons'
 import type { ChatSession } from '@/integrations/general-chat'
 
 export interface ChatCommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   sessions: ChatSession[]
-  activeMode: ModeId
   onNewChat: () => void
   onSwitchSession: (id: string) => void
-  onSwitchMode: (mode: ModeId) => void
   onFocusComposer: () => void
 }
 
@@ -34,10 +31,8 @@ export function ChatCommandPalette({
   open,
   onOpenChange,
   sessions,
-  activeMode,
   onNewChat,
   onSwitchSession,
-  onSwitchMode,
   onFocusComposer,
 }: ChatCommandPaletteProps) {
   const [search, setSearch] = useState('')
@@ -65,42 +60,46 @@ export function ChatCommandPalette({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: reduced ? 0 : 0.15 }}
+            transition={{ duration: reduced ? 0 : duration.backdrop }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            style={{ zIndex: zIndex.overlay }}
           />
-          <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[18vh]">
+          <div
+            className="fixed inset-0 flex items-start justify-center px-4 pt-[18vh]"
+            style={{ zIndex: zIndex.overlayPanel }}
+          >
             <motion.div
               initial={reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.98 }}
               transition={spring.panel}
               onClick={(e) => e.stopPropagation()}
-              className="glass-surface border-glass-border w-full max-w-lg overflow-hidden rounded-2xl border"
-              style={{ boxShadow: 'var(--shadow-panel)' }}
+              className="w-full max-w-lg overflow-hidden rounded-2xl border border-(--border-hairline)"
+              style={{ background: 'var(--surface-overlay)', boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-modal)' }}
             >
-              <div className="border-glass-border flex items-center gap-2 border-b px-3.5 py-3">
+              <div className="flex items-center gap-2 border-b border-(--border-hairline) px-3.5 py-3">
                 <SearchIcon width={14} height={14} className="text-text-tertiary shrink-0" />
                 <Command.Input
                   ref={inputRef}
                   value={search}
                   onValueChange={setSearch}
                   placeholder="Search commands and chats…"
-                  className="text-text-primary placeholder:text-text-tertiary w-full bg-transparent text-[13.5px] outline-none"
+                  className="text-text-primary placeholder:text-text-tertiary w-full bg-transparent text-base outline-none"
                 />
-                <kbd className="text-text-tertiary border-glass-border shrink-0 rounded-md border px-1.5 py-0.5 text-[10px]">
+                <kbd className="text-text-tertiary border-(--border-hairline) shrink-0 rounded-md border px-1.5 py-0.5 text-2xs">
                   Esc
                 </kbd>
               </div>
 
               <Command.List className="max-h-80 overflow-y-auto p-1.5">
-                <Command.Empty className="text-text-tertiary px-3 py-6 text-center text-[12.5px]">
+                <Command.Empty className="text-text-tertiary px-3 py-6 text-center text-sm">
                   No matching commands.
                 </Command.Empty>
 
                 <Command.Group
                   heading="Actions"
-                  className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
+                  className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
                 >
                   <PaletteItem onSelect={() => run(onNewChat)}>
                     <PlusIcon width={13} height={13} />
@@ -110,18 +109,12 @@ export function ChatCommandPalette({
                     <ChatBubbleIcon width={13} height={13} />
                     Focus composer
                   </PaletteItem>
-                  {MODES.filter((m) => m.id !== activeMode).map((m) => (
-                    <PaletteItem key={m.id} onSelect={() => run(() => onSwitchMode(m.id))}>
-                      <SparkleIcon width={13} height={13} />
-                      Switch to {m.label}
-                    </PaletteItem>
-                  ))}
                 </Command.Group>
 
                 {sessions.length > 0 && (
                   <Command.Group
                     heading="Recent chats"
-                    className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
+                    className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
                   >
                     {sessions.map((s) => (
                       <PaletteItem key={s.id} onSelect={() => run(() => onSwitchSession(s.id))}>
@@ -148,7 +141,7 @@ function PaletteItem({
   return (
     <Command.Item
       className={cn(
-        'text-text-secondary data-[selected=true]:bg-glass-hover data-[selected=true]:text-text-primary flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] outline-none transition-colors duration-100',
+        'text-text-secondary data-[selected=true]:bg-(--surface-raised) data-[selected=true]:text-text-primary flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none transition-colors duration-100',
         className,
       )}
       {...props}
