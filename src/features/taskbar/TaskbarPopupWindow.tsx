@@ -17,6 +17,7 @@ import {
 } from '@/integrations/taskbar/client'
 import { BellIcon, WindowMinimizeIcon } from '@/shared/icons'
 import type { ShowHoverPreviewPayload, ShowTaskbarPopupPayload } from './taskbarPopupTypes'
+import { QuickSettingsPanel } from './QuickSettingsPanel'
 
 /**
  * A dedicated, on-demand Tauri window (see tauri.conf.json's
@@ -223,6 +224,11 @@ function estimateHeight(payload: ShowTaskbarPopupPayload): number {
     }
     case 'notifications-panel':
       return 200 + NOTCH_HEIGHT_CONTRIBUTION
+    case 'quick-settings':
+      // Two toggle tiles (~58) + volume row (~46) + up to three stat rows
+      // (~34 each) + the panel's own gaps/padding. Erring tall for the
+      // same reason the hover-preview estimate does — see above.
+      return 58 + 46 + 3 * 34 + 34 + NOTCH_HEIGHT_CONTRIBUTION
   }
 }
 
@@ -498,6 +504,8 @@ export function TaskbarPopupWindow() {
           >
             {payload.kind === 'hover-preview' ? (
               <HoverPreviewContent payload={payload} onEntryClick={handleEntryClick} onCloseWindow={handleCloseWindow} />
+            ) : payload.kind === 'quick-settings' ? (
+              <QuickSettingsPanel />
             ) : (
               <NotificationsPanelContent />
             )}

@@ -15,13 +15,13 @@ import {
   cursorPosition,
   type OpenWindow,
 } from '@/integrations/taskbar/client'
-import { batteryStatus, sendVolumeCommand, type BatteryStatus } from '@/integrations/quick-settings/client'
+import { batteryStatus, type BatteryStatus } from '@/integrations/quick-settings/client'
 import { getStatus as getRecorderStatus, stopRecording, onRecorderEvent } from '@/integrations/audio-recorder/client'
 import { formatElapsed } from '@/shared/lib/formatElapsed'
 import { TaskbarEntry, TASKBAR_ICON_BUTTON, TASKBAR_ICON_GLYPH, type WindowGroup } from './TaskbarEntry'
 import { TASKBAR_BAR_HEIGHT_PX, TASKBAR_BOTTOM_MARGIN_PX, AUTO_HIDE_TASKBAR_PREF_KEY } from '@/shared/lib/taskbarGeometry'
 import { getTaskbarPref } from '@/integrations/taskbar-prefs/client'
-import type { ShowNotificationsPanelPayload } from './taskbarPopupTypes'
+import type { ShowNotificationsPanelPayload, ShowQuickSettingsPayload } from './taskbarPopupTypes'
 
 const WINDOW_POLL_MS = 700
 const QUICK_SETTINGS_POLL_MS = 10_000
@@ -224,7 +224,9 @@ export function TaskbarWindow() {
   const [recording, setRecording] = useState(false)
   const [recordingElapsed, setRecordingElapsed] = useState(0)
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false)
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const notificationsButtonRef = useRef<HTMLButtonElement>(null)
+  const quickSettingsButtonRef = useRef<HTMLButtonElement>(null)
 
   // Keeps notificationsPanelOpen accurate even when the popup closes some
   // way OTHER than clicking this same button again (mouse moved away, an
@@ -251,7 +253,11 @@ export function TaskbarWindow() {
     })
     listen('taskbar-popup:hidden', () => {
       popupOpenRef.current = false
+      // Both flyout triggers reset here: the popup window can close itself
+      // (click-outside, focus loss), and a button left in its active state
+      // with no panel showing reads as a stuck control.
       setNotificationsPanelOpen(false)
+      setQuickSettingsOpen(false)
     }).then((fn) => {
       if (cancelled) fn()
       else unlistenHidden = fn
@@ -742,11 +748,6 @@ export function TaskbarWindow() {
     }
   }
 
-  async function toggleMute() {
-    await sendVolumeCommand('mute')
-    setMuted((prev) => !prev)
-  }
-
   async function handleStopRecording() {
     try {
       await stopRecording()
@@ -778,9 +779,25 @@ export function TaskbarWindow() {
       void emit('taskbar-popup:hide')
       return
     }
+    // Only one flyout at a time — opening this while quick settings is up
+    // would leave that button stuck in its active state with no panel.
+    setQuickSettingsOpen(false)
     const { x, y } = anchorPointFor(notificationsButtonRef.current)
     const payload: ShowNotificationsPanelPayload = { kind: 'notifications-panel', x, y }
     setNotificationsPanelOpen(true)
+    void emit('taskbar-popup:show', payload)
+  }
+
+  function toggleQuickSettingsPanel() {
+    if (quickSettingsOpen) {
+      setQuickSettingsOpen(false)
+      void emit('taskbar-popup:hide')
+      return
+    }
+    setNotificationsPanelOpen(false)
+    const { x, y } = anchorPointFor(quickSettingsButtonRef.current)
+    const payload: ShowQuickSettingsPayload = { kind: 'quick-settings', x, y }
+    setQuickSettingsOpen(true)
     void emit('taskbar-popup:show', payload)
   }
 
@@ -958,19 +975,38 @@ export function TaskbarWindow() {
             </motion.button>
           )}
 
+          {/* Quick settings. This was a mute-only button while the backend
+              already exposed volume stepping, the Wi-Fi radio, and live
+              memory/disk stats — all built and unreachable.
+
+              Rendered in the SEPARATE taskbar-popup window rather than a
+              portal inside this one: this window is sized to exactly the
+              dock's height, so anything drawn above the bar would be
+              clipped off-window, and making it taller to fit re-creates
+              the click-stealing bug documented at the top of
+              TaskbarPopupWindow.tsx (a transparent window intercepts
+              clicks across its whole rect). */}
           <motion.button
+            ref={quickSettingsButtonRef}
             type="button"
-            onClick={toggleMute}
+            onClick={toggleQuickSettingsPanel}
             whileHover={pressableIcon.whileHover}
             whileTap={pressableIcon.whileTap}
             transition={pressableIcon.transition}
-            aria-label={muted ? 'Unmute' : 'Mute'}
+            aria-label="Quick settings"
             className={cn(
               TASKBAR_ICON_BUTTON,
-              'text-text-secondary hover:bg-white/8 hover:text-text-primary flex items-center justify-center rounded-xl transition-colors duration-150',
+              'flex items-center justify-center rounded-xl transition-colors duration-150',
+              quickSettingsOpen
+                ? 'bg-white/10 text-text-primary'
+                : 'text-text-secondary hover:bg-white/8 hover:text-text-primary',
             )}
           >
-            {muted ? <VolumeMuteIcon className={TASKBAR_ICON_GLYPH} /> : <VolumeIcon className={TASKBAR_ICON_GLYPH} />}
+            {muted ? (
+              <VolumeMuteIcon className={TASKBAR_ICON_GLYPH} />
+            ) : (
+              <VolumeIcon className={TASKBAR_ICON_GLYPH} />
+            )}
           </motion.button>
 
           <motion.button
