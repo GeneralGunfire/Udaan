@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import udaanMark from '@/assets/udaan-mark.png'
 import { SendIcon, StopIcon, PlusIcon, ChevronRightIcon, WindowCloseIcon, TrashIcon, NewspaperIcon, ChatBubbleIcon } from '@/shared/icons'
 import { openNewsBrief } from '@/app/apps'
 import { Button } from '@/shared/components/ui/button'
@@ -16,6 +15,7 @@ import { spring, duration, prefersReducedMotion } from '@/shared/lib/motion'
 import { MODES, type ModeId } from './modes'
 import { ChatMessage } from './ChatMessage'
 import { ChatCommandPalette } from './ChatCommandPalette'
+import { ChatWelcome } from './ChatWelcome'
 import { WorkspacePanel } from './WorkspacePanel'
 import { useGeneralChat } from '../hooks/useGeneralChat'
 import { useStickyScroll } from '../hooks/useStickyScroll'
@@ -139,33 +139,14 @@ export function Composer() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
             transition={reduced ? { duration: duration.instant } : spring.emphasis}
-            className="relative mb-8 flex shrink-0 flex-col items-center gap-6 px-1"
+            className="relative flex shrink-0 flex-col items-center px-1"
           >
-            {/* The dark radial veil that used to sit here existed to keep
-                this text readable over a bright photographic wallpaper —
-                the panel's own flat gray background now provides that
-                contrast on its own, so the veil (and the heavy per-line
-                text-shadows/drop-shadows compensating for it) has been
-                removed entirely rather than tuned down; it was reading as
-                a literal dark smudge against the new flat surface. */}
-            <div className="flex flex-col items-center gap-2.5 text-center">
-              <img src={udaanMark} alt="" className="h-12 w-12 object-contain" />
-              <div>
-                <div className="font-display text-text-primary text-xl font-semibold">Udaan</div>
-                <div className="font-display text-text-secondary text-md">Your ideas, set in motion</div>
-              </div>
-            </div>
-
-            {/* Text shadows here were compensating for a photographic
-                wallpaper behind this text; on the flat panel surface they
-                only muddied it. The kbd now uses the surface ladder like
-                every other small chip in the app. */}
-            <div className="text-text-tertiary flex items-center gap-1.5 text-2xs">
-              <kbd className="rounded-sm border border-(--border-hairline) bg-(--surface-overlay) px-1.5 py-0.5 font-mono text-2xs text-text-secondary">
-                {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K
-              </kbd>
-              <span>for commands</span>
-            </div>
+            <ChatWelcome
+              sessions={sessions}
+              onSuggestion={(prompt) => handleSubmit(prompt)}
+              onOpenSession={handleSwitchSession}
+              onOpenPalette={() => setPaletteOpen(true)}
+            />
           </motion.div>
         ) : (
           <motion.div
