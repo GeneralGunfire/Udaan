@@ -21,14 +21,15 @@
         "fullscreen": false,
         "transparent": false,
         "decorations": false,
-        "backgroundColor": "#0b0f16"
+        "backgroundColor": "#0b0f16",
+        "visible": false
       },
       {
         "label": "taskbar",
         "title": "Udaan Taskbar",
         "url": "index.html?window=taskbar",
-        "width": 760,
-        "height": 76,
+        "width": 960,
+        "height": 104,
         "resizable": false,
         "fullscreen": false,
         "transparent": true,
@@ -37,10 +38,30 @@
         "skipTaskbar": true,
         "visible": false,
         "shadow": false
+      },
+      {
+        "label": "taskbar-popup",
+        "title": "Udaan Taskbar Popup",
+        "url": "index.html?window=taskbar-popup",
+        "width": 1,
+        "height": 1,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost https://demotiles.maplibre.org; media-src 'self' data: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' http://localhost:20128 https://demotiles.maplibre.org https://api.open-meteo.com https://raw.githubusercontent.com https://tonejs.github.io asset: http://asset.localhost; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {

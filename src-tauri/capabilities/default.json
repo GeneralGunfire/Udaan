@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
-  "windows": ["main", "taskbar"],
+  "windows": ["main", "taskbar", "taskbar-popup"],
   "permissions": [
     "core:default",
     "core:path:default",
@@ -23,9 +23,31 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "agritrack-collector",
+          "cmd": "python",
+          "args": true
+        }
+      ]
+    },
     {
       "identifier": "fs:allow-read-file",
       "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$TEMP/**" }
+      ]
     }
   ]
 }
