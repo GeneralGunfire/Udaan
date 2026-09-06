@@ -76,11 +76,35 @@ const INITIAL_VIEW = {
 }
 
 /**
- * A dark basemap with no API key. demotiles is MapLibre's own free
- * style — deliberately sparse, which suits a data overlay: the columns
- * are the subject, the map is a reference grid.
+ * Dark basemap, defined inline rather than fetched.
+ *
+ * A remote style is a hard dependency on a third party being up and on
+ * the CSP allowing both its style and its tile host — and it buys very
+ * little here, because the columns are the subject and a basemap that
+ * draws coastlines over them would actively get in the way. Carto's
+ * dark raster tiles are free and keyless; if they fail to load the
+ * background colour still renders and the data layers still draw, which
+ * a style-json failure would have prevented entirely.
  */
-const BASEMAP_STYLE = 'https://demotiles.maplibre.org/style.json'
+const BASEMAP_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    carto: {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+  },
+  layers: [
+    { id: 'background', type: 'background', paint: { 'background-color': '#0d1117' } },
+    { id: 'carto', type: 'raster', source: 'carto' },
+  ],
+}
 
 /** Sequential ramp, low → high. Viridis-like, colourblind-safe. */
 const RAMP: [number, number, number][] = [
@@ -238,9 +262,11 @@ export function AgriTrackMap() {
   // basemap handles pan/zoom/pitch and deck just draws into the same
   // WebGL context, which keeps the two perfectly in sync.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
+    const container = containerRef.current
+    if (!container) return
+
     const map = new maplibregl.Map({
-      container: containerRef.current,
+      container,
       style: BASEMAP_STYLE,
       center: [INITIAL_VIEW.longitude, INITIAL_VIEW.latitude],
       zoom: INITIAL_VIEW.zoom,
@@ -249,11 +275,26 @@ export function AgriTrackMap() {
       attributionControl: false,
     })
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
-    const overlay = new MapboxOverlay({ interleaved: true, layers: [] })
+    // Non-interleaved: interleaving asks deck to share the basemap's
+    // draw passes, which needs the style fully parsed before any layer
+    // is added. As an overlaid canvas the columns draw regardless of
+    // basemap timing — and still track pan/zoom/pitch exactly.
+    const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
     map.addControl(overlay)
     mapRef.current = map
     overlayRef.current = overlay
+
+    // The map mounts inside a Suspense boundary in a flex column, so on
+    // first paint the container can still measure 0x0 — MapLibre caches
+    // that and renders nothing until something forces a re-measure.
+    // A ResizeObserver covers both that first layout settle and any
+    // later window resize.
+    const observer = new ResizeObserver(() => map.resize())
+    observer.observe(container)
+
+
     return () => {
+      observer.disconnect()
       overlay.finalize()
       map.remove()
       mapRef.current = null
@@ -446,8 +487,16 @@ export function AgriTrackMap() {
   }, [extent, metric])
 
   return (
-    <div className="relative h-full min-h-0 w-full overflow-hidden rounded-lg">
-      <div ref={containerRef} className="absolute inset-0" />
+    // `isolate` + an opaque background are both load-bearing. The map
+    // renders inside Udaan's translucent glass panel, whose
+    // backdrop-filter promotes its ancestors to their own compositing
+    // layers. A WebGL canvas with no stacking context of its own gets
+    // composited *behind* that frosted pane and never becomes visible,
+    // even though MapLibre reports the map as loaded and the canvas has
+    // real dimensions. Giving this subtree its own stacking context and
+    // something opaque to paint onto is what puts the canvas in front.
+    <div className="relative isolate h-full min-h-0 w-full overflow-hidden rounded-lg bg-[#0d1117]">
+      <div ref={containerRef} className="absolute inset-0 z-0" />
 
       {error && (
         <div className="absolute left-4 top-4 z-20 rounded-md bg-black/70 px-3 py-2 text-xs text-[var(--color-danger)]">
@@ -457,7 +506,7 @@ export function AgriTrackMap() {
 
       {/* Layer + metric panel */}
       <div className="absolute left-4 top-4 z-10 w-60 rounded-lg border border-white/10 bg-black/70 p-3 backdrop-blur">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-white/50">Layers</p>
+        <p className="mb-2 text-2xs font-medium uppercase tracking-wide text-white/50">Layers</p>
         <div className="mb-3 flex flex-col gap-1.5">
           {(
             [
@@ -480,7 +529,7 @@ export function AgriTrackMap() {
           ))}
         </div>
 
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-white/50">Metric</p>
+        <p className="mb-2 text-2xs font-medium uppercase tracking-wide text-white/50">Metric</p>
         <div className="flex flex-col gap-1">
           {METRICS.map((m) => {
             const disabled = m.requiresNdvi && !ndviReady
@@ -500,7 +549,7 @@ export function AgriTrackMap() {
                 ].join(' ')}
               >
                 {m.label}
-                {disabled && <span className="ml-1 text-[10px]">no data yet</span>}
+                {disabled && <span className="ml-1 text-2xs-alt">no data yet</span>}
               </button>
             )
           })}
@@ -509,7 +558,7 @@ export function AgriTrackMap() {
         {/* Legend */}
         {extent && (
           <div className="mt-3 border-t border-white/10 pt-2">
-            <p className="mb-1 text-[11px] text-white/50">
+            <p className="mb-1 text-2xs text-white/50">
               {metric.label}
               {metric.unit ? ` (${metric.unit})` : ''}
             </p>
@@ -520,7 +569,7 @@ export function AgriTrackMap() {
                     className="h-2"
                     style={{ background: `rgb(${s.color[0]},${s.color[1]},${s.color[2]})` }}
                   />
-                  <p className="mt-0.5 text-center text-[9px] text-white/60">
+                  <p className="mt-0.5 text-center text-3xs text-white/60">
                     {s.value.toFixed(Math.abs(s.value) >= 100 ? 0 : 1)}
                   </p>
                 </div>
@@ -530,7 +579,7 @@ export function AgriTrackMap() {
         )}
 
         {metric.requiresNdvi && !ndviReady && (
-          <p className="mt-2 text-[10px] leading-snug text-white/40">
+          <p className="mt-2 text-2xs-alt leading-snug text-white/40">
             NDVI layers stay empty until Earth Engine credentials are configured.
           </p>
         )}
@@ -542,7 +591,7 @@ export function AgriTrackMap() {
           <div className="mb-2 flex items-start justify-between gap-2">
             <div>
               <p className="text-sm text-white">{selected}</p>
-              <p className="text-[11px] text-white/50">{activeDate}</p>
+              <p className="text-2xs text-white/50">{activeDate}</p>
             </div>
             <button
               type="button"
@@ -559,7 +608,7 @@ export function AgriTrackMap() {
             return (
               <div key={String(c.crop_id)} className="mb-2 border-t border-white/10 pt-2">
                 <p className="text-xs text-white/90">{String(c.crop_name)}</p>
-                <dl className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px]">
+                <dl className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-2xs">
                   <dt className="text-white/45">GDD</dt>
                   <dd className="text-white/80">
                     {fmt(num(c.gdd_accumulated), '')}
@@ -619,7 +668,7 @@ export function AgriTrackMap() {
             {activeDate || '—'}
           </span>
         </div>
-        <p className="mt-1 text-[10px] text-white/40">
+        <p className="mt-1 text-2xs-alt text-white/40">
           {dates.length === 0
             ? 'No dates collected yet — run the collector.'
             : `${dateIndex + 1} of ${dates.length} collected days`}
@@ -629,7 +678,7 @@ export function AgriTrackMap() {
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="pointer-events-none absolute z-30 max-w-xs rounded-md border border-white/15 bg-black/85 px-2.5 py-2 text-[11px] shadow-lg"
+          className="pointer-events-none absolute z-30 max-w-xs rounded-md border border-white/15 bg-black/85 px-2.5 py-2 text-2xs shadow-lg"
           style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
         >
           <p className="mb-1 text-white">{tooltip.title}</p>
