@@ -1,21 +1,22 @@
 # `daily_economic` source investigation
 
-Written 2026-09-06. Nothing here is wired in yet — this is the evidence
-and a recommendation, per the standing rule that this table gets real
-sources or explicit NULLs, never a guess.
+Written 2026-09-06, updated the same day once scraping was approved.
+This is the evidence behind what `economic.py` now does, per the standing
+rule that this table gets real sources or explicit NULLs, never a guess.
 
 Every endpoint below was called live during the investigation; the
 responses quoted are real, not from documentation.
 
-**Short version:** two of the three fields have a genuinely free,
-keyless, official source and should be wired in. The third (SAFEX maize)
-does not, and should stay NULL.
+**Short version:** all three fields now have a working free source and
+are wired in (`economic.py`). Two come from official JSON APIs; maize is
+scraped, which you approved on the condition it be fully automated,
+scheduled, and reliable — see §5 for how that condition is met.
 
 | Field | Verdict | Source |
 | --- | --- | --- |
-| `zar_usd_rate` | ✅ Wire it | SARB API (official) + Frankfurter (backfill) |
-| `inflation_rate` | ✅ Wire it | SARB API (official, carries Stats SA's CPI) |
-| `maize_price_safex` | ❌ Leave NULL | No free API exists; see below |
+| `zar_usd_rate` | ✅ Live | SARB API (official) + Frankfurter (backfill) |
+| `inflation_rate` | ✅ Live | SARB API (official, carries Stats SA's CPI) |
+| `maize_price_safex` | ✅ Live | Scraped settlement table (no API exists) |
 
 ---
 
@@ -149,43 +150,57 @@ served as JSON. We get the official number without touching a PDF.
 history, an attribution obligation we'd have to honour in the UI, and no
 authority advantage over the central bank's own number.
 
-## 5. SAFEX / maize — no free source
+## 5. SAFEX / maize — scraped, because no API exists
 
-This is the field that fails the test.
-
-What exists:
+No free API exists at any tier:
 
 - **JSE/SAFEX official** — grain futures pricing is licensed commercial
   market data.
 - **Barchart** — carries SAFEX white maize (`HW*0`) and offers an API,
-  but the API is a commercial product; the free web view is 10–15 min
-  delayed and is a webpage, not a feed.
-- **Applied Derivatives** (`derivative.co.za/safex-prices.html`) — a JSE
-  member brokerage publishing daily settlement prices free to the
-  public. The page is live and genuinely carries the data; fetched
-  2026-09-06 it read:
-
-  > Latest settlement — Fri 4 Sep 2026 · Sep 26 contract. white maize at
-  > R 4 002/t (+80); yellow maize at R 4 019/t (+76); wheat at
-  > R 6 075/t (−45); sunflower at R 10 124/t (−176); soya at
-  > R 8 540/t (−242).
-
-  But this is **an HTML page, not an API**. Consuming it means scraping.
+  but the API is a commercial product.
 - **SAGIS** — the official grain information service, free, but publishes
   weekly/monthly *bulletins* (deliveries, stocks, import parity) rather
   than a daily settlement price feed, and offers no API.
 
-### Recommendation: leave `maize_price_safex` NULL
+So the source is **Applied Derivatives** (`derivative.co.za`), a JSE
+member brokerage that publishes daily settlement prices free and
+publicly. On closer inspection this is far better structured than a
+marketing page:
 
-Not because nothing is reachable, but because the only daily source is a
-brokerage's marketing page. Scraping it would mean a fragile parser
-against markup that can change without notice, silently producing either
-stale or wrong prices in a table we've committed to keeping honest — and
-it sits uncomfortably close to the project's own "no scraping" rule.
+- It is a real `<table>`, not prose — 24 rows, one per session.
+- It carries **~23 sessions of history** (about a month), so backfilling
+  missed days finds real prices rather than gaps.
+- Columns: white maize, yellow maize, wheat, sunflower, soya, all in
+  rand per tonne with the change against the previous session.
 
-If you later decide you want it, the least-bad option is a **manual
-weekly entry**, the same posture we took for `disease_bulletins`. Say the
-word and I'll extend the bulletin entry tool to cover it.
+Live sample (fetched 2026-09-06):
+
+```
+Session          White maize   Yellow maize   Wheat
+Fri 4 Sep 2026   R 4 002 +80   R 4 019 +76    R 6 075 -45
+Thu 3 Sep 2026   R 3 922 +5    R 3 943 -8     R 6 120 -53
+Wed 2 Sep 2026   R 3 917 -53   R 3 951 -44    R 6 173 +23
+```
+
+### How the scraper is kept honest
+
+The risk with scraping is not that it breaks — it's that it breaks
+*quietly* and starts writing a wrong number. `fetch_safex_maize()` in
+`economic.py` is built so that every failure mode is loud:
+
+- **The column is found by its header text**, not by index. If a new
+  contract column is inserted, we don't silently slide onto yellow maize.
+- **Only the leading `R <number>` is parsed**, ignoring the trailing
+  change figure — reading `+80` as the price is precisely what a looser
+  regex would eventually do.
+- **Values outside R500–R15 000/t are rejected**, which catches a parser
+  that has started reading the wrong field entirely.
+- **A missing table, a missing header, or zero parsed rows all raise**,
+  and the caller records the failure in `collection_log.sources_failed`
+  with the reason. The field goes NULL rather than stale or wrong.
+
+Nothing is behind a login or a paywall, and the request rate is one page
+fetch per collector run (once daily).
 
 ---
 
@@ -203,17 +218,29 @@ came from.
    days rather than carrying a stale monthly figure across dates it
    doesn't belong to — CPI is monthly, so it should only be written
    against the month SARB reports it for.
-3. **`maize_price_safex`** — stays NULL, with the reason recorded in
-   `collection_log` notes exactly as it is now.
+3. **`maize_price_safex`** — scrape the settlement table once per run;
+   because it carries a month of sessions, the same single fetch serves
+   both the daily path and any backfill. Write
+   `data_source = "safex:derivative.co.za"`.
 4. **CSP** — `custom.resbank.co.za` and `api.frankfurter.dev` are only
    called from the Python collector, not the webview, so no CSP change
    is needed.
 
-One caveat worth stating plainly: SARB's API has no published contract
-and its own help pages 404, so it could change without warning. The
-collector should treat a failure there the way it already treats a
-NASA POWER failure — log it, write NULL, carry on — rather than assuming
-it will always answer.
+Two caveats worth stating plainly. SARB's API has no published contract
+and its own help pages 404, so it could change without warning. And the
+SAFEX source is a scrape, so it is one redesign away from breaking. Both
+are handled the same way the collector already handles a NASA POWER
+failure — log it, write NULL, carry on — and neither can take down a
+run. The data-quality checker (`validate.py`) is the backstop that
+catches a source going quietly stale.
+
+### Status: implemented
+
+All three fields are live in `economic.py` and wired into the collector.
+Verified against a real 12-day range: ZAR/USD from SARB for the current
+day and Frankfurter for prior days, white maize R3 825–R4 004/t across
+the span, weekends correctly empty, and CPI written only against dates
+inside the month it describes. Re-running produced no duplicates.
 
 ## Sources
 

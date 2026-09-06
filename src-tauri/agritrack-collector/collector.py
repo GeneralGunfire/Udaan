@@ -20,7 +20,7 @@ Data sources (both free, no API key, no scraping):
 
 Everything else the schema has room for (NDVI, economic indicators,
 disease bulletins) is deliberately stubbed rather than approximated —
-see get_ndvi_stub() and collect_economic_stub().
+see get_ndvi_stub(); economic.py documents its own sources.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from typing import Any
 import httpx
 import pandas as pd
 
+from economic import EconomicRow, collect_economic
 from ndvi import NdviService, resolve_ndvi
 
 # --------------------------------------------------------------------------
@@ -148,6 +149,14 @@ def connect(db_path: str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
+    # daily_economic is one row per date, but the Rust schema predates
+    # that being enforced. The index is what makes the ON CONFLICT upsert
+    # in write_economic() work, so it is created here rather than assumed.
+    # CREATE UNIQUE INDEX IF NOT EXISTS is a no-op once it exists.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_economic_date ON daily_economic(date)"
+    )
+    conn.commit()
     return conn
 
 
@@ -710,29 +719,36 @@ def write_crop_telemetry(
     )
 
 
-def collect_economic_stub(conn: sqlite3.Connection, target: date) -> str:
-    """Insert a placeholder daily_economic row with NULL indicators.
+def write_economic(conn: sqlite3.Connection, target: date, row: "EconomicRow") -> None:
+    """Upsert one day's economic indicators.
 
-    TODO: identify a genuinely free, keyless source for ZAR/USD, SA CPI
-    inflation, and the SAFEX white/yellow maize spot price. The obvious
-    candidates all fail at least one of those tests — exchangerate.host
-    and Fixer now gate behind an API key, the SARB and Stats SA publish
-    releases rather than an open JSON endpoint, and JSE/SAFEX pricing is
-    licensed commercial data. Nothing is guessed or approximated here:
-    the row exists so the date is accounted for, with NULLs making the
-    absence explicit in the table view.
+    Skips entirely when every field is None — a row of nothing but NULLs
+    records only that the collector ran, which `collection_log` already
+    says more clearly. Weekends legitimately have no FX or settlement
+    price, and an empty row would misrepresent that as a failed fetch.
     """
+    if row.is_empty():
+        return
+
     conn.execute(
         """INSERT INTO daily_economic
              (date, zar_usd_rate, inflation_rate, maize_price_safex, data_source, retrieved_at)
-           VALUES (?, NULL, NULL, NULL, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(date) DO UPDATE SET
+             zar_usd_rate = COALESCE(excluded.zar_usd_rate, daily_economic.zar_usd_rate),
+             inflation_rate = COALESCE(excluded.inflation_rate, daily_economic.inflation_rate),
+             maize_price_safex = COALESCE(excluded.maize_price_safex, daily_economic.maize_price_safex),
+             data_source = excluded.data_source,
+             retrieved_at = excluded.retrieved_at""",
         (
             target.isoformat(),
-            "TODO: no free keyless source identified",
+            row.zar_usd_rate,
+            row.inflation_rate,
+            row.maize_price_safex,
+            row.data_source(),
             datetime.now(timezone.utc).isoformat(timespec="seconds"),
         ),
     )
-    return "daily_economic stubbed (no free keyless source yet)"
 
 
 def write_collection_log(
@@ -911,7 +927,6 @@ async def run(target: date, backfill_from: date | None, db_path: str) -> int:
                         (deficit, loc.location_id, day.isoformat()),
                     )
 
-            collect_economic_stub(conn, day)
             conn.commit()
 
         # Telemetry runs after every weather row for the window is
@@ -936,7 +951,24 @@ async def run(target: date, backfill_from: date | None, db_path: str) -> int:
                 telemetry_rows += 1
             conn.commit()
 
-        notes.append("daily_economic stubbed (no free keyless source yet)")
+
+        # Economic indicators: one fetch covering the whole window
+        # rather than per day. Sources differ per field and per date
+        # (see economic.py), so provenance is recorded per row.
+        econ_rows, econ_failures = collect_economic(pending)
+        for failure in econ_failures:
+            failed.append(str(failure))
+        econ_written = 0
+        for day, econ in econ_rows.items():
+            if not econ.is_empty():
+                write_economic(conn, day, econ)
+                econ_written += 1
+        conn.commit()
+        if econ_written:
+            succeeded.append("economic")
+            notes.append(f"wrote {econ_written} daily_economic rows")
+        else:
+            notes.append("no daily_economic rows (weekend/holiday span, or all sources failed)")
 
         notes.append(f"wrote {weather_rows} daily_weather + {telemetry_rows} daily_crop_telemetry rows")
         write_collection_log(conn, target, succeeded, [f for f in failed if f], notes)
