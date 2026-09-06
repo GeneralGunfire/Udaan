@@ -202,11 +202,11 @@ export function AgriTrackView({ onClose }: AgriTrackViewProps) {
         }
       />
 
+      {/* `[&>*]:h-full` forces the Suspense child to fill this flex
+          item: the map sizes its canvas from the container's measured
+          height, and a bare flex child leaves that at auto. */}
       {mode === 'map' ? (
-        // The map fills the remaining height itself rather than sitting
-        // inside ViewBody's scroll region — a scrolling map container
-        // would fight the map's own drag handling.
-        <div className="min-h-0 flex-1 px-8 pb-8">
+        <div className="min-h-0 flex-1 px-8 pb-8 [&>*]:h-full">
           <Suspense
             fallback={
               <div className="flex h-full items-center justify-center">
