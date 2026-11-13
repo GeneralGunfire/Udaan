@@ -10,10 +10,28 @@ import { invoke } from '@tauri-apps/api/core'
  * immediately even where storage events are throttled.
  */
 
-export type EdgeColorMode = 'solid' | 'gradient' | 'rainbow' | 'level'
+/**
+ * How the light is coloured.
+ *
+ *   solid     one colour
+ *   gradient  between two colours, drifting
+ *   rainbow   the full wheel around the border
+ *   level     between two colours by loudness
+ *   spectrum  hue follows the music's own brightness, and beats flash it
+ */
+export type EdgeColorMode = 'solid' | 'gradient' | 'rainbow' | 'level' | 'spectrum'
 export type EdgeDirection = 'clockwise' | 'anticlockwise'
-/** Bars stand on the edge; a wave is one smooth filled curve; glow is a soft ambient wash. */
-export type EdgeStyle = 'bars' | 'wave' | 'glow'
+/**
+ * How the light is drawn.
+ *
+ *   bars    equaliser bars standing on the edge, with falling peak caps
+ *   wave    one smooth filled curve along each side
+ *   glow    a soft ambient wash, no visible shape
+ *   pulse   rings that leave the edge on every beat and travel inward
+ *   comet   a bright head that runs the border, trailing light behind it
+ *   flame   licks of light that rise and fall with their own turbulence
+ */
+export type EdgeStyle = 'bars' | 'wave' | 'glow' | 'pulse' | 'comet' | 'flame'
 
 export interface EdgeLightConfig {
   enabled: boolean

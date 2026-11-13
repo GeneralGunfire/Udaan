@@ -6,6 +6,32 @@ import { loadEdgeConfig, onEdgeConfig, type EdgeLightConfig } from '@/features/e
 const N = 64
 const MAX_DPR = 1.5
 
+/**
+ * One frame from the analyser (shell/edge_light.rs).
+ *
+ * It carries the spectrum *and* what the music is doing. The features are
+ * computed there, against the raw spectrum, because by the time the bands
+ * reach this window they have been smoothed twice — enough that beat
+ * detection from them lags audibly and mistakes a sustained bass note for a
+ * continuous run of hits.
+ */
+interface AnalysisFrame {
+  /** 0–255 per band, low to high, perceptually weighted and smoothed. */
+  bands: number[]
+  /** 0–255 overall loudness. */
+  level: number
+  /** 0–255 energy below ~160 Hz. */
+  bass: number
+  /** 0–255 energy above ~4 kHz. */
+  treble: number
+  /** 0–255, spikes on each onset and decays. */
+  beat: number
+  /** Tempo in BPM, 0 when the analyser is not confident. */
+  bpm: number
+  /** 0–255 spectral centroid — where the energy sits, low to high. */
+  centroid: number
+}
+
 type RGB = [number, number, number]
 
 function hexToRgb(hex: string): RGB {
@@ -60,8 +86,8 @@ export function EdgeLightWindow() {
     const cur = new Float32Array(N)
     const peak = new Float32Array(N)
     let beat = 0
-    let bassAvg = 0
-    let beatCooldown = 0
+    let bpm = 0
+    let centroid = 0
     let phase = 0
     let hue = 0
     let last = 0
@@ -110,6 +136,17 @@ export function EdgeLightWindow() {
           return hslToRgb(u * 360 + hue, 0.9, 0.6)
         case 'level':
           return mix(c1, c2, Math.min(1, level * 1.1))
+        case 'spectrum': {
+          // Hue follows the music's own brightness: a bass-heavy passage
+          // sits red through amber, a bright one runs cyan through violet.
+          // Only possible now the analyser reports a spectral centroid —
+          // the overlay cannot compute one from smoothed bands without the
+          // result lagging a beat behind what you are hearing.
+          // Beats briefly push saturation and lightness up, so each hit
+          // reads as a flash of colour rather than only a change in size.
+          const base = 250 - centroid * 230
+          return hslToRgb(base + u * 40 + hue * 0.15, 0.72 + beat * 0.25, 0.46 + level * 0.16 + beat * 0.12)
+        }
       }
     }
 
@@ -262,18 +299,16 @@ export function EdgeLightWindow() {
         energy += cur[i]
       }
 
-      let bass = 0
-      for (let i = 0; i < 8; i++) bass += cur[i]
-      bass /= 8
-      bassAvg += (bass - bassAvg) * Math.min(1, dt * 1.2)
-      beatCooldown -= dt
-      if (beatCooldown <= 0 && bass > bassAvg * 1.3 + 0.06) {
-        beat = 1
-        beatCooldown = 0.18
-      }
+      // The beat pulse arrives from the analyser already triggered; this
+      // only decays it between frames.
       beat *= Math.pow(0.88, frames)
 
-      hue = (hue + cfg.hueSpeed * 6 * dt) % 360
+      // Hue drifts on its own, but when the analyser is confident about the
+      // tempo the drift locks to it — a full turn of the colour wheel every
+      // sixteen beats — so the light moves *with* the music instead of at an
+      // unrelated constant speed.
+      const hueRate = bpm > 0 ? (bpm / 60) * (360 / 16) : cfg.hueSpeed * 6
+      hue = (hue + hueRate * dt) % 360
       phase = (((phase + (cfg.spin / 60) * dt) % 1) + 1) % 1
 
       draw()
@@ -308,13 +343,20 @@ export function EdgeLightWindow() {
       applyBloom()
       wake()
     })
-    const unFrame = listen<{ bands: number[] }>('edge-light:frame', (e) => {
-      const b = e.payload.bands
+    const unFrame = listen<AnalysisFrame>('edge-light:frame', (e) => {
+      const f = e.payload
       let any = false
       for (let i = 0; i < N; i++) {
-        target[i] = (b[i] ?? 0) / 255
-        if (b[i]) any = true
+        target[i] = (f.bands[i] ?? 0) / 255
+        if (f.bands[i]) any = true
       }
+      // Musical features come from the analyser, where the raw spectrum is.
+      // Detecting beats here from already-smoothed bands (which is what this
+      // used to do) adds the smoothing's latency to every hit and fires on
+      // sustained bass notes, because a held note looks like a rising level.
+      beat = Math.max(beat, f.beat / 255)
+      bpm = f.bpm
+      centroid = f.centroid / 255
       if (any) wake()
     })
 

@@ -17,6 +17,7 @@ const COLOR_MODES: { id: EdgeColorMode; label: string }[] = [
   { id: 'gradient', label: 'Gradient' },
   { id: 'rainbow', label: 'Rainbow' },
   { id: 'level', label: 'By level' },
+  { id: 'spectrum', label: 'By music' },
 ]
 
 const STYLES: { id: EdgeStyle; label: string; hint: string }[] = [
@@ -124,6 +125,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** A little picture of what a preset looks like: its colours. */
 function swatchOf(patch: Partial<EdgeLightConfig>): string {
   if (patch.colorMode === 'rainbow') return 'conic-gradient(#ff4d6d, #ffd166, #80ed99, #4cc9f0, #8b5cf6, #ff4d6d)'
+  // "By music" runs bass→treble as red→violet, which is the mapping the
+  // spectral centroid drives.
+  if (patch.colorMode === 'spectrum') return 'linear-gradient(135deg, #ff4d4d, #ffa64d, #4cc9f0, #8b5cf6)'
   if (patch.colorMode === 'gradient') return `linear-gradient(135deg, ${patch.color1 ?? '#4cc9f0'}, ${patch.color2 ?? '#b5179e'})`
   return patch.color1 ?? '#ffffff'
 }
@@ -299,7 +303,7 @@ export function EdgeLightPanel() {
                 </Chip>
               ))}
             </div>
-            {cfg.colorMode !== 'rainbow' && <ColorField label={cfg.colorMode === 'solid' ? 'Colour' : 'From'} value={cfg.color1} onChange={(v) => update({ color1: v })} />}
+            {cfg.colorMode !== 'rainbow' && cfg.colorMode !== 'spectrum' && <ColorField label={cfg.colorMode === 'solid' ? 'Colour' : 'From'} value={cfg.color1} onChange={(v) => update({ color1: v })} />}
             {(cfg.colorMode === 'gradient' || cfg.colorMode === 'level') && <ColorField label="To" value={cfg.color2} onChange={(v) => update({ color2: v })} />}
             {(cfg.colorMode === 'gradient' || cfg.colorMode === 'rainbow') && <Slider label="Drift" value={cfg.hueSpeed} min={0} max={60} onChange={(v) => update({ hueSpeed: v })} />}
           </>
