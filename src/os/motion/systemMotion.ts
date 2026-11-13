@@ -411,3 +411,139 @@ export const badgePop = {
   animate: { scale: 1, opacity: 1, transition: { type: 'spring' as const, stiffness: 600, damping: 20, mass: 0.6 } },
   exit: { scale: 0, opacity: 0, transition: { duration: dur.instant } },
 }
+
+/* ------------------------------------------------------------------ */
+/*  CINEMATIC                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The techniques below come from film rather than from UI convention.
+ * They are for the OS's "moments" — opening a view, revealing a surface,
+ * transitioning between modes — not for ordinary controls, where they
+ * would be overbearing and slow.
+ */
+
+/**
+ * RACK FOCUS. A surface arriving from out of focus, as a camera pulling
+ * focus onto it.
+ *
+ * Blur is expensive to animate (it cannot run on the compositor alone), so
+ * this is reserved for one element at a time, over a short distance, and
+ * never on a list of items.
+ */
+export const rackFocus = {
+  initial: { opacity: 0, filter: 'blur(12px)', scale: 1.04 },
+  animate: {
+    opacity: 1,
+    filter: 'blur(0px)',
+    scale: 1,
+    transition: { duration: dur.medium, ease: curve.emphasizedDecelerate },
+  },
+  exit: {
+    opacity: 0,
+    filter: 'blur(8px)',
+    scale: 0.99,
+    transition: { duration: dur.fast, ease: curve.accelerate },
+  },
+}
+
+/**
+ * DOLLY. The camera moving toward the subject: a surface growing from
+ * slightly behind the screen plane while the backdrop recedes.
+ *
+ * Pair with `recede` on whatever sits behind it — the contrast between the
+ * two is what creates the sense of depth. Either one alone reads as a
+ * simple scale.
+ */
+export const dolly = {
+  initial: { opacity: 0, scale: 0.92, y: 18 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { type: 'spring' as const, stiffness: 320, damping: 30, mass: 0.9 },
+  },
+  exit: { opacity: 0, scale: 0.96, y: 8, transition: { duration: dur.fast, ease: curve.accelerate } },
+}
+
+/** The backdrop pushing away as something dollies toward the viewer. */
+export const recede = {
+  animate: { scale: 0.97, filter: 'brightness(0.72)' },
+  transition: { duration: dur.medium, ease: curve.emphasizedDecelerate },
+}
+
+/**
+ * REVEAL. Content wiped into view behind a moving edge, rather than faded.
+ *
+ * A fade says "this is becoming visible"; a wipe says "this is being
+ * uncovered", which is the right reading for something that was already
+ * there — a panel sliding open, a section expanding.
+ *
+ * `direction` is where the edge travels from.
+ */
+export function reveal(direction: 'up' | 'down' | 'left' | 'right' = 'up') {
+  const from = {
+    up: 'inset(100% 0 0 0)',
+    down: 'inset(0 0 100% 0)',
+    left: 'inset(0 0 0 100%)',
+    right: 'inset(0 100% 0 0)',
+  }[direction]
+  return {
+    initial: { clipPath: from, opacity: 0 },
+    animate: {
+      clipPath: 'inset(0 0 0 0)',
+      opacity: 1,
+      transition: { duration: dur.medium, ease: curve.emphasizedDecelerate },
+    },
+    exit: { clipPath: from, opacity: 0, transition: { duration: dur.fast, ease: curve.accelerate } },
+  }
+}
+
+/**
+ * PARALLAX. Layers moving at different rates to imply depth.
+ *
+ * `depth` 0 is the furthest layer (moves least), 1 the nearest (moves
+ * most). Returns the offset for a given scroll or pointer displacement.
+ */
+export function parallax(offset: number, depth: number): number {
+  return offset * (0.15 + depth * 0.85)
+}
+
+/**
+ * TITLE SEQUENCE. Characters rising into place one after another.
+ *
+ * For a single short heading at a moment that deserves one — a boot
+ * screen, an empty state, a first run. Never for body text: animating
+ * every character of a paragraph is unreadable and slow.
+ */
+export const titleChar = {
+  initial: { opacity: 0, y: '0.4em', filter: 'blur(4px)' },
+  animate: { opacity: 1, y: '0em', filter: 'blur(0px)' },
+}
+
+export function titleCharDelay(index: number, step = 0.035): number {
+  return index * step
+}
+
+/**
+ * BREATHE. A slow, barely-perceptible swell, for something at rest that
+ * should not look frozen — a logo during a wait, an idle empty state.
+ *
+ * Six seconds and 3%: fast or large enough to notice is distracting, and
+ * this is meant to be felt rather than watched.
+ */
+export const breathe = {
+  animate: { scale: [1, 1.03, 1] },
+  transition: { duration: 6, repeat: Infinity, ease: 'easeInOut' as const },
+}
+
+/**
+ * SHIMMER. A highlight travelling across a surface, for loading states.
+ *
+ * Better than a pulsing opacity for a skeleton: a sweep implies progress
+ * along the content, where a pulse only says "something is happening".
+ */
+export const shimmer = {
+  animate: { backgroundPosition: ['200% 0', '-200% 0'] },
+  transition: { duration: 1.6, repeat: Infinity, ease: 'linear' as const },
+}

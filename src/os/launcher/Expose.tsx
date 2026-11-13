@@ -72,13 +72,16 @@ export function Expose({ title, handles, onDone }: { title: string; handles: num
         onDone()
       }}
     >
-      {/* The backdrop blurs in rather than appearing: the desktop visibly
-          recedes behind the overview instead of being replaced by it. */}
+      {/* The backdrop deepens as the overview comes forward, so the desktop
+          recedes behind it. The blur itself is the compositor's: this
+          window carries real DWM acrylic, and a backdrop-filter here would
+          blur that tint rather than the desktop, at the cost of a
+          full-screen filter pass every frame. */}
       <motion.div
-        className="absolute inset-0 bg-black/55"
-        initial={{ backdropFilter: 'blur(0px)', opacity: 0 }}
-        animate={{ backdropFilter: 'blur(18px)', opacity: 1 }}
-        exit={{ backdropFilter: 'blur(0px)', opacity: 0 }}
+        className="absolute inset-0"
+        initial={{ backgroundColor: 'rgba(0,0,0,0)' }}
+        animate={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+        exit={{ backgroundColor: 'rgba(0,0,0,0)' }}
         transition={{ duration: dur.normal, ease: curve.decelerate }}
       />
       <motion.p

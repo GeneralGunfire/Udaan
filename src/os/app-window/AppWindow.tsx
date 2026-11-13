@@ -216,9 +216,19 @@ export function AppWindow({ appId }: { appId: AppId }) {
         onMinimize={() => void win.minimize()}
         onToggleMaximize={() => void zoom.toggle()}
       />}
-      <main className="relative min-h-0 flex-1 overflow-hidden">
+      {/* Content settles a beat after the frame.
+          A window whose chrome and contents arrive on the same frame reads
+          as one flat image appearing. Letting the frame land first and the
+          content rise into it reads as a window opening and then filling —
+          the same staging a real compositor's open animation has. */}
+      <motion.main
+        className="relative min-h-0 flex-1 overflow-hidden"
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.3, ease: [0.05, 0.7, 0.1, 1] }}
+      >
         <Suspense fallback={<Loading />}>{content}</Suspense>
-      </main>
+      </motion.main>
     </motion.div>
   )
 }

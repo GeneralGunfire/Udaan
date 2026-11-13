@@ -211,9 +211,25 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
               animate={{ scale: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 240, damping: 24, mass: 0.9 }}
             >
-              {windows.map((w, i) => (
-                <Card key={w.handle} desktop={w === DESKTOP} w={w} shot={shots[w.handle]} icon={icons[w.handle] ?? null} active={i === front} transform={`rotateY(${i * step}deg) translateZ(${radius}px)`} />
-              ))}
+              {windows.map((w, i) => {
+                // Distance from the front card, the short way round the
+                // ring — card 0 and card n-1 are neighbours, so a plain
+                // subtraction would make one of them appear furthest away.
+                const raw = Math.abs(i - front)
+                const depth = Math.min(raw, n - raw)
+                return (
+                  <Card
+                    key={w.handle}
+                    desktop={w === DESKTOP}
+                    w={w}
+                    shot={shots[w.handle]}
+                    icon={icons[w.handle] ?? null}
+                    active={i === front}
+                    depth={depth}
+                    transform={`rotateY(${i * step}deg) translateZ(${radius}px)`}
+                  />
+                )
+              })}
             </motion.div>
           </div>
           <div className="mt-24 flex h-16 flex-col items-center text-white">
@@ -228,7 +244,41 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   )
 }
 
-function Card({ w, shot, icon, active, transform, desktop }: { w: ShellWindow; shot?: string; icon: string | null; active: boolean; transform: string; desktop?: boolean }) {
+/**
+ * One window in the carousel.
+ *
+ * `depth` is how far this card is from the front, in card positions. It
+ * drives two effects that together sell the perspective:
+ *
+ *  * DEPTH OF FIELD. Cards behind the front one blur progressively, the
+ *    way a camera focused on the front card would render them. This is
+ *    what makes the stack read as physical distance rather than as flat
+ *    cards rotated in a circle, and it draws the eye to the selection
+ *    without needing a border to do the work.
+ *  * AERIAL PERSPECTIVE. They also darken and desaturate with distance,
+ *    which is how depth reads in the real world.
+ */
+function Card({
+  w,
+  shot,
+  icon,
+  active,
+  transform,
+  desktop,
+  depth = 0,
+}: {
+  w: ShellWindow
+  shot?: string
+  icon: string | null
+  active: boolean
+  transform: string
+  desktop?: boolean
+  depth?: number
+}) {
+  // Capped: past about three positions away the card is small enough that
+  // more blur only costs fill rate.
+  const blur = Math.min(depth * 1.6, 5)
+  const dim = Math.max(0.42, 1 - depth * 0.22)
   return (
     <div
       className="absolute inset-0 overflow-hidden rounded-[12px] bg-[var(--surface-base)] transition-[box-shadow,filter] duration-200"
@@ -236,7 +286,7 @@ function Card({ w, shot, icon, active, transform, desktop }: { w: ShellWindow; s
         transform,
         backfaceVisibility: 'hidden',
         boxShadow: active ? '0 0 0 3px var(--color-accent), 0 30px 80px rgb(0 0 0 / 0.6)' : '0 20px 60px rgb(0 0 0 / 0.5)',
-        filter: active ? 'none' : 'brightness(0.6)',
+        filter: active ? 'none' : `brightness(${dim}) saturate(${Math.max(0.55, 1 - depth * 0.16)}) blur(${blur}px)`,
       }}
     >
       {desktop ? (

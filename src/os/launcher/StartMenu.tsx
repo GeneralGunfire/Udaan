@@ -1045,8 +1045,14 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
   let index = -1
   return (
     <motion.div className="fixed inset-0"
-      initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: dur.fade } }}
-      exit={{ opacity: 0, transition: { duration: dur.fade } }}
+      // The backdrop darkens as the menu comes forward, so the desktop
+      // recedes behind it rather than merely being covered. No CSS blur:
+      // this window already carries real DWM acrylic (ThemeProvider), and
+      // a backdrop-filter on top of it would blur the tint rather than the
+      // desktop while costing a full-screen filter pass every frame.
+      initial={{ opacity: 0, backgroundColor: 'rgba(0,0,0,0)' }}
+      animate={{ opacity: 1, backgroundColor: 'rgba(0,0,0,0.25)', transition: { duration: dur.normal, ease: curve.decelerate } }}
+      exit={{ opacity: 0, backgroundColor: 'rgba(0,0,0,0)', transition: { duration: dur.fast, ease: curve.accelerate } }}
       onMouseDown={onClose}
     >
       <motion.div
