@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
+import { AnimatePresence } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring, zIndex } from '@/shared/lib/motion'
 import { ChevronDownIcon, CheckIcon } from '@/shared/icons'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/shared/components/primitives/DropdownMenu'
 
 export interface SelectOption<T extends string> {
   value: T
@@ -20,20 +24,20 @@ interface SelectProps<T extends string> {
 }
 
 /**
- * Custom-styled value select, built on the same Radix dropdown-menu +
- * Framer Motion combo as the rest of the app's menus (see ui/dropdown-menu.tsx)
- * rather than a native `<select>` — native selects render with the OS's own
- * (non-themeable) popup styling, which reads as visually broken against
- * this app's dark glass UI and can even render invisible/wrong-colored text
- * depending on the OS theme.
+ * Custom-styled value select — single-select semantics on top of the
+ * hand-built DropdownMenu, not a parallel primitive. A native `<select>`
+ * renders with the OS's own non-themeable popup styling, which reads as
+ * visually broken against this app's dark UI (and can render invisible/
+ * wrong-colored text depending on the OS theme), so this composes the
+ * app's own menu instead.
  */
 export function Select<T extends string>({ value, options, onChange, className, size = 'md' }: SelectProps<T>) {
   const [open, setOpen] = useState(false)
   const current = options.find((o) => o.value === value)
 
   return (
-    <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
-      <DropdownMenuPrimitive.Trigger asChild>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
         <button
           type="button"
           className={cn(
@@ -56,44 +60,27 @@ export function Select<T extends string>({ value, options, onChange, className, 
             className={cn('text-text-tertiary shrink-0 transition-transform duration-150', open && 'rotate-180')}
           />
         </button>
-      </DropdownMenuPrimitive.Trigger>
+      </DropdownMenuTrigger>
 
       <AnimatePresence>
         {open && (
-          <DropdownMenuPrimitive.Portal forceMount>
-            <DropdownMenuPrimitive.Content align="end" sideOffset={6} asChild>
-              <motion.div
-                initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                transition={spring.standard}
-                data-overlay-scroll
-                className="flex max-h-72 min-w-36 flex-col overflow-y-auto rounded-xl border p-1"
-                style={{
-                  background: 'var(--surface-overlay)',
-                  borderColor: 'var(--border-hairline)',
-                  boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-overlay)',
-                  zIndex: zIndex.dropdown,
-                }}
+          <DropdownMenuContent align="end" className="min-w-36">
+            {options.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onSelect={() => onChange(option.value)}
+                className={cn(
+                  'justify-between gap-3',
+                  option.value === value && 'text-text-primary',
+                )}
               >
-                {options.map((option) => (
-                  <DropdownMenuPrimitive.Item
-                    key={option.value}
-                    onSelect={() => onChange(option.value)}
-                    className={cn(
-                      'text-text-secondary hover:text-text-primary data-highlighted:bg-(--surface-raised) data-highlighted:text-text-primary flex cursor-pointer items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-100',
-                      option.value === value && 'text-text-primary',
-                    )}
-                  >
-                    <span className="truncate">{option.label}</span>
-                    {option.value === value && <CheckIcon width={12} height={12} className="shrink-0" />}
-                  </DropdownMenuPrimitive.Item>
-                ))}
-              </motion.div>
-            </DropdownMenuPrimitive.Content>
-          </DropdownMenuPrimitive.Portal>
+                <span className="truncate">{option.label}</span>
+                {option.value === value && <CheckIcon width={12} height={12} className="shrink-0" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
         )}
       </AnimatePresence>
-    </DropdownMenuPrimitive.Root>
+    </DropdownMenu>
   )
 }

@@ -110,7 +110,7 @@ export function PdfPageRenderer({
 
   if (error) {
     return (
-      <div className="py-8 text-center text-sm" style={{ color: '#b91c1c' }}>
+      <div className="py-8 text-center text-sm" style={{ color: 'var(--color-danger)' }}>
         {error}
       </div>
     )

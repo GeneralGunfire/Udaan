@@ -122,7 +122,7 @@ pub fn run() {
       tv::tv_host_running,
       tv::tv_host_close,
       tv::tv_host_nav,
-      sound_fx::speaker_keepalive_set,
+      sound_fx::keepalive::speaker_keepalive_set,
       sound_fx::sound_fx_status,
       sound_fx::sound_fx_apply,
       sound_fx::sound_fx_apply_custom,

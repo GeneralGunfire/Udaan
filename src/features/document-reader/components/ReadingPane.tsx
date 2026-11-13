@@ -83,13 +83,13 @@ export function ReadingPane({
     <div
       ref={scrollRef}
       className="doc-reader-scroll h-full w-full overflow-y-auto px-6 py-10 md:px-16"
-      style={{ backgroundColor: 'var(--color-bg-base)' }}
+      style={{ backgroundColor: '#1c1d21' }}
     >
       <div
         className="mx-auto max-w-3xl rounded-xl px-10 py-12 shadow-2xl"
         style={{
-          backgroundColor: '#1c2029',
-          color: '#f2f3f5',
+          backgroundColor: '#232429',
+          color: 'var(--color-text-primary)',
           minHeight: '60vh',
           border: '1px solid rgb(255 255 255 / 8%)',
         }}

@@ -1,7 +1,6 @@
 /**
- * Splash intro — isolated stylesheet, not part of the shared token system.
- * Only `transform` and `opacity` are keyframed (cheap on integrated GPUs);
- * `filter: blur` is static per-element rather than animated.
+ * Boot splash — isolated stylesheet, not part of the shared token system.
+ * Only `transform` and `opacity` are keyframed (cheap on integrated GPUs).
  */
 
 .splash-root {
@@ -11,440 +10,358 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #05070b;
+  /* Fallback only — the wallpaper covers this. Kept so a failed image
+     decode shows a considered dark ground rather than white. */
+  background: var(--surface-canvas);
   overflow: hidden;
 }
 
+.splash-wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Weighted to the lower-left where the lockup sits, rather than a flat
+   dim across the whole frame — the top and right of the photograph stay
+   fully visible, which is what stops this reading as a loading overlay
+   and makes it read as the picture itself. Matches the screensaver. */
+.splash-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to top right,
+    rgb(2 5 10 / 78%) 0%,
+    rgb(2 5 10 / 42%) 45%,
+    rgb(2 5 10 / 12%) 75%
+  );
+}
+
 .splash-stage {
-  position: relative;
+  /* Anchored low-left, not centred. A centred lockup makes the wallpaper
+     a backdrop for a widget; anchoring it the way the screensaver anchors
+     its clock lets the image keep the frame. */
+  position: absolute;
+  z-index: 2;
+  left: 8%;
+  bottom: 14%;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+}
+
+/* ---- Lockup: mark + wordmark, composed together and recentered as a unit once stopped ---- */
+
+.splash-lockup {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
+}
+
+.splash-lockup--stopped {
+  gap: 16px;
+}
+
+/* ---- Logo mark ---- */
+
+.splash-mark-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* No coloured halo. A neutral drop-shadow gives the mark separation
+     from the backdrop without making it look self-illuminated. */
+  filter: drop-shadow(0 2px 12px rgb(0 0 0 / 45%));
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.splash-mark {
+  width: 100%;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+/* A directional plane spinning 360° in place reads wrong regardless of
+   tuning — it's a mismatch between the motion and a shape that isn't
+   rotationally symmetric. A plane flies a real flight PATH instead: a
+   long, single 18s choreographed circuit (matching the ~20s total boot
+   duration so it completes almost exactly once, rather than visibly
+   restarting mid-boot) — climb out, bank into a wide loop, level off,
+   a tighter secondary loop, then settle back to center just as the
+   stop-and-reveal sequence takes over. Built from translateX/Y + rotate
+   + scale keyframes on one element (cheap, GPU-composited), no new DOM.
+   `--stopped` still ends things early via the climb-settle keyframes
+   further down, same as before — this only replaces what plays *while*
+   still spinning. */
+.splash-mark-wrap--spinning .splash-mark {
+  animation: splash-flight-path 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes splash-flight-path {
+  /* Climb-out: banks up and right, gaining a little altitude and scale
+     (reads as "coming toward camera" on the ascent). */
+  0% {
+    transform: translate(0, 0) rotate(-4deg) scale(1);
+  }
+  8% {
+    transform: translate(10px, -14px) rotate(10deg) scale(1.05);
+  }
+  /* Wide loop, first half: banks hard into a long climbing turn. */
+  20% {
+    transform: translate(18px, -6px) rotate(38deg) scale(1.08);
+  }
+  30% {
+    transform: translate(10px, 10px) rotate(95deg) scale(1.02);
+  }
+  /* Apex of the loop — inverted bank, briefly smaller (reads as
+     "further away" at the top of the arc). */
+  38% {
+    transform: translate(-6px, 4px) rotate(165deg) scale(0.92);
+  }
+  /* Wide loop, second half: comes back around and levels out. */
+  48% {
+    transform: translate(-16px, -8px) rotate(220deg) scale(1);
+  }
+  58% {
+    transform: translate(-8px, -18px) rotate(275deg) scale(1.06);
+  }
+  66% {
+    transform: translate(4px, -10px) rotate(340deg) scale(1.02);
+  }
+  /* Level flight, cruising — a plain bank+bob holding pattern, same
+     language as the original loop, so the sequence has a calm middle
+     beat rather than being maneuver after maneuver. */
+  74% {
+    transform: translate(0, -4px) rotate(-6deg) scale(1);
+  }
+  82% {
+    transform: translate(0, 2px) rotate(6deg) scale(1);
+  }
+  /* Tighter second loop — smaller radius, quicker, a flourish before
+     settling back to the exact start pose so the 18s cycle seams
+     invisibly if boot ever runs long enough to loop again. */
+  88% {
+    transform: translate(6px, -6px) rotate(60deg) scale(1.04);
+  }
+  94% {
+    transform: translate(-4px, 2px) rotate(220deg) scale(0.96);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-4deg) scale(1);
+  }
+}
+
+/* A short motion-trail streak behind the mark during the flight path —
+   two faint offset copies of the glyph's own silhouette, staggered just
+   behind the real animation timing, giving the impression of speed
+   through the air rather than a single shape sliding around in
+   isolation. Purely decorative (aria-hidden, no pointer events).
+   Deliberately NOT gated behind prefers-reduced-motion, matching the
+   rest of this file and SplashScreen.tsx's own top-of-file decision: the
+   boot sequence always plays in full regardless of that OS setting (see
+   SplashScreen.tsx's doc comment for why — a machine with Windows'
+   system-wide "Show animations" toggle off was reported to make WebView2
+   claim prefers-reduced-motion: reduce, which would otherwise have
+   silently collapsed this entire choreographed sequence to nothing). */
+.splash-trail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.splash-trail > svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
 
-/* ---- Smoke/liquid blobs ---- */
-
-.splash-blob-field {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  will-change: transform, opacity;
+.splash-mark-wrap--spinning .splash-trail-1 > svg {
+  animation: splash-flight-path 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation-delay: -0.12s;
+  opacity: 0.16;
+}
+.splash-mark-wrap--spinning .splash-trail-2 > svg {
+  animation: splash-flight-path 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation-delay: -0.24s;
+  opacity: 0.08;
 }
 
-/*
- * Each blob is a two-layer transform: an outer "orbit" element spins around
- * the center (rotate + oscillating radius via nested translate), and an inner
- * "shape" element holds the actual gradient blob offset from that center.
- * Rotating the offset — rather than rotating the blob in place — is what
- * reads as tendrils sweeping around a point instead of a blob pulsing in place.
- *
- * While loading, the orbit/blob-spin animations loop indefinitely (duration
- * is unknown up front — it's however long the real app takes to become
- * paint-ready). The `--resolved` modifier swaps to a one-shot keyframe that
- * spins the radius down to zero once, coalescing the smoke into the mark.
- */
-.splash-orbit {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
+.splash-mark-wrap--stopped .splash-trail {
   opacity: 0;
-  animation: splash-orbit-loop-a 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  transition: opacity 0.3s ease-out;
 }
 
-.splash-blob {
-  position: absolute;
-  border-radius: 42% 58% 61% 39% / 45% 40% 60% 55%;
-  filter: blur(26px);
-  mix-blend-mode: screen;
-  transform-origin: center;
-  animation: splash-blob-spin-loop-a 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+/* Settling: one decisive upward climb-and-bank, eased out hard, then
+   levelling off — reads as the plane finishing its ascent and holding
+   position, rather than an arbitrary "spin winding down." */
+.splash-mark-wrap--stopped .splash-mark {
+  animation: splash-climb-settle 0.9s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
 }
 
-.splash-orbit--1 {
-  animation-name: splash-orbit-loop-a;
-}
-.splash-orbit--2 {
-  animation-name: splash-orbit-loop-b;
-  animation-delay: 0.3s;
-}
-.splash-orbit--3 {
-  animation-name: splash-orbit-loop-c;
-  animation-delay: 0.6s;
-}
-.splash-orbit--4 {
-  animation-name: splash-orbit-loop-d;
-  animation-delay: 0.15s;
-}
-
-.splash-blob--1 {
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle at 35% 35%, var(--splash-cyan, #37b4c8), transparent 70%);
-  animation-name: splash-blob-spin-loop-a;
-}
-
-.splash-blob--2 {
-  width: 230px;
-  height: 230px;
-  background: radial-gradient(circle at 60% 40%, var(--splash-blue, #185fa5), transparent 70%);
-  animation-name: splash-blob-spin-loop-b;
-  animation-delay: 0.3s;
-}
-
-.splash-blob--3 {
-  width: 160px;
-  height: 160px;
-  background: radial-gradient(circle at 45% 55%, var(--splash-teal, #7fe0d0), transparent 70%);
-  animation-name: splash-blob-spin-loop-c;
-  animation-delay: 0.6s;
-}
-
-.splash-blob--4 {
-  width: 260px;
-  height: 260px;
-  background: radial-gradient(circle at 50% 50%, var(--splash-blue, #185fa5), transparent 72%);
-  animation-name: splash-blob-spin-loop-d;
-  animation-delay: 0.15s;
-}
-
-/* Looping: orbit radius breathes in and out, opacity stays present — smoke that keeps drifting while we wait. */
-@keyframes splash-orbit-loop-a {
+@keyframes splash-climb-settle {
   0% {
-    opacity: 0;
-    transform: rotate(0deg) translateX(20px);
+    transform: rotate(-6deg) translateY(0) scale(1);
   }
-  15% {
-    opacity: 0.85;
-  }
-  50% {
-    opacity: 0.75;
-    transform: rotate(180deg) translateX(70px);
-  }
-  85% {
-    opacity: 0.6;
+  55% {
+    transform: rotate(8deg) translateY(-14px) scale(1.08);
   }
   100% {
-    opacity: 0;
-    transform: rotate(360deg) translateX(20px);
+    transform: rotate(0deg) translateY(0) scale(1);
   }
 }
 
-@keyframes splash-orbit-loop-b {
-  0% {
-    opacity: 0;
-    transform: rotate(0deg) translateX(24px);
-  }
-  15% {
-    opacity: 0.8;
-  }
-  50% {
-    opacity: 0.7;
-    transform: rotate(-190deg) translateX(88px);
-  }
-  85% {
-    opacity: 0.55;
-  }
-  100% {
-    opacity: 0;
-    transform: rotate(-360deg) translateX(24px);
-  }
+.splash-lockup--stopped .splash-mark-wrap {
+  transform: translateX(0);
 }
 
-@keyframes splash-orbit-loop-c {
-  0% {
-    opacity: 0;
-    transform: rotate(0deg) translateX(16px);
-  }
-  15% {
-    opacity: 0.85;
-  }
-  50% {
-    opacity: 0.85;
-    transform: rotate(160deg) translateX(56px);
-  }
-  85% {
-    opacity: 0.6;
-  }
-  100% {
-    opacity: 0;
-    transform: rotate(360deg) translateX(16px);
-  }
-}
-
-@keyframes splash-orbit-loop-d {
-  0% {
-    opacity: 0;
-    transform: rotate(0deg) translateX(12px);
-  }
-  15% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.45;
-    transform: rotate(-160deg) translateX(40px);
-  }
-  85% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 0;
-    transform: rotate(-360deg) translateX(12px);
-  }
-}
-
-@keyframes splash-blob-spin-loop-a {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.05) rotate(220deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(440deg);
-  }
-}
-
-@keyframes splash-blob-spin-loop-b {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.1) rotate(-200deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(-400deg);
-  }
-}
-
-@keyframes splash-blob-spin-loop-c {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1) rotate(180deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(360deg);
-  }
-}
-
-@keyframes splash-blob-spin-loop-d {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(0.95) rotate(-160deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.7) rotate(-320deg);
-  }
-}
-
-/* Resolved: one-shot, radius spins down to zero — smoke coalescing into the mark. */
-.splash-blob-field--resolved .splash-orbit {
-  animation-name: splash-orbit-resolve;
-  animation-duration: 0.65s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  animation-iteration-count: 1;
-  animation-delay: 0s;
-}
-
-.splash-blob-field--resolved .splash-blob {
-  animation-name: splash-blob-resolve;
-  animation-duration: 0.65s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  animation-iteration-count: 1;
-  animation-delay: 0s;
-}
-
-@keyframes splash-orbit-resolve {
-  0% {
-    opacity: 0.6;
-  }
-  40% {
-    opacity: 0.7;
-    transform: rotate(120deg) translateX(10px);
-  }
-  100% {
-    opacity: 0;
-    transform: rotate(220deg) translateX(0px);
-  }
-}
-
-@keyframes splash-blob-resolve {
-  0% {
-    transform: translate(-50%, -50%) scale(0.85) rotate(0deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(0.3) rotate(140deg);
-  }
-}
-
-/* ---- Seed point of light (holds steady while loading; fades once resolved) ---- */
-
-.splash-seed {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #bdf3ff;
-  box-shadow: 0 0 18px 6px rgba(120, 220, 230, 0.9);
-  animation: splash-seed-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes splash-seed-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
-}
-
-.splash-blob-field--resolved .splash-seed {
-  animation: splash-seed-vanish 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-}
-
-@keyframes splash-seed-vanish {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.2);
-  }
-}
-
-/* ---- Logo mark: hidden while loading, resolves in once the --resolved class lands ---- */
-
-.splash-mark {
-  position: relative;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  opacity: 0;
-  transform: scale(0.4);
-  filter: drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
-}
-
-.splash-mark--resolved {
-  animation: splash-mark-resolve 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes splash-mark-resolve {
-  0% {
-    opacity: 0;
-    transform: scale(0.35);
-    filter: blur(10px) drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1.06);
-    filter: blur(0px) drop-shadow(0 0 22px rgba(55, 180, 200, 0.55));
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0px) drop-shadow(0 0 16px rgba(55, 180, 200, 0.45));
-  }
-}
-
-/* ---- Wordmark + tagline ---- */
+/* ---- Wordmark: slides in from the right with a glow sweep once the mark has stopped ---- */
 
 .splash-wordmark {
-  margin-top: 18px;
-  font-family: var(--font-display, 'Poppins', sans-serif);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  position: relative;
+  font-family: var(--font-wordmark, 'Space Grotesk', sans-serif);
+  font-size: 44px;
+  /* Light, with tight negative tracking — the screensaver's own
+     typography. A semibold wordmark read as branding stamped on the
+     image; this reads as part of it. */
+  font-weight: 300;
+  letter-spacing: -0.01em;
   color: rgba(255, 255, 255, 0.96);
+  text-shadow:
+    0 2px 24px rgb(0 0 0 / 55%),
+    0 1px 3px rgb(0 0 0 / 40%);
   opacity: 0;
-  transform: translateY(8px);
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transform: translateX(24px);
 }
 
-.splash-wordmark--resolved {
-  animation: splash-fade-up 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
+.splash-wordmark--revealed {
+  animation: splash-wordmark-reveal 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes splash-wordmark-reveal {
+  0% {
+    opacity: 0;
+    width: 0;
+    transform: translateX(24px);
+  }
+  1% {
+    width: auto;
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 1;
+    width: auto;
+    transform: translateX(0);
+  }
+}
+
+/* Light-sweep glow across the wordmark as it settles — a diagonal highlight
+   band that crosses once and fades, layered via ::after so it doesn't
+   disturb the text's own opacity/transform animation above. */
+.splash-wordmark--revealed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.7) 48%,
+    rgba(255, 255, 255, 0.45) 52%,
+    transparent 70%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: splash-wordmark-sweep 0.9s cubic-bezier(0.3, 0, 0.15, 1) forwards;
+  animation-delay: 0.25s;
+  pointer-events: none;
+}
+
+@keyframes splash-wordmark-sweep {
+  0% {
+    background-position: 160% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+/* The mark settles by lifting into full contrast, not by glowing.
+
+   This was a permanent cyan drop-shadow halo (drop-shadow 0 0 18px) left
+   burning around the logo for the whole splash — the loudest instance of
+   the effect being removed app-wide, and the one thing separating this
+   screen from the screensaver's restraint. The arrival is now carried by
+   opacity and a barely-there scale settle, which is how the screensaver
+   introduces its own clock. */
+.splash-lockup--stopped .splash-mark-wrap {
+  animation: splash-mark-settle 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   animation-delay: 0.4s;
 }
 
-.splash-tagline {
-  margin-top: 8px;
-  font-family: var(--font-sans, 'Montserrat', sans-serif);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.6);
-  opacity: 0;
-  transform: translateY(6px);
-}
-
-.splash-tagline--resolved {
-  animation: splash-fade-up 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
-  animation-delay: 0.6s;
-}
-
-@keyframes splash-fade-up {
-  to {
+@keyframes splash-mark-settle {
+  0% {
+    opacity: 0.82;
+    transform: scale(1.015);
+  }
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 
-/* ---- Skip hint ---- */
+/* ---- Status text ---- */
 
-.splash-skip-hint {
-  position: absolute;
-  bottom: 32px;
+.splash-status {
+  /* Sits under the lockup rather than pinned to the window's bottom edge,
+     so the two read as one block instead of a logo and an unrelated
+     caption at opposite ends of the screen. */
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 60%);
+}
+
+.splash-status-text {
+  font-family: var(--font-sans, 'Montserrat', sans-serif);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.splash-status-slow {
   font-family: var(--font-sans, 'Montserrat', sans-serif);
   font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.32);
-  opacity: 0;
-  animation: splash-fade-up 0.5s ease forwards;
-  animation-delay: 1s;
+  letter-spacing: 0.02em;
+  color: rgba(255, 200, 140, 0.65);
+  animation: splash-fade-simple 0.4s ease forwards;
 }
 
-/* ---- Reduced motion: near-instant fallback ---- */
-
-@media (prefers-reduced-motion: reduce) {
-  .splash-blob,
-  .splash-seed {
-    display: none;
-  }
-
-  .splash-mark,
-  .splash-mark--resolved {
-    animation: splash-fade-simple 0.25s ease forwards;
-    animation-delay: 0s;
-    filter: none;
-  }
-
-  .splash-wordmark,
-  .splash-wordmark--resolved {
-    animation: splash-fade-simple 0.25s ease forwards;
-    animation-delay: 0.1s;
-  }
-
-  .splash-tagline,
-  .splash-tagline--resolved {
-    animation: splash-fade-simple 0.25s ease forwards;
-    animation-delay: 0.15s;
-  }
-
-  .splash-skip-hint {
-    display: none;
-  }
+.splash-wordmark-tagline {
+  margin-top: 12px;
+  font-family: var(--font-sans, 'Montserrat', sans-serif);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 @keyframes splash-fade-simple {
@@ -453,6 +370,5 @@
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }

@@ -29,14 +29,14 @@ export function EmptyState({ onFileSelected, errorMessage }: EmptyStateProps) {
       <button
         type="button"
         onClick={handleBrowse}
-        className="bg-brand-blue hover:bg-brand-cyan mt-2 flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-white transition-colors"
+        className="bg-accent text-accent-contrast mt-2 flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-transform active:scale-95"
       >
         <UploadIcon width={16} height={16} />
         Open document
       </button>
       <p className="text-text-tertiary text-xs">Supports .txt, .md, .pdf, and .docx</p>
       {errorMessage && (
-        <p className="mt-2 max-w-md rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+        <p className="mt-2 max-w-md rounded-lg border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger">
           {errorMessage}
         </p>
       )}

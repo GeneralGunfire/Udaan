@@ -1,13 +1,2 @@
-export {
-  chat,
-  isReachable,
-  transcribe,
-  transcribeBytes,
-  configuredChatModel,
-  listRunningModels,
-  startOllama,
-  stopOllama,
-  hasStartedOllama,
-} from './client'
-export type { ChatMessage, ChatOptions, ChatResult, ChatTool, ChatToolCall, TranscriptionResult } from './types'
-export type { RunningModel } from './client'
+export { listTtsVoices, synthesizeSpeech } from './client'
+export type { TtsVoice } from './client'

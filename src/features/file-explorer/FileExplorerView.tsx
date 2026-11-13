@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { duration, ease } from '@/shared/lib/motion'
+import { parentPath } from './lib/pathUtils'
 import { cn } from '@/shared/lib/cn'
-import { Button } from '@/shared/components/ui/button'
-import { WindowCloseIcon } from '@/shared/icons'
 import type { FileEntry, NewFileKind } from '@/integrations/file-explorer/types'
 import {
   createFolder,
@@ -40,9 +39,6 @@ import { useTransferProgress } from './hooks/useTransferProgress'
 import { useToasts } from './hooks/useToasts'
 import { sortEntries } from './lib/sortEntries'
 import { openFileWith } from '@/integrations/installed-apps/client'
-import { openDocumentReader } from '@/app/apps'
-
-const DOCUMENT_READER_EXTENSIONS = new Set(['txt', 'md', 'markdown', 'pdf', 'docx'])
 import {
   renameOperation,
   createFolderOperation,
@@ -62,10 +58,12 @@ import type { QuickAccessLocation, ConflictMode } from '@/integrations/file-expl
  */
 interface FileExplorerViewProps {
   onClose: () => void
+  /** Folder to open at, e.g. a folder double-clicked on the desktop. */
+  initialPath?: string
 }
 
-export function FileExplorerView({ onClose }: FileExplorerViewProps) {
-  const [homePath, setHomePath] = useState<string | null>(null)
+export function FileExplorerView({ initialPath }: FileExplorerViewProps) {
+  const [homePath, setHomePath] = useState<string | null>(initialPath ?? null)
   const [quickAccess, setQuickAccess] = useState<QuickAccessLocation[]>([])
 
   useEffect(() => {
@@ -78,28 +76,12 @@ export function FileExplorerView({ onClose }: FileExplorerViewProps) {
   if (!homePath) {
     return (
       <div className="relative h-full w-full">
-        <CloseButton onClose={onClose} />
         <LoadingState />
       </div>
     )
   }
 
-  return <FileExplorerReady initialPath={homePath} quickAccess={quickAccess} onClose={onClose} />
-}
-
-function CloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <Button
-      type="button"
-      aria-label="Close File Explorer"
-      variant="ghost"
-      size="icon-sm"
-      onClick={onClose}
-      className="absolute top-3 right-3 z-20"
-    >
-      <WindowCloseIcon width={14} height={14} />
-    </Button>
-  )
+  return <FileExplorerReady initialPath={homePath} requestedPath={initialPath} quickAccess={quickAccess} />
 }
 
 interface PendingTransfer {
@@ -112,14 +94,23 @@ interface PendingTransfer {
 
 function FileExplorerReady({
   initialPath,
+  requestedPath,
   quickAccess,
-  onClose,
 }: {
   initialPath: string
+  requestedPath: string | undefined
   quickAccess: QuickAccessLocation[]
-  onClose: () => void
 }) {
   const { currentPath, canGoBack, canGoForward, navigateTo, goBack, goForward } = useNavigationHistory(initialPath)
+
+  // A second "open this folder" request while the window is already open
+  // navigates in place, like Explorer reusing its window.
+  const lastRequested = useRef(requestedPath)
+  useEffect(() => {
+    if (!requestedPath || requestedPath === lastRequested.current) return
+    lastRequested.current = requestedPath
+    navigateTo(requestedPath)
+  }, [requestedPath, navigateTo])
   const { entries, loading, error, refresh } = useDirectoryListing(currentPath)
   const { pinned, pin, unpin, reorder } = usePinnedFolders()
   const { canUndo, canRedo, push: pushUndo, undo, redo } = useUndoStack()
@@ -131,6 +122,8 @@ function FileExplorerReady({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null)
+  const anchorPath = useRef<string | null>(null)
+  const typeAhead = useRef<{ text: string; timer: ReturnType<typeof setTimeout> | undefined }>({ text: '', timer: undefined })
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
   const [contextMenu, setContextMenu] = useState<{ position: ContextMenuPosition; path: string | null } | null>(null)
@@ -495,6 +488,33 @@ function FileExplorerReady({
       } else if ((e.ctrlKey || e.metaKey) && (key === 'y' || (e.shiftKey && key === 'z'))) {
         e.preventDefault()
         redo()
+      } else if (e.key === ' ' && selectedPaths.size === 1 && !e.ctrlKey && !e.altKey) {
+        // Quick Look: Space previews the selected item.
+        e.preventDefault()
+        const entry = visibleEntries.find((en) => en.path === Array.from(selectedPaths)[0])
+        if (entry && !entry.isDir) setPreviewEntry(entry)
+      } else if ((e.key === 'Backspace' && !e.ctrlKey) || (e.altKey && e.key === 'ArrowUp')) {
+        e.preventDefault()
+        const up = parentPath(currentPath)
+        if (up) navigateTo(up)
+      } else if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (canGoBack) goBack()
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (canGoForward) goForward()
+      } else if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && key === 'r')) {
+        e.preventDefault()
+        refresh()
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'c' && selectedPaths.size > 0) {
+        // Copy the full path(s), one per line.
+        e.preventDefault()
+        void navigator.clipboard.writeText(Array.from(selectedPaths).join('\n')).then(() => pushToast(selectedPaths.size === 1 ? 'Path copied' : `${selectedPaths.size} paths copied`))
+      } else if ((e.key === 'Home' || e.key === 'End') && visibleEntries.length > 0) {
+        e.preventDefault()
+        const target = visibleEntries[e.key === 'Home' ? 0 : visibleEntries.length - 1].path
+        setSelectedPaths(new Set([target]))
+        setLastSelectedPath(target)
       } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && visibleEntries.length > 0) {
         e.preventDefault()
         const paths = visibleEntries.map((en) => en.path)
@@ -504,14 +524,33 @@ function FileExplorerReady({
             ? Math.min(paths.length - 1, currentIndex + 1)
             : Math.max(0, currentIndex === -1 ? 0 : currentIndex - 1)
         const nextPath = paths[nextIndex]
-        setSelectedPaths(new Set([nextPath]))
+        if (e.shiftKey && anchorPath.current) {
+          // Shift+arrow grows the selection from where it started.
+          const from = paths.indexOf(anchorPath.current)
+          const [lo, hi] = from <= nextIndex ? [from, nextIndex] : [nextIndex, from]
+          setSelectedPaths(new Set(paths.slice(lo, hi + 1)))
+        } else {
+          anchorPath.current = nextPath
+          setSelectedPaths(new Set([nextPath]))
+        }
         setLastSelectedPath(nextPath)
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && visibleEntries.length > 0) {
+        // Type-to-jump: typing a name selects the first match, like Finder and Explorer.
+        typeAhead.current.text += e.key.toLowerCase()
+        clearTimeout(typeAhead.current.timer)
+        typeAhead.current.timer = setTimeout(() => (typeAhead.current.text = ''), 700)
+        const hit = visibleEntries.find((en) => en.name.toLowerCase().startsWith(typeAhead.current.text))
+        if (hit) {
+          anchorPath.current = hit.path
+          setSelectedPaths(new Set([hit.path]))
+          setLastSelectedPath(hit.path)
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPaths, clipboard, renamingPath, visibleEntries, lastSelectedPath])
+  }, [selectedPaths, clipboard, renamingPath, visibleEntries, lastSelectedPath, currentPath, canGoBack, canGoForward])
 
   // refresh() after undo/redo mutate the filesystem out from under the current listing.
   useEffect(() => {
@@ -531,7 +570,6 @@ function FileExplorerReady({
 
   return (
     <div ref={containerRef} className="relative flex h-full min-h-0 w-full flex-col" tabIndex={-1}>
-      <CloseButton onClose={onClose} />
       <ExplorerTopBar
         currentPath={currentPath}
         canGoBack={canGoBack}
@@ -572,7 +610,7 @@ function FileExplorerReady({
         />
 
         <div
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
           onContextMenu={(e) => {
             if ((e.target as HTMLElement).closest('[data-path]')) return
             e.preventDefault()
@@ -591,7 +629,7 @@ function FileExplorerReady({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
               transition={{ duration: duration.standard, ease: ease.standard }}
-              className={cn('flex min-h-0 flex-1 flex-col')}
+              className={cn('flex min-h-0 min-w-0 flex-1 flex-col')}
             >
               {loading && <LoadingState />}
               {!loading && error && <ErrorState message={error} />}
@@ -629,8 +667,8 @@ function FileExplorerReady({
                   onDropOntoFolder={handleDropOntoFolder}
                 />
               )}
-              {searching && <p className="text-text-tertiary px-3 pb-2 text-[11px]">Searching…</p>}
-              {openError && <p className="text-danger px-3 pb-2 text-[11px]">{openError}</p>}
+              {searching && <p className="text-text-tertiary px-3 pb-2 text-2xs">Searching…</p>}
+              {openError && <p className="text-danger px-3 pb-2 text-2xs">{openError}</p>}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -647,11 +685,7 @@ function FileExplorerReady({
         isSingleFile={selectedPaths.size === 1 && !!contextMenuEntry && !contextMenuEntry.isDir}
         onOpen={handleOpenSelected}
         onOpenWith={handleOpenWith}
-        onReadAloud={
-          contextMenuEntry && !contextMenuEntry.isDir && DOCUMENT_READER_EXTENSIONS.has(contextMenuEntry.extension.toLowerCase())
-            ? () => openDocumentReader(contextMenuEntry.path)
-            : undefined
-        }
+        onReadAloud={undefined}
         onRename={() => startRename(contextMenu?.path)}
         onDelete={requestDelete}
         onCopy={handleCopy}

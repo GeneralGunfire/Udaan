@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { homeDir } from '@tauri-apps/api/path'
-import { chat as localChat, isReachable as isOllamaReachable } from '@/integrations/local-model'
-import { submitTask, onTaskEvent, parseStreamLine } from '@/integrations/claude-code'
+import {
+  chat as omniRouteChat,
+  type ChatMessage as OmniRouteMessage,
+} from '@/integrations/omniroute'
 import {
   isScheduleQuery,
   buildScheduleContextMessage,
   SCHEDULE_QUERY_TEMPERATURE,
-  tryExecuteBulkScheduleAction,
   isScheduleActionRequest,
   SCHEDULE_TOOLS,
   executeScheduleToolCall,
@@ -21,21 +21,106 @@ import {
   addMessage,
   updateMessage,
   deleteSession as deleteSessionApi,
+  listMemoryFacts,
   type ChatSession,
 } from '@/integrations/general-chat'
+import { AGENT_WORKSPACE_TOOLS, executeAgentToolCall, getWorkspacePath } from '@/integrations/agent-workspace'
 import type { ModeId } from '../components/modes'
-import type { ChatMessageData } from '../components/ChatMessage'
+import type { ChatMessageData, ChatMessageStep } from '../components/ChatMessage'
+import { isAgentTaskRequest } from '../lib/agentIntent'
+import { invoke } from '@tauri-apps/api/core'
+import { search as webSearch, fetchPage } from '@/integrations/omni-find/client'
 
-/** Tracks the in-flight Claude Code task backing an assistant message, so stream events can be routed to the right bubble. */
-interface PendingClaudeTask {
-  taskId: string
-  messageId: string
+/** Questions that need today's information, not the model's memory. */
+const CURRENT_EVENTS = /\b(latest|today|tonight|yesterday|this week|right now|currently|news|update|price of|prices?|weather|score|who won|election|stock|exchange rate|rand|release date|2025|2026)\b/i
+
+/** Searches the web and reads the top pages; returns numbered sources for the prompt. */
+async function gatherWeb(query: string, signal: AbortSignal): Promise<{ context: string; sources: { title: string; url: string }[] }> {
+  const hits = await webSearch(query, 10).catch(() => [])
+  const top = hits.slice(0, 8)
+  // Read the best few pages in parallel; each gets 12s before it is skipped.
+  const pages = await Promise.all(
+    top.slice(0, 5).map((h) =>
+      Promise.race([fetchPage(h.url).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 12_000))]),
+    ),
+  )
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+  const sources = top.map((h) => ({ title: h.title, url: h.url }))
+  const blocks = top.map((h, i) => {
+    const page = pages[i]
+    const body = page?.text ? page.text.slice(0, 2200) : h.snippet
+    return `[${i + 1}] ${h.title}\n${h.url}\n${body}`
+  })
+  return { context: blocks.join('\n\n---\n\n'), sources }
+}
+
+const IMAGE_MD = /!\[[^\]]*\]\([^)]*\)/g
+
+/** "draw a fox", "generate an image of…", "/imagine …" → the thing to draw; otherwise null. */
+function imageRequest(prompt: string): string | null {
+  const p = prompt.trim()
+  const slash = p.match(/^\/(?:imagine|image|draw)\s+(.+)/i)
+  if (slash) return slash[1]
+  const m = p.match(/^(?:please\s+)?(?:can you\s+)?(?:draw|paint|sketch|generate|create|make|design)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|drawing|painting|logo|wallpaper|art(?:work)?)?\s*(?:of|showing|with)?\s+(.+)/i)
+  if (m && /(draw|paint|sketch|image|picture|photo|illustration|drawing|painting|logo|wallpaper|art)/i.test(p)) return m[1].replace(/[.?!]+$/, '')
+  return null
+}
+
+/** Hard cap on tool-calling steps per user turn — forces a stop and an honest message rather than looping silently forever against a flaky backend. */
+const MAX_AGENT_STEPS = 10
+
+/**
+ * Turns a raw OmniRoute client error into something a reader can act on.
+ * The prior version always appended "Is OmniRoute running?" and dumped
+ * the entire raw response body (a JSON blob with a `diagnostics` object
+ * listing every provider combo it tried) straight into the chat bubble
+ * — misleading when OmniRoute plainly *did* respond (it's not a
+ * reachability problem), and unreadable either way. `client.ts`'s
+ * "Cannot reach OmniRoute at …" message already covers true
+ * unreachability distinctly (a network-level fetch failure, not an HTTP
+ * error status), so this only needs to handle "OmniRoute answered, but
+ * with an error" — which after `RETRYABLE_STATUSES` already retries
+ * 401/429/499/502/503 a couple of times, means every retry attempt
+ * genuinely failed.
+ */
+function describeOmniRouteError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (raw.startsWith('Cannot reach OmniRoute')) return raw
+
+  // The client's own retry-exhaustion messages are already short and
+  // don't carry a raw JSON body — pass those through unchanged.
+  if (/^OmniRoute chat request failed after \d+ attempts:/.test(raw)) {
+    return `${raw} Every provider OmniRoute tried failed — try again in a moment, or check omniroute's own logs if this keeps happening.`
+  }
+
+  // A single non-retried failure (`OmniRoute chat request failed: <status>
+  // <statusText> — <body>`) still carries the raw response body. Extract
+  // just the human-readable `error.message` field if the body parses as
+  // OmniRoute's own JSON error shape, so a Bearer-key auth failure reads
+  // as a sentence instead of `{"error":{"message":"...",...`.
+  const bodyMatch = raw.match(/^OmniRoute chat request failed: (\d+) [^—]*— (.+)$/s)
+  if (bodyMatch) {
+    const [, status, body] = bodyMatch
+    try {
+      const parsed = JSON.parse(body) as { error?: { message?: string } }
+      if (parsed.error?.message) {
+        return `OmniRoute (${status}): ${parsed.error.message} — try sending again, or restart OmniRoute if this keeps happening.`
+      }
+    } catch {
+      // Not JSON — fall through to the raw message below rather than
+      // guessing at a shape it doesn't have.
+    }
+  }
+
+  return `Something went wrong getting a reply: ${raw.replace(/^Error: /, "")} — try sending it again.`
 }
 
 /**
- * Local and Claude are separate conversation spaces — each has its own list
- * of sessions and its own active session id, never sharing messages. Switch
- * `mode` and the hook loads that provider's own session list/history.
+ * General Chat talks to OmniRoute (a local multi-provider cloud proxy) —
+ * the local Ollama-backed mode was removed along with Ollama itself.
+ * `mode` is kept as a parameter (always `'omniroute'` today) so session
+ * storage/history stay scoped the same way if another provider mode is
+ * ever added back.
  */
 export function useGeneralChat(mode: ModeId) {
   const [messages, setMessages] = useState<ChatMessageData[]>([])
@@ -44,12 +129,19 @@ export function useGeneralChat(mode: ModeId) {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
-  const pendingClaudeTask = useRef<PendingClaudeTask | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Assistant-message DB row ids only exist once the row is first persisted
   // (after the reply resolves) — this maps in-memory message id -> db id so
   // a later updateMessage() call targets the right row.
   const dbMessageId = useRef<Map<string, string>>(new Map())
+  // Cross-session key facts (e.g. name, timezone) — loaded once and
+  // prepended to every turn's system prompt so the model has some memory
+  // beyond the current conversation. Refreshed on mount only; a fact
+  // written mid-session takes effect on the *next* new session.
+  const memoryFactsRef = useRef<string>('')
+  // The conversation so far, sent with every turn so replies have context.
+  const messagesRef = useRef<ChatMessageData[]>([])
+  messagesRef.current = messages
 
   const loadSessionList = useCallback(async () => {
     try {
@@ -69,7 +161,7 @@ export function useGeneralChat(mode: ModeId) {
       stored.map((m) => ({
         id: m.id,
         role: m.role,
-        mode: (m.mode as ModeId) ?? 'local',
+        mode: (m.mode as ModeId) ?? 'omniroute',
         text: m.content,
         createdAt: m.created_at,
       })),
@@ -108,40 +200,12 @@ export function useGeneralChat(mode: ModeId) {
   }, [mode, loadSessionList, loadSession])
 
   useEffect(() => {
-    const unlistenPromise = onTaskEvent((event) => {
-      const pending = pendingClaudeTask.current
-      if (!pending || event.task_id !== pending.taskId) return
-
-      if (event.kind === 'line') {
-        const rendered = parseStreamLine(event.line)
-        if (rendered.variant === 'result') {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === pending.messageId ? { ...m, text: rendered.text } : m)),
-          )
-          persistAssistantContent(pending.messageId, rendered.text)
-        }
-      } else if (event.kind === 'status' && event.status === 'done') {
-        setResponding(false)
-        pendingClaudeTask.current = null
-      } else if (event.kind === 'status' && event.status === 'failed') {
-        const text = 'Claude session failed.'
-        setMessages((prev) =>
-          prev.map((m) => (m.id === pending.messageId ? { ...m, text } : m)),
-        )
-        persistAssistantContent(pending.messageId, text)
-        setResponding(false)
-        pendingClaudeTask.current = null
-      } else if (event.kind === 'stderr') {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === pending.messageId ? { ...m, text: event.line } : m)),
-        )
-        persistAssistantContent(pending.messageId, event.line)
-      }
-    })
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    listMemoryFacts()
+      .then((facts) => {
+        memoryFactsRef.current =
+          facts.length > 0 ? facts.map((f) => `- ${f.key}: ${f.value}`).join('\n') : ''
+      })
+      .catch((err) => console.error('Failed to load memory facts:', err))
   }, [])
 
   /** Writes an assistant message's final text to the DB row created for it (see `send`). */
@@ -152,158 +216,225 @@ export function useGeneralChat(mode: ModeId) {
     }
   }, [])
 
-  const runLocal = useCallback(
-    async (prompt: string, assistantId: string) => {
+  const updateAssistant = useCallback((assistantId: string, patch: Partial<ChatMessageData>) => {
+    setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m)))
+  }, [])
+
+  const appendStep = useCallback(
+    (assistantId: string, step: ChatMessageStep) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, steps: [...(m.steps ?? []), step] } : m)),
+      )
+    },
+    [],
+  )
+
+  /**
+   * The agentic tool-calling loop for the sandboxed file workspace. Real
+   * multi-turn tool-calling: each tool result is fed back to the model as
+   * a `tool` message and the model is called again, up to MAX_AGENT_STEPS
+   * times, rather than the schedule path's fixed two-call pattern. Given
+   * OmniRoute's free-tier backends' known failure rate, a malformed or
+   * failing tool call is surfaced as a failed step and the loop stops
+   * there rather than retrying silently or pretending success.
+   */
+  const runAgentLoop = useCallback(
+    async (prompt: string, assistantId: string, controller: AbortController, systemPreamble: string) => {
+      const history: OmniRouteMessage[] = [
+        { role: 'system', content: systemPreamble },
+        { role: 'user', content: prompt },
+      ]
+
+      for (let step = 0; step < MAX_AGENT_STEPS; step++) {
+        const result = await omniRouteChat(history, controller.signal, undefined, AGENT_WORKSPACE_TOOLS)
+
+        if (!result.toolCalls || result.toolCalls.length === 0) {
+          const text = result.content || '(empty response)'
+          updateAssistant(assistantId, { text })
+          persistAssistantContent(assistantId, text)
+          return
+        }
+
+        // Record the assistant's own tool-call turn so the next request's
+        // history is a valid OpenAI-style transcript (assistant tool_calls
+        // -> tool results -> assistant continues), not just the results.
+        history.push({
+          role: 'assistant',
+          content: result.content || '',
+        })
+
+        let anyFailed = false
+        for (const call of result.toolCalls) {
+          const outcome = await executeAgentToolCall(call)
+          appendStep(assistantId, { label: outcome.label, ok: outcome.ok })
+          history.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: outcome.result,
+          })
+          if (!outcome.ok) anyFailed = true
+        }
+
+        if (anyFailed) {
+          const text =
+            'One of the steps above failed, so I stopped here rather than continuing on bad information. You can ask me to try a different approach.'
+          updateAssistant(assistantId, { text })
+          persistAssistantContent(assistantId, text)
+          return
+        }
+      }
+
+      const text = `I've hit my step limit (${MAX_AGENT_STEPS}) for this task — here's where I got to. You can ask me to continue.`
+      updateAssistant(assistantId, { text })
+      persistAssistantContent(assistantId, text)
+    },
+    [persistAssistantContent, updateAssistant, appendStep],
+  )
+
+  const runOmniRoute = useCallback(
+    async (prompt: string, assistantId: string, images: string[] = [], web = false) => {
       const started = performance.now()
       const controller = new AbortController()
       abortRef.current = controller
       try {
-        const reachable = await isOllamaReachable()
-        if (!reachable) {
-          const text =
-            'Ollama is not running at localhost:11434. Start it with "ollama serve" (or the Ollama background service) and try again.'
-          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
-          persistAssistantContent(assistantId, text)
-          return
-        }
-
-        // Tier 1 — bulk schedule actions ("move all today's events to
-        // tomorrow"): resolved and executed deterministically in code, a
-        // 1.5B model can't reliably batch multi-target tool calls in one
-        // turn (verified directly). The model only phrases the result.
-        const bulkResult = await tryExecuteBulkScheduleAction(prompt)
-        if (bulkResult.handled) {
-          const phrasing = await localChat(
-            [
-              {
-                role: 'system' as const,
-                content: `The following schedule action was already performed successfully. Report it back to the user in one short, natural sentence. Do not add anything not stated here.\n\n${bulkResult.summary}`,
-              },
-              { role: 'user' as const, content: prompt },
-            ],
-            controller.signal,
-            { temperature: SCHEDULE_QUERY_TEMPERATURE },
-          )
-          const text = phrasing.content || bulkResult.summary
-          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
-          persistAssistantContent(assistantId, text)
-          setLastLatencyMs(Math.round(performance.now() - started))
-          return
-        }
-
         const scheduleQuery = isScheduleQuery(prompt)
+        const scheduleAction = isScheduleActionRequest(prompt)
+        const agentTask = isAgentTaskRequest(prompt)
 
-        if (scheduleQuery) {
-          // Tier 2 — read-only schedule question: grounded plain-text
-          // context, low temperature, no tools needed.
-          const result = await localChat(
-            [
-              { role: 'system' as const, content: buildScheduleContextMessage(prompt) },
-              { role: 'user' as const, content: prompt },
-            ],
-            controller.signal,
-            { temperature: SCHEDULE_QUERY_TEMPERATURE },
-          )
-          const text = result.content || '(empty response)'
-          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
+        const memoryPreamble = [
+          `Today is ${new Date().toISOString().slice(0, 10)}.`,
+          memoryFactsRef.current ? `Known facts about the user:\n${memoryFactsRef.current}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+
+        if (agentTask && !scheduleAction) {
+          const workspacePath = await getWorkspacePath().catch(() => null)
+          const systemPreamble = [
+            memoryPreamble,
+            'You can read, write, list, and delete files inside a sandboxed workspace directory using the provided tools.' +
+              (workspacePath ? ` The workspace is at: ${workspacePath}` : '') +
+              ' You cannot access any other location on disk, and there is no command-execution tool available yet. Use relative paths only.',
+          ]
+            .filter(Boolean)
+            .join('\n\n')
+          await runAgentLoop(prompt, assistantId, controller, systemPreamble)
+          setLastLatencyMs(Math.round(performance.now() - started))
+          return
+        }
+
+        const systemPrompt = [
+          "You are Udaan's assistant: a knowledgeable, capable, friendly AI in the user's desktop, as helpful as ChatGPT. " +
+            'Give complete, accurate answers; use Markdown (headings, lists, tables, code blocks) when it helps readability, and keep casual replies short. ' +
+            "You remember this whole conversation. If the user wants a picture drawn, tell them to start the message with /imagine.",
+          memoryPreamble,
+          scheduleQuery ? buildScheduleContextMessage(prompt) : null,
+          scheduleAction && SCHEDULE_EVENTS.length > 0
+            ? `Here are the user's real schedule events/todos, with their exact ids:\n\n${buildEventIdReference(SCHEDULE_EVENTS)}\n\nUse the schedule tools with these exact ids to carry out any requested action(s) — including multiple events in one request. If a request is ambiguous or matches nothing, ask for clarification instead of calling a tool.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+
+        // Earlier turns (text only, most recent 24) so the model remembers the conversation.
+        const history = messagesRef.current
+          .filter((m) => m.id !== assistantId && m.text.trim() && !m.text.startsWith('('))
+          .slice(-25, -1)
+          .map((m) => ({ role: m.role, content: m.text.replace(IMAGE_MD, '[image]') }))
+        const messages = [
+          ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+          ...history,
+          { role: 'user' as const, content: prompt },
+        ]
+
+        // Picture requests go to the free Pollinations generator.
+        const imagePrompt = imageRequest(prompt)
+        if (imagePrompt && !images.length) {
+          updateAssistant(assistantId, { text: '' })
+          const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`
+          const saved = await invoke<string>('chat_download_image', { url })
+          const text = `Here's **${imagePrompt}**:
+
+![${imagePrompt.replace(/[[\]]/g, '')}](${saved})`
+          updateAssistant(assistantId, { text })
           persistAssistantContent(assistantId, text)
           setLastLatencyMs(Math.round(performance.now() - started))
           return
         }
 
-        if (isScheduleActionRequest(prompt) && SCHEDULE_EVENTS.length > 0) {
-          // Tier 3 — single-target schedule action ("move event X to
-          // Friday"): real Ollama tool-calling. Reliable for one clear
-          // target per turn (verified directly against the real endpoint).
-          const result = await localChat(
-            [
-              {
-                role: 'system' as const,
-                content: `Today is ${new Date().toISOString().slice(0, 10)}. Here are the user's real schedule events/todos, with their exact ids:\n\n${buildEventIdReference(SCHEDULE_EVENTS)}\n\nIf the user's request maps to exactly one of these events, call the matching tool with its exact id. If it's ambiguous or doesn't match any event, reply with text asking for clarification instead of calling a tool.`,
-              },
-              { role: 'user' as const, content: prompt },
-            ],
-            controller.signal,
-            { temperature: SCHEDULE_QUERY_TEMPERATURE },
-            [...SCHEDULE_TOOLS],
-          )
-
-          if (result.toolCalls && result.toolCalls.length > 0) {
-            const toolResults: string[] = []
-            for (const call of result.toolCalls as OllamaToolCall[]) {
-              toolResults.push(await executeScheduleToolCall(call))
-            }
-            const phrasing = await localChat(
-              [
-                {
-                  role: 'system' as const,
-                  content: `The following actions were already performed successfully. Report them back to the user in one short, natural sentence. Do not add anything not stated here.\n\n${toolResults.join('\n')}`,
-                },
-                { role: 'user' as const, content: prompt },
-              ],
-              controller.signal,
-              { temperature: SCHEDULE_QUERY_TEMPERATURE },
-            )
-            const text = phrasing.content || toolResults.join(' ')
-            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
-            persistAssistantContent(assistantId, text)
-            setLastLatencyMs(Math.round(performance.now() - started))
-            return
+        // Web search: when asked for, or when the question is plainly about now.
+        let webSources: { title: string; url: string }[] = []
+        if ((web || CURRENT_EVENTS.test(prompt)) && !images.length && !scheduleAction) {
+          updateAssistant(assistantId, { text: '', steps: [{ label: 'Searching the web', ok: true }] })
+          const found = await gatherWeb(prompt, controller.signal)
+          webSources = found.sources
+          if (found.context) {
+            messages.splice(messages.length - 1, 0, {
+              role: 'system' as const,
+              content:
+                `Today is ${new Date().toDateString()}. Answer using these web results, which are more current than your training. ` +
+                'Cite them inline as [1], [2] etc. matching their numbers. If they conflict or do not answer the question, say so.\n\n' +
+                found.context,
+            })
           }
+          updateAssistant(assistantId, { steps: [] })
+        }
 
-          const text = result.content || '(empty response)'
-          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
+        const result = await omniRouteChat(
+          messages,
+          controller.signal,
+          { temperature: scheduleQuery ? SCHEDULE_QUERY_TEMPERATURE : undefined, images },
+          scheduleAction && !images.length ? [...SCHEDULE_TOOLS] : undefined,
+        )
+
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          const toolResults: string[] = []
+          for (const call of result.toolCalls) {
+            toolResults.push(await executeScheduleToolCall(call as OllamaToolCall))
+          }
+          const phrasing = await omniRouteChat([
+            {
+              role: 'system' as const,
+              content: `The following actions were already performed successfully. Report them back to the user in one short, natural sentence. Do not add anything not stated here.\n\n${toolResults.join('\n')}`,
+            },
+            { role: 'user' as const, content: prompt },
+          ])
+          const text = phrasing.content || toolResults.join(' ')
+          updateAssistant(assistantId, { text })
           persistAssistantContent(assistantId, text)
           setLastLatencyMs(Math.round(performance.now() - started))
           return
         }
 
-        // Tier 4 — plain conversation, no schedule involvement.
-        const result = await localChat([{ role: 'user' as const, content: prompt }], controller.signal)
-        const text = result.content || '(empty response)'
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
+        const sourcesMd = webSources.length ? `\n\n**Sources**\n${webSources.map((src, i) => `${i + 1}. [${src.title.replace(/[[\]]/g, '')}](${src.url})`).join('\n')}` : ''
+        const text = (result.content || '(empty response)') + sourcesMd
+        updateAssistant(assistantId, { text })
         persistAssistantContent(assistantId, text)
         setLastLatencyMs(Math.round(performance.now() - started))
       } catch (err) {
         const message =
-          err instanceof Error && err.name === 'AbortError'
-            ? '(stopped)'
-            : `Local model error: ${err instanceof Error ? err.message : String(err)}. Is Ollama running?`
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text: message } : m)))
+          err instanceof Error && err.name === 'AbortError' ? '(stopped)' : describeOmniRouteError(err)
+        updateAssistant(assistantId, { text: message })
         persistAssistantContent(assistantId, message)
       } finally {
         abortRef.current = null
         setResponding(false)
       }
     },
-    [persistAssistantContent],
-  )
-
-  const runClaude = useCallback(
-    async (prompt: string, assistantId: string) => {
-      try {
-        const cwd = await homeDir()
-        const task = await submitTask(prompt, cwd)
-        pendingClaudeTask.current = { taskId: task.id, messageId: assistantId }
-      } catch (err) {
-        const text = `Claude session error: ${err instanceof Error ? err.message : String(err)}`
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, text } : m)))
-        persistAssistantContent(assistantId, text)
-        setResponding(false)
-      }
-    },
-    [persistAssistantContent],
+    [persistAssistantContent, updateAssistant, runAgentLoop],
   )
 
   const send = useCallback(
-    async (prompt: string) => {
-      const trimmed = prompt.trim()
-      if (!trimmed) return
+    async (prompt: string, images: string[] = [], web = false) => {
+      const typed = prompt.trim()
+      if (!typed && !images.length) return
+      // Attached pictures live in the message itself, so they show (and persist) in the thread.
+      const trimmed = [typed || 'What do you see in this image?', ...images.map((p) => `![image](${p})`)].join('\n\n')
 
       let activeSessionId = sessionId
       if (!activeSessionId) {
         try {
-          const session: ChatSession = await createSession(trimmed, mode)
+          const session: ChatSession = await createSession(typed || 'Image', mode)
           activeSessionId = session.id
           setSessionId(session.id)
           setSessions((prev) => [session, ...prev])
@@ -343,19 +474,13 @@ export function useGeneralChat(mode: ModeId) {
         }
       }
 
-      if (mode === 'claude') {
-        runClaude(trimmed, assistantId)
-      } else {
-        runLocal(trimmed, assistantId)
-      }
+      runOmniRoute(typed || 'What do you see in this image?', assistantId, images, web)
     },
-    [sessionId, mode, runClaude, runLocal],
+    [sessionId, mode, runOmniRoute],
   )
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
-    // Claude Code tasks run headless server-side; there's no cancel command
-    // yet, so stop only interrupts the local-model request.
   }, [])
 
   /** Starts a fresh, empty conversation in the current provider — the next `send()` creates its session. */

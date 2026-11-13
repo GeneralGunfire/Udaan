@@ -1,4 +1,4 @@
-export type EventCategory = 'school' | 'work' | 'creativity' | 'general'
+export type EventCategory = 'school' | 'work' | 'creativity' | 'general' | 'personal'
 
 /**
  * unplanned — no fixed date/time yet (a loose todo-style item)
@@ -19,6 +19,10 @@ export interface ScheduleEvent {
   category: EventCategory
   status: EventStatus
   createdAt: string
+  /** True for a Calendar all-day event. */
+  allDay?: boolean
+  /** Calendar event duration in minutes, when known. */
+  durationMinutes?: number
 }
 
 export interface NewScheduleEvent {
@@ -29,4 +33,6 @@ export interface NewScheduleEvent {
   endTime?: string
   description?: string
   category: EventCategory
+  allDay?: boolean
+  durationMinutes?: number
 }

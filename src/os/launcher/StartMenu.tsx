@@ -1026,20 +1026,20 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         style={{ willChange: 'transform, opacity', transformOrigin: '50% 100%' }}
-        className="absolute left-1/2 top-1/2 flex h-[min(740px,calc(100vh-100px))] w-[min(860px,calc(100vw-40px))] -translate-x-1/2 -translate-y-[calc(50%+24px)] flex-col overflow-hidden rounded-[18px] border border-[var(--os-acrylic-border)] bg-[var(--os-acrylic)] text-[var(--os-menu-text)] shadow-[var(--os-shadow-overlay)]"
+        className="os-panel-material os-sheen absolute left-1/2 top-1/2 flex h-[min(740px,calc(100vh-100px))] w-[min(860px,calc(100vw-40px))] -translate-x-1/2 -translate-y-[calc(50%+24px)] flex-col overflow-hidden rounded-[var(--os-radius-overlay)] text-[var(--os-text)]"
       >
         {/* Search */}
         <div className="px-6 pb-3 pt-5">
-          <label className="flex h-11 items-center gap-3 rounded-full border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-5 focus-within:border-[var(--color-accent)] transition-colors duration-100">
+          <label className="flex h-11 items-center gap-3 rounded-full border border-[var(--os-border)] bg-[var(--os-hover)] px-5 transition-[border-color,box-shadow] duration-150 focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_22%,transparent)]">
             <SearchIcon width={16} height={16} className="shrink-0 opacity-50" />
             <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
               placeholder="Search apps, settings, files and the web"
               spellCheck={false}
-              className="h-full flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--os-menu-text-dim)]"
+              className="h-full flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--os-text-faint)]"
             />
             {query && (
               <button type="button" onClick={() => setQuery('')}
-                className="text-[var(--os-menu-text-dim)] transition-colors hover:text-[var(--os-menu-text)]">
+                className="text-[var(--os-text-dim)] transition-colors hover:text-[var(--os-text)]">
                 <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
                   <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm2.78 4.22a.75.75 0 0 1 0 1.06L9.06 8l1.72 1.72a.75.75 0 1 1-1.06 1.06L8 9.06l-1.72 1.72a.75.75 0 0 1-1.06-1.06L6.94 8 5.22 6.28a.75.75 0 0 1 1.06-1.06L8 6.94l1.72-1.72a.75.75 0 0 1 1.06 0Z" />
                 </svg>

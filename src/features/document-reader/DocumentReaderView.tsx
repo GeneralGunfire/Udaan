@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './documentReader.css'
-import { WindowCloseIcon } from '@/shared/icons'
 import { ReadingPane } from './components/ReadingPane'
 import { PlaybackControls } from './components/PlaybackControls'
 import { EmptyState } from './components/EmptyState'
@@ -10,8 +9,13 @@ import { parseDocument, UnsupportedFormatError, ScannedPdfError } from './lib/pa
 import { getReadingPosition } from '@/integrations/document-reader/client'
 import { listTtsVoices, type TtsVoice } from '@/integrations/local-model/client'
 import type { ParsedDocument } from './lib/types'
+import { ViewShell } from '@/shared/components/ui/view'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
 interface DocumentReaderViewProps {
+  /** Part of BaseAppProps (AppHost always passes it) — unused here now
+   *  that AppTitleBar is the one shared close affordance every app view
+   *  uses, kept for contract consistency. */
   onClose: () => void
   /** Set when opened via File Explorer's "Read Aloud" action — loads this document immediately instead of showing the empty state. */
   initialFilePath?: string
@@ -19,7 +23,7 @@ interface DocumentReaderViewProps {
 
 type LoadState = 'empty' | 'loading' | 'ready' | 'error'
 
-export function DocumentReaderView({ onClose, initialFilePath }: DocumentReaderViewProps) {
+export function DocumentReaderView({ initialFilePath }: DocumentReaderViewProps) {
   const [filePath, setFilePath] = useState<string | null>(initialFilePath ?? null)
   const [loadState, setLoadState] = useState<LoadState>(initialFilePath ? 'loading' : 'empty')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -121,20 +125,46 @@ export function DocumentReaderView({ onClose, initialFilePath }: DocumentReaderV
     [document, playback],
   )
 
+  // Keyboard: Space play/pause, arrows by sentence, Shift+arrows by paragraph.
+  useEffect(() => {
+    if (!document) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest('input, select, textarea')) return
+      if (e.key === ' ') playback.togglePlayPause()
+      else if (e.key === 'ArrowRight') (e.shiftKey ? playback.skipForwardParagraph : playback.skipForwardSentence)()
+      else if (e.key === 'ArrowLeft') (e.shiftKey ? playback.skipBackParagraph : playback.skipBackSentence)()
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [document, playback])
+
+  const pickFile = async () => {
+    const selected = await openDialog({ multiple: false, filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'txt', 'md', 'markdown'] }] })
+    if (typeof selected === 'string') void loadDocument(selected)
+  }
+
   return (
-    <div className="flex h-full w-full flex-col" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-      <div className="border-glass-border flex items-center justify-between border-b px-5 py-3">
-        <h1 className="text-text-primary text-sm font-medium">
-          {filePath ? filePath.split(/[/\\]/).pop() : 'Document Reader'}
-        </h1>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-text-secondary hover:text-text-primary rounded-md p-1.5 transition-colors"
-        >
-          <WindowCloseIcon width={16} height={16} />
+    <ViewShell className="bg-[#1c1d21]">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.06] px-6">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-semibold text-white">{filePath ? filePath.split(/[/\\]/).pop() : 'Reader'}</p>
+          <p className="text-[11.5px] text-white/45">
+            {document
+              ? `${document.format.toUpperCase()} · ${document.sentences.length} sentences · about ${Math.max(1, Math.round(((document.sentences.length - playback.sentenceIndex) * 4.5) / 60 / playback.speed))} min left`
+              : 'Open a PDF, Word, text or Markdown file to have it read aloud'}
+          </p>
+        </div>
+        <button type="button" onClick={() => void pickFile()} className="h-9 rounded-[9px] bg-white/[0.08] px-4 text-[13px] font-medium text-white hover:bg-white/[0.14]">
+          Open…
         </button>
-      </div>
+      </header>
+      {document && (
+        <div className="h-[3px] shrink-0 bg-white/[0.04]">
+          <div className="h-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out" style={{ width: `${((playback.sentenceIndex + 1) / Math.max(1, document.sentences.length)) * 100}%` }} />
+        </div>
+      )}
 
       <div className="relative min-h-0 flex-1">
         {loadState === 'empty' && <EmptyState onFileSelected={loadDocument} />}
@@ -159,13 +189,17 @@ export function DocumentReaderView({ onClose, initialFilePath }: DocumentReaderV
             />
           </>
         )}
-      </div>
 
-      {playback.error && (
-        <div className="border-t border-red-500/30 bg-red-500/10 px-5 py-2 text-sm text-red-300">
-          {playback.error}
-        </div>
-      )}
+        {/* Floating rather than an inline flex sibling below this pane, so
+            a playback failure is never squeezed out of view regardless of
+            document length or viewport height — this is what hid the CSP
+            media-src bug for as long as it went unnoticed. */}
+        {playback.error && (
+          <div className="absolute inset-x-0 bottom-0 z-10 border-t border-danger-border bg-danger-surface px-5 py-2 text-sm text-danger shadow-lg">
+            {playback.error}
+          </div>
+        )}
+      </div>
 
       {loadState === 'ready' && document && voices.length > 0 && (
         <PlaybackControls
@@ -175,6 +209,9 @@ export function DocumentReaderView({ onClose, initialFilePath }: DocumentReaderV
           speed={playback.speed}
           volume={playback.volume}
           progressLabel={progressLabel}
+          sentenceIndex={playback.sentenceIndex}
+          sentenceCount={document.sentences.length}
+          onSeek={playback.seekToSentence}
           onTogglePlayPause={playback.togglePlayPause}
           onStop={playback.stop}
           onSkipForwardSentence={playback.skipForwardSentence}
@@ -186,6 +223,6 @@ export function DocumentReaderView({ onClose, initialFilePath }: DocumentReaderV
           onVolumeChange={playback.setVolume}
         />
       )}
-    </div>
+    </ViewShell>
   )
 }

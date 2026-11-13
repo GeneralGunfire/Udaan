@@ -75,8 +75,8 @@ export function ChatCommandPalette({
               exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.98 }}
               transition={spring.panel}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg overflow-hidden rounded-2xl border border-(--border-hairline)"
-              style={{ background: 'var(--surface-overlay)', boxShadow: 'inset 0 1px 0 var(--highlight-inset), var(--shadow-modal)' }}
+              className="border-hairline bg-surface-overlay w-full max-w-lg overflow-hidden rounded-xl border"
+              style={{ boxShadow: 'var(--shadow-modal)' }}
             >
               <div className="flex items-center gap-2 border-b border-(--border-hairline) px-3.5 py-3">
                 <SearchIcon width={14} height={14} className="text-text-tertiary shrink-0" />
@@ -99,7 +99,7 @@ export function ChatCommandPalette({
 
                 <Command.Group
                   heading="Actions"
-                  className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
+                  className="[&_[cmdk-group-heading]]:text-text-secondary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
                 >
                   <PaletteItem onSelect={() => run(onNewChat)}>
                     <PlusIcon width={13} height={13} />
@@ -114,7 +114,7 @@ export function ChatCommandPalette({
                 {sessions.length > 0 && (
                   <Command.Group
                     heading="Recent chats"
-                    className="[&_[cmdk-group-heading]]:text-text-tertiary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
+                    className="[&_[cmdk-group-heading]]:text-text-secondary [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:uppercase"
                   >
                     {sessions.map((s) => (
                       <PaletteItem key={s.id} onSelect={() => run(() => onSwitchSession(s.id))}>
@@ -141,7 +141,7 @@ function PaletteItem({
   return (
     <Command.Item
       className={cn(
-        'text-text-secondary data-[selected=true]:bg-(--surface-raised) data-[selected=true]:text-text-primary flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none transition-colors duration-100',
+        'text-text-primary data-[selected=true]:bg-accent data-[selected=true]:text-accent-contrast flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium outline-none transition-colors duration-100',
         className,
       )}
       {...props}

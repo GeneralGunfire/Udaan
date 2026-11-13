@@ -305,9 +305,11 @@ export async function executeScheduleToolCall(call: OllamaToolCall): Promise<str
     case 'create_event': {
       const title = String(args.title ?? '').trim()
       if (!title) return 'Could not create event: no title given.'
-      const category = (['school', 'work', 'creativity', 'general'] as const).includes(
-        args.category as EventCategory,
-      )
+      // Must list every EventCategory (types.ts) — omitting one silently
+      // downgraded that category to 'general' instead of honouring it.
+      const category = (
+        ['school', 'work', 'creativity', 'general', 'personal'] as const
+      ).includes(args.category as never)
         ? (args.category as EventCategory)
         : 'general'
       const created = await createScheduleEvent({

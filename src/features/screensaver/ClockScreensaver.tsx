@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { keepAwake } from '@/integrations/power-state'
-import { useWallpaper } from '@/shared/hooks/useWallpaper'
-import { getWallpaper } from '@/app/wallpapers'
-
-/** How long the desktop sits idle (no mouse/key input) before the screensaver takes over. */
-export const SCREENSAVER_IDLE_MS = 90_000
+import { Wallpaper } from '@/os/desktop/Wallpaper'
 
 /**
- * Full-screen clock screensaver — appears after SCREENSAVER_IDLE_MS of no
+ * Full-screen clock screensaver — appears after the idle delay chosen in
+ * Settings ('screensaver.idleSeconds': 30 s, 1, 5 or 10 minutes) of no
  * input, or on demand (Space from anywhere, or the sidebar's clock
  * button).
  *
@@ -22,8 +19,6 @@ export const SCREENSAVER_IDLE_MS = 90_000
 export function ClockScreensaver({ onDismiss }: { onDismiss: () => void }) {
   const [now, setNow] = useState(() => new Date())
   const [revealed, setRevealed] = useState(false)
-  const { wallpaperId } = useWallpaper()
-  const wallpaperSrc = getWallpaper(wallpaperId).src
 
   useEffect(() => {
     const holdTimer = window.setTimeout(() => setRevealed(true), 900)
@@ -94,13 +89,7 @@ export function ClockScreensaver({ onDismiss }: { onDismiss: () => void }) {
     >
       {/* The active wallpaper, full-bleed — the same image the rest of
           the app shows, and the subject of this screen. */}
-      <img
-        src={wallpaperSrc}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 z-0 h-full w-full object-cover"
-        draggable={false}
-      />
+      <Wallpaper />
       {/* A gradient weighted to the lower-left, where the clock actually
           sits, rather than a flat dim across the whole frame — the top
           and right of the photograph stay fully visible. */}

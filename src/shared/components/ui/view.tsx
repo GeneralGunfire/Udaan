@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { spring, staggerGroup, staggerItem, prefersReducedMotion } from '@/shared/lib/motion'
-import { Skeleton } from './skeleton'
+import { spring, prefersReducedMotion } from '@/shared/lib/motion'
 
 /**
  * Shared layout shell for every full-screen feature view.
@@ -35,8 +34,13 @@ export function ViewShell({
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={reduced ? { duration: 0 } : spring.gentle}
+      // The app panel behind this (App.tsx's .app-panel) is opaque
+      // --surface-base, not translucent — the wallpaper only shows in the
+      // gutter around the panel now, never through it. This view has no
+      // background of its own for the same reason it never did: it sits
+      // directly on that opaque panel fill, and legibility comes from type
+      // weight and shadow, not a card underneath it.
       className={cn('flex h-full min-h-0 w-full flex-col', className)}
-      style={{ background: 'var(--surface-base)' }}
     >
       {children}
     </motion.div>
@@ -68,6 +72,10 @@ export function ViewHeader({
       )}
     >
       <div className="flex min-w-0 flex-col gap-1.5">
+        {/* No text-shadow: this sits on the opaque --surface-base panel
+            fill, not the photo wallpaper, so legibility comes from real
+            contrast (the text-* tokens) rather than a shadow tuned for a
+            photograph behind it. */}
         <h1 className="font-display text-text-primary truncate text-xl font-light tracking-tight">
           {title}
         </h1>
@@ -93,33 +101,6 @@ export function ViewBody({
     >
       {children}
     </div>
-  )
-}
-
-/**
- * A staggered list wrapper — children arrive in sequence so a list reads
- * with an order rather than appearing all at once. Pair with
- * `ViewListItem` for the per-child variant.
- */
-export function ViewList({ children, className }: { children: ReactNode; className?: string }) {
-  const reduced = prefersReducedMotion()
-  return (
-    <motion.div
-      variants={reduced ? undefined : staggerGroup}
-      initial={reduced ? undefined : 'hidden'}
-      animate={reduced ? undefined : 'show'}
-      className={cn('flex flex-col gap-2', className)}
-    >
-      {children}
-    </motion.div>
-  )
-}
-
-export function ViewListItem({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <motion.div variants={staggerItem} className={className}>
-      {children}
-    </motion.div>
   )
 }
 
@@ -153,28 +134,3 @@ export function ViewEmpty({
   )
 }
 
-/**
- * Loading state shaped like the content it stands in for, so the view
- * settles into its final layout immediately rather than jumping when data
- * lands. Replaces the bare "Loading…" text every view used before, which
- * told the user nothing and occupied the wrong amount of space.
- */
-export function ViewLoading({ rows = 5, className }: { rows?: number; className?: string }) {
-  return (
-    <div className={cn('flex flex-col gap-2.5', className)} role="status" aria-label="Loading">
-      {Array.from({ length: rows }, (_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-3 rounded-lg border border-(--border-hairline) px-3.5 py-3"
-          style={{ background: 'var(--surface-raised)' }}
-        >
-          <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Skeleton className="h-3" style={{ width: `${70 - i * 6}%` }} />
-            <Skeleton className="h-2.5" style={{ width: `${45 - i * 4}%` }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}

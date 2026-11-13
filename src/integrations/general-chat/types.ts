@@ -1,5 +1,5 @@
-/** "local" | "claude" — Local and Claude conversations are separate threads, never merged. */
-export type ChatProvider = 'local' | 'claude'
+/** "local" | "omniroute" — Local and OmniRoute conversations are separate threads, never merged. */
+export type ChatProvider = 'local' | 'omniroute'
 
 export interface ChatSession {
   id: string
@@ -16,7 +16,14 @@ export interface StoredChatMessage {
   session_id: string
   role: MessageRole
   content: string
-  /** "local" | "claude" — the provider active when the message was sent/answered. */
+  /** "local" | "omniroute" — the provider active when the message was sent/answered. */
   mode: string
   created_at: string
+}
+
+/** One cross-session key fact (e.g. key: "name", value: "Tess"). */
+export interface MemoryFact {
+  key: string
+  value: string
+  updated_at: string
 }

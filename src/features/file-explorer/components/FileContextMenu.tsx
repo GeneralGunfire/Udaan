@@ -1,7 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import {
   DropdownMenu,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSub,
@@ -83,11 +83,11 @@ export function FileContextMenu({
     <AnimatePresence>
       {position && (
         <DropdownMenu open onOpenChange={(open) => !open && onClose()}>
-          <DropdownMenuPrimitive.Trigger asChild>
+          <DropdownMenuTrigger asChild>
             <div
               style={{ position: 'fixed', left: position.x, top: position.y, width: 1, height: 1 }}
             />
-          </DropdownMenuPrimitive.Trigger>
+          </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52 p-1">
             {hasSelection ? (
               <>
@@ -112,7 +112,7 @@ export function FileContextMenu({
                       {openWithHandlers.map((handler) => (
                         <DropdownMenuItem key={handler.exePath} onSelect={() => onOpenWith?.(handler.exePath)}>
                           {handler.name}
-                          {handler.isDefault && <span className="text-text-tertiary ml-auto text-[10px]">Default</span>}
+                          {handler.isDefault && <span className="text-text-tertiary ml-auto text-2xs-alt">Default</span>}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuSubContent>
@@ -148,7 +148,7 @@ export function FileContextMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={onDelete}
-                  className="text-red-400 hover:text-red-300 data-highlighted:text-red-300"
+                  className="text-danger hover:text-danger data-highlighted:text-danger"
                 >
                   <TrashIcon width={14} height={14} /> Delete
                 </DropdownMenuItem>

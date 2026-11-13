@@ -21,11 +21,30 @@ const base = {
   strokeLinejoin: 'round' as const,
 }
 
+export function HomeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 9.5L10 4l6.5 5.5" />
+      <path d="M5.5 8.5V16h9V8.5" />
+      <path d="M8 16v-4.5h4V16" />
+    </svg>
+  )
+}
+
 export function SearchIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
       <circle cx="9" cy="9" r="6" />
       <path d="M17 17l-3.5-3.5" />
+    </svg>
+  )
+}
+
+export function ClockIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="10" cy="10" r="7.5" />
+      <path d="M10 5.5V10l3 2" />
     </svg>
   )
 }
@@ -53,6 +72,16 @@ export function BookOpenIcon(props: IconProps) {
     <svg {...base} {...props}>
       <path d="M10 5.5C8.5 4.3 6.3 3.7 4 3.7v10.6c2.3 0 4.5.6 6 1.8 1.5-1.2 3.7-1.8 6-1.8V3.7c-2.3 0-4.5.6-6 1.8z" />
       <path d="M10 5.5v10.6" />
+    </svg>
+  )
+}
+
+export function GraduationCapIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2 8l8-3.5L18 8l-8 3.5L2 8z" />
+      <path d="M5.5 9.8v3.5c0 1 2 2.2 4.5 2.2s4.5-1.2 4.5-2.2V9.8" />
+      <path d="M17 8v4.5" />
     </svg>
   )
 }
@@ -504,6 +533,15 @@ export function ClipboardIcon(props: IconProps) {
   )
 }
 
+export function CopyIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+      <path d="M13 7V4.5A1.5 1.5 0 0 0 11.5 3h-6A1.5 1.5 0 0 0 4 4.5v6A1.5 1.5 0 0 0 5.5 12H7" />
+    </svg>
+  )
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -874,6 +912,145 @@ export function VolumeMuteIcon(props: IconProps) {
     <svg {...base} {...props}>
       <path d="M4 8v4h3l4 3.5v-11L7 8H4z" />
       <path d="M14 8l4 4M18 8l-4 4" />
+    </svg>
+  )
+}
+
+export function ShuffleIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 6h2.5l7 8H16M3 14h2.5l2.7-3.1" />
+      <path d="M13.3 6H16m0 0v2.7M16 6l-3.7 4.2" />
+      <path d="M13.3 14H16m0 0v-2.7M16 14l-1.8-2" />
+    </svg>
+  )
+}
+
+export function RepeatIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 7h8a2.5 2.5 0 012.5 2.5V11" />
+      <path d="M6.5 5L5 7l1.5 2" />
+      <path d="M15 13H7a2.5 2.5 0 01-2.5-2.5V9" />
+      <path d="M13.5 15L15 13l-1.5-2" />
+    </svg>
+  )
+}
+
+export function HeartIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 16.5s-6.5-4-6.5-9A3.75 3.75 0 0110 5.3 3.75 3.75 0 0116.5 7.5c0 5-6.5 9-6.5 9z" />
+    </svg>
+  )
+}
+
+export function HeartFilledIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 16.5s-6.5-4-6.5-9A3.75 3.75 0 0110 5.3 3.75 3.75 0 0116.5 7.5c0 5-6.5 9-6.5 9z" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function NewspaperIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="4.5" width="12" height="11" rx="1" />
+      <path d="M14.5 7h2a1 1 0 011 1v7a1.5 1.5 0 01-1.5 1.5h-13" />
+      <path d="M5 7.5h6M5 10h6M5 12.5h4" />
+    </svg>
+  )
+}
+
+export function LandmarkIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8l7-4.5L17 8" />
+      <path d="M3 8h14" />
+      <path d="M4.5 8v7M8 8v7M12 8v7M15.5 8v7" />
+      <path d="M2.5 17h15" />
+    </svg>
+  )
+}
+
+export function ShieldAlertIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10 2.5l6.5 2.5v4.5c0 4.5-2.8 7.3-6.5 8.5-3.7-1.2-6.5-4-6.5-8.5V5l6.5-2.5z" />
+      <path d="M10 7v4M10 13.5v.01" />
+    </svg>
+  )
+}
+
+export function FlaskIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M8 3h4M8.5 3v4.5L4.3 14.8A1.5 1.5 0 005.6 17h8.8a1.5 1.5 0 001.3-2.2L11.5 7.5V3" />
+      <path d="M6.3 12.5h7.4" />
+    </svg>
+  )
+}
+
+export function BriefcaseIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="2.5" y="6.5" width="15" height="9.5" rx="1.5" />
+      <path d="M7 6.5V5a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0113 5v1.5" />
+      <path d="M2.5 10.5h15" />
+    </svg>
+  )
+}
+
+/** Loop / repeat region — two arrows tracing a cycle. */
+export function LoopIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8V7a3 3 0 013-3h9" />
+      <path d="M13.5 1.5L16 4l-2.5 2.5" />
+      <path d="M16 12v1a3 3 0 01-3 3H4" />
+      <path d="M6.5 18.5L4 16l2.5-2.5" />
+    </svg>
+  )
+}
+
+/** Metronome — a pendulum in a tapered case. */
+export function MetronomeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7.5 3h5l3 14h-11z" />
+      <path d="M10 15V6" />
+      <path d="M5.5 12h9" />
+    </svg>
+  )
+}
+
+/** Magnet — grid snapping on/off. */
+export function MagnetIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 4v6a6 6 0 0012 0V4" />
+      <path d="M4 4h4v6a2 2 0 004 0V4h4" />
+    </svg>
+  )
+}
+
+/** Lock — protected/restricted sidebar sections. */
+export function LockIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="5" y="9" width="10" height="8" rx="1.75" />
+      <path d="M7 9V6.5a3 3 0 016 0V9" />
+    </svg>
+  )
+}
+
+export function ScholarIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="14" height="13" rx="1.5" />
+      <path d="M3 8h14M7 2.5v3M13 2.5v3" />
+      <path d="M6.5 11.5h7M6.5 13.5h4.5" />
     </svg>
   )
 }

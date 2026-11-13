@@ -1,135 +1,99 @@
-/**
- * Weather integration — Open-Meteo (free, no API key required).
- * https://open-meteo.com/
- */
+const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
 
-export interface HourlyForecast {
-  time: string // "HH:mm"
-  temperatureC: number
+export interface DailyWeather {
+  date: string
+  weatherCode: number
+  highC: number
+  lowC: number
+  precipitationChancePct: number
+  precipitationSumMm: number
+  windMaxKph: number
+  humidityPct: number
 }
 
 export interface WeatherSnapshot {
   locationLabel: string
-  temperatureC: number
-  feelsLikeC: number
-  humidityPct: number
-  windKph: number
-  sunrise: string // "HH:mm"
-  sunset: string // "HH:mm"
-  hourly: HourlyForecast[]
-}
-
-const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search'
-const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
-
-function formatHour(iso: string): string {
-  return iso.slice(11, 16)
-}
-
-async function fetchForecast(
-  latitude: number,
-  longitude: number,
-  locationLabel: string,
-  signal?: AbortSignal,
-): Promise<WeatherSnapshot> {
-  const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m',
-    hourly: 'temperature_2m',
-    daily: 'sunrise,sunset',
-    timezone: 'auto',
-    forecast_days: '1',
-  })
-
-  const forecastRes = await fetch(`${FORECAST_URL}?${params}`, { signal })
-  if (!forecastRes.ok) throw new Error('Forecast request failed')
-  const data = await forecastRes.json()
-
-  const nowHour = new Date().getHours()
-  const hourly: HourlyForecast[] = (data.hourly?.time ?? [])
-    .map((t: string, i: number) => ({
-      time: formatHour(t),
-      temperatureC: Math.round(data.hourly.temperature_2m[i]),
-    }))
-    .slice(nowHour, nowHour + 6)
-
-  return {
-    locationLabel,
-    temperatureC: Math.round(data.current.temperature_2m),
-    feelsLikeC: Math.round(data.current.apparent_temperature),
-    humidityPct: Math.round(data.current.relative_humidity_2m),
-    windKph: Math.round(data.current.wind_speed_10m),
-    sunrise: formatHour(data.daily.sunrise[0]),
-    sunset: formatHour(data.daily.sunset[0]),
-    hourly,
-  }
-}
-
-export async function fetchWeather(
-  city: string,
-  signal?: AbortSignal,
-): Promise<WeatherSnapshot> {
-  const geoRes = await fetch(
-    `${GEOCODE_URL}?name=${encodeURIComponent(city)}&count=1`,
-    { signal },
-  )
-  if (!geoRes.ok) throw new Error('Geocoding request failed')
-  const geoData = await geoRes.json()
-  const place = geoData.results?.[0]
-  if (!place) throw new Error(`No location found for "${city}"`)
-
-  return fetchForecast(
-    place.latitude,
-    place.longitude,
-    [place.name, place.admin1, place.country].filter(Boolean).join(', '),
-    signal,
-  )
+  daily: DailyWeather[]
+  /** epoch ms this snapshot was fetched — lets callers show "as of" and cache-age. */
+  fetchedAt: number
 }
 
 /**
  * Real device location via the browser Geolocation API (works the same in
- * a Tauri webview as a normal browser — no native plugin needed) rather
- * than a hardcoded city. Skips the geocoding round trip entirely since
- * Open-Meteo's forecast endpoint accepts raw coordinates; the location
- * label is generic ("Your location") since Open-Meteo has no reverse-
- * geocoding endpoint to turn coordinates back into a place name.
+ * a Tauri webview as a normal browser — no native plugin needed). Falls
+ * back to rejecting rather than a hardcoded city — callers decide what to
+ * show on failure.
  */
-export function fetchWeatherAtCurrentLocation(signal?: AbortSignal): Promise<WeatherSnapshot> {
+function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
       reject(new Error('Geolocation is not available in this environment.'))
       return
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        fetchForecast(
-          position.coords.latitude,
-          position.coords.longitude,
-          'Your location',
-          signal,
-        )
-          .then(resolve)
-          .catch(reject)
-      },
+      resolve,
       (err) => reject(new Error(`Could not get your location: ${err.message}`)),
       { timeout: 8000, maximumAge: 10 * 60 * 1000 },
     )
   })
 }
 
-/**
- * Model-readable summary — the shape a local-model "what's the weather"
- * query or morning debrief should consume.
- */
-export function summarizeWeather(snapshot: WeatherSnapshot) {
-  return {
-    location: snapshot.locationLabel,
-    temperatureC: snapshot.temperatureC,
-    feelsLikeC: snapshot.feelsLikeC,
-    humidityPct: snapshot.humidityPct,
-    windKph: snapshot.windKph,
-    sunrise: snapshot.sunrise,
-    sunset: snapshot.sunset,
-  }
+/** 7-day daily forecast (temps, precip chance/amount, wind, humidity) for the device's current location. */
+export async function fetchWeeklyWeatherAtCurrentLocation(
+  signal?: AbortSignal,
+): Promise<WeatherSnapshot> {
+  const position = await getCurrentPosition()
+  const params = new URLSearchParams({
+    latitude: String(position.coords.latitude),
+    longitude: String(position.coords.longitude),
+    daily:
+      'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean',
+    forecast_days: '7',
+    timezone: 'auto',
+  })
+
+  const res = await fetch(`${FORECAST_URL}?${params}`, { signal })
+  if (!res.ok) throw new Error('Weather request failed')
+  const data = await res.json()
+
+  const daily: DailyWeather[] = data.daily.time.map((date: string, i: number) => ({
+    date,
+    weatherCode: data.daily.weather_code[i],
+    highC: Math.round(data.daily.temperature_2m_max[i]),
+    lowC: Math.round(data.daily.temperature_2m_min[i]),
+    precipitationChancePct: Math.round(data.daily.precipitation_probability_max?.[i] ?? 0),
+    precipitationSumMm: Math.round((data.daily.precipitation_sum?.[i] ?? 0) * 10) / 10,
+    windMaxKph: Math.round(data.daily.wind_speed_10m_max?.[i] ?? 0),
+    humidityPct: Math.round(data.daily.relative_humidity_2m_mean?.[i] ?? 0),
+  }))
+
+  return { locationLabel: 'Your location', daily, fetchedAt: Date.now() }
+}
+
+/** Maps Open-Meteo WMO weather codes to a compact glyph — no icon library dependency. */
+export function weatherCodeToGlyph(code: number): string {
+  if (code === 0) return '☀'
+  if (code <= 2) return '🌤'
+  if (code === 3) return '☁'
+  if (code <= 48) return '🌫'
+  if (code <= 57) return '🌦'
+  if (code <= 67) return '🌧'
+  if (code <= 77) return '🌨'
+  if (code <= 82) return '🌧'
+  if (code <= 86) return '🌨'
+  return '⛈'
+}
+
+/** Human-readable label for a WMO weather code. */
+export function weatherCodeToLabel(code: number): string {
+  if (code === 0) return 'Clear sky'
+  if (code <= 2) return 'Partly cloudy'
+  if (code === 3) return 'Overcast'
+  if (code <= 48) return 'Fog'
+  if (code <= 57) return 'Drizzle'
+  if (code <= 67) return 'Rain'
+  if (code <= 77) return 'Snow'
+  if (code <= 82) return 'Rain showers'
+  if (code <= 86) return 'Snow showers'
+  return 'Thunderstorm'
 }

@@ -7,12 +7,12 @@ interface ResumePromptProps {
 export function ResumePrompt({ onResume, onStartOver }: ResumePromptProps) {
   return (
     <div className="absolute inset-x-0 top-4 z-10 flex justify-center px-4">
-      <div className="glass-surface border-glass-border flex items-center gap-3 rounded-full border px-4 py-2 shadow-lg">
+      <div className="glass-surface border-hairline flex items-center gap-3 rounded-full border px-4 py-2 shadow-lg">
         <span className="text-text-secondary text-sm">You left off partway through this document.</span>
         <button
           type="button"
           onClick={onResume}
-          className="bg-brand-blue hover:bg-brand-cyan rounded-full px-3 py-1 text-xs font-medium text-white transition-colors"
+          className="bg-accent text-accent-contrast rounded-full px-3 py-1 text-xs font-medium transition-transform active:scale-95"
         >
           Resume
         </button>

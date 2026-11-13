@@ -1,508 +1,496 @@
-import { useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { GlassPanel } from '@/shared/components/GlassPanel'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { WeekView } from './components/WeekView'
+import { BigMonthGrid } from './components/BigMonthGrid'
+import { ViewToggle, type CalendarViewMode } from './components/ViewToggle'
+import { EventModal } from './components/EventModal'
+import { DayEventsPanel } from './components/DayEventsPanel'
+import { CommandBar } from './components/CommandBar'
+import { useEvents } from './hooks/useEvents'
+import { getWeekDates, toISODate, formatMonthYear } from './lib/dateUtils'
+import { TAG_ORDER } from './lib/tags'
+import type { CalendarEvent, EventDraft, EventTag } from './lib/types'
+import { pageEnter, spring, prefersReducedMotion } from '@/shared/lib/motion'
 import { Button } from '@/shared/components/ui/button'
-import { QuickEditEvent } from '@/shared/components/QuickEditEvent'
-import { spring, duration, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
-import { ChevronRightIcon, CalendarIcon, PlusIcon } from '@/shared/icons'
-import {
-  getEventsForDate,
-  getUpcomingEvents,
-  updateScheduleEvent,
-  type EventCategory,
-} from '@/integrations/schedule/scheduleStore'
+import { ChevronRightIcon, PlusIcon } from '@/shared/icons'
+import { cn } from '@/shared/lib/cn'
+import { useWallpaper } from '@/shared/hooks/useWallpaper'
+import { getWallpaper } from '@/app/wallpapers'
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MINI_WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-
-const CATEGORY_TAGS: { id: EventCategory; label: string }[] = [
-  { id: 'work', label: 'Work' },
-  { id: 'creativity', label: 'Creativity' },
-  { id: 'school', label: 'School' },
-]
-
-function toISO(y: number, m: number, d: number) {
-  const mm = String(m + 1).padStart(2, '0')
-  const dd = String(d).padStart(2, '0')
-  return `${y}-${mm}-${dd}`
-}
-
-function categoryAccentVar(category: EventCategory) {
-  return `--color-accent-${category}`
-}
-
-const GRID_CELL_COUNT = 42 // fixed 6 rows × 7 cols — keeps grid height constant across all months
-
-function buildMonthCells(year: number, month: number) {
-  const firstWeekday = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const cells: { day: number | null; iso: string | null }[] = []
-  for (let i = 0; i < firstWeekday; i++) cells.push({ day: null, iso: null })
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ day: d, iso: toISO(year, month, d) })
-  }
-  while (cells.length < GRID_CELL_COUNT) cells.push({ day: null, iso: null })
-  return cells
-}
-
-interface CalendarViewProps {
-  onAddEvent?: () => void
-}
-
-export function CalendarView({ onAddEvent }: CalendarViewProps) {
+/**
+ * Calendar — a single full-width surface built entirely on the app's real
+ * design tokens (--surface-*, --color-accent, --border-hairline,
+ * --shadow-raised) rather than a hand-picked hex palette. The previous
+ * version's sub-components (DayEventsPanel, ViewToggle, BigMonthGrid) were
+ * already token-based; only this top-level shell hardcoded its own
+ * competing hardcoded hex colours, which is what made the view read as
+ * visually inconsistent with the rest of Udaan — half of it followed the
+ * theme, half of it didn't.
+ */
+export function CalendarView() {
   const today = useMemo(() => new Date(), [])
-  const todayISO = toISO(today.getFullYear(), today.getMonth(), today.getDate())
 
-  // Two independent cursors: right-side big grid, left-side mini nav —
-  // both step by month via arrows only, never a scroll gesture.
-  const [cursor, setCursor] = useState(
-    () => new Date(today.getFullYear(), today.getMonth(), 1),
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('month')
+  const [viewYear, setViewYear] = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth())
+  const [weekAnchor, setWeekAnchor] = useState(today)
+  const [activeTags] = useState<Set<EventTag>>(() => new Set(TAG_ORDER))
+
+  const [dayPanelDate, setDayPanelDate] = useState<Date | null>(null)
+  const [eventModalDate, setEventModalDate] = useState<Date | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [prefillTime, setPrefillTime] = useState<string | null>(null)
+  const [commandBarOpen, setCommandBarOpen] = useState(false)
+
+  const { addEvent, updateEvent, deleteEvent, toggleEventDone, eventsByDate, events, loadError } = useEvents()
+
+  const visibleEvents = useMemo(
+    () => events.filter((e) => activeTags.has(e.tag)),
+    [events, activeTags],
   )
-  const [selectedDate, setSelectedDate] = useState<string>(todayISO)
-  const [activeTags, setActiveTags] = useState<Set<EventCategory>>(
-    new Set(CATEGORY_TAGS.map((t) => t.id)),
-  )
 
-  const year = cursor.getFullYear()
-  const month = cursor.getMonth()
-  const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long' })
-  const reduced = prefersReducedMotion()
+  const datesWithEvents = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of visibleEvents) set.add(e.date)
+    return set
+  }, [visibleEvents])
 
-  const cells = useMemo(() => buildMonthCells(year, month), [year, month])
+  const eventsByDateSorted = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>()
+    for (const e of visibleEvents) {
+      const list = map.get(e.date)
+      if (list) list.push(e)
+      else map.set(e.date, [e])
+    }
+    for (const list of map.values()) list.sort((a, b) => a.time.localeCompare(b.time))
+    return map
+  }, [visibleEvents])
 
-  const upcoming = getUpcomingEvents(todayISO, 5)
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-  const yesterdayISO = toISO(
-    yesterday.getFullYear(),
-    yesterday.getMonth(),
-    yesterday.getDate(),
-  )
-  const yesterdayEvents = getEventsForDate(yesterdayISO)
+  const weekDates = useMemo(() => getWeekDates(weekAnchor), [weekAnchor])
 
-  function goMonth(delta: number) {
-    setCursor(new Date(year, month + delta, 1))
+  function goPrevMonth() {
+    const d = new Date(viewYear, viewMonth - 1, 1)
+    setViewYear(d.getFullYear())
+    setViewMonth(d.getMonth())
   }
 
-  function toggleTag(id: EventCategory) {
-    setActiveTags((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function goNextMonth() {
+    const d = new Date(viewYear, viewMonth + 1, 1)
+    setViewYear(d.getFullYear())
+    setViewMonth(d.getMonth())
   }
 
-  const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
-  const [dragOverISO, setDragOverISO] = useState<string | null>(null)
-
-  /** Drag an event pill onto a different day cell to reschedule it — a
-   * date-only patch via the same updateScheduleEvent used everywhere else,
-   * so it stays consistent with quick-edit/manage-events. No-ops if
-   * dropped back on its own current day. */
-  function handleDrop(targetISO: string) {
-    setDragOverISO(null)
-    const id = draggingEventId
-    setDraggingEventId(null)
-    if (!id) return
-    updateScheduleEvent(id, { date: targetISO }).catch((err) =>
-      console.error('Failed to reschedule event:', err),
-    )
+  function goPrevWeek() {
+    setWeekAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() - 7))
   }
+
+  function goNextWeek() {
+    setWeekAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() + 7))
+  }
+
+  function handleSelectDate(date: Date) {
+    const iso = toISODate(date)
+    if (datesWithEvents.has(iso)) {
+      setDayPanelDate(date)
+    } else {
+      setEditingEvent(null)
+      setEventModalDate(date)
+    }
+  }
+
+  function handleAddFromDayPanel() {
+    if (!dayPanelDate) return
+    setEditingEvent(null)
+    setEventModalDate(dayPanelDate)
+    setDayPanelDate(null)
+  }
+
+  function handleEditFromDayPanel(event: CalendarEvent) {
+    setEditingEvent(event)
+    setEventModalDate(new Date(`${event.date}T00:00:00`))
+    setDayPanelDate(null)
+  }
+
+  function openEventFromList(event: CalendarEvent) {
+    setEditingEvent(event)
+    setPrefillTime(null)
+    setEventModalDate(new Date(`${event.date}T00:00:00`))
+  }
+
+  function createAtSlot(date: Date, time: string) {
+    setEditingEvent(null)
+    setPrefillTime(time)
+    setEventModalDate(date)
+  }
+
+  function handleSaveEvent(draft: EventDraft, editingId?: string) {
+    if (editingId) {
+      updateEvent(editingId, draft)
+    } else {
+      addEvent(draft)
+    }
+  }
+
+  function handleCommandReschedule(id: string, date: string, time: string | null) {
+    const target = events.find((e) => e.id === id)
+    if (!target) return
+    updateEvent(id, { ...target, date, time: time ?? target.time })
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandBarOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  const reducedMotion = prefersReducedMotion()
+
+  // The one deliberate depth/image moment: a heavily blurred, low-opacity
+  // wash of the user's own desktop wallpaper behind the whole view — the
+  // same technique macOS System Settings and visionOS panels use (the
+  // surface reads as "floating over your desktop," not "decorated with a
+  // stock photo"). Everything else in the view stays flat; this is the one
+  // place depth is spent, not a background pasted behind everything.
+  const { wallpaperId } = useWallpaper()
+  const wallpaper = useMemo(() => getWallpaper(wallpaperId), [wallpaperId])
+
+  const upcoming = useMemo(() => {
+    const now = new Date()
+    const nowIso = toISODate(now)
+    const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    return visibleEvents
+      .filter((e) => !e.done && (e.date > nowIso || (e.date === nowIso && (e.allDay || e.time >= hm))))
+      .sort((x, y) => x.date.localeCompare(y.date) || x.time.localeCompare(y.time))
+      .slice(0, 6)
+  }, [visibleEvents])
+
+  function goToday() {
+    setViewYear(today.getFullYear())
+    setViewMonth(today.getMonth())
+    setWeekAnchor(today)
+  }
+
+  function jumpTo(date: Date) {
+    setViewYear(date.getFullYear())
+    setViewMonth(date.getMonth())
+    setWeekAnchor(date)
+  }
+
+  // Keyboard, like Apple Calendar: T is today, the arrows step a month or week, M and W switch view.
+  // The handler is re-pointed on every render so it always sees the current view.
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
+  onKey.current = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const target = e.target as HTMLElement | null
+    if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
+    if (e.key === 'ArrowLeft') {
+      if (viewMode === 'month') goPrevMonth()
+      else goPrevWeek()
+    } else if (e.key === 'ArrowRight') {
+      if (viewMode === 'month') goNextMonth()
+      else goNextWeek()
+    } else if (e.key.toLowerCase() === 't') goToday()
+    else if (e.key.toLowerCase() === 'm') setViewMode('month')
+    else if (e.key.toLowerCase() === 'w') setViewMode('week')
+  }
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => onKey.current(e)
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
-    <div className="grid w-full max-w-6xl grid-cols-[280px_1fr] gap-4">
-      {/* Left column — mini calendar, category tags, event lists */}
-      <div className="flex flex-col gap-4">
-        <GlassPanel className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-text-primary text-[14px] font-semibold">
-              {monthLabel} {year}
-            </h2>
-            <div className="flex items-center gap-0.5">
-              <Button
-                type="button"
-                aria-label="Previous month"
-                onClick={() => goMonth(-1)}
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-              >
-                <span className="flex rotate-180">
-                  <ChevronRightIcon width={11} height={11} />
-                </span>
-              </Button>
-              <Button
-                type="button"
-                aria-label="Next month"
-                onClick={() => goMonth(1)}
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-              >
-                <ChevronRightIcon width={11} height={11} />
-              </Button>
-            </div>
-          </div>
+    <motion.div
+      initial={reducedMotion ? { opacity: 0 } : pageEnter.initial}
+      animate={pageEnter.animate}
+      transition={reducedMotion ? { duration: 0 } : spring.gentle}
+      className="text-text-primary relative flex h-full min-h-0 w-full overflow-hidden"
+      style={{ background: 'var(--surface-base)' }}
+    >
+      {wallpaper.src && !wallpaper.generated && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.16]"
+          style={{
+            backgroundImage: `url(${wallpaper.src})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(60px) saturate(1.3)',
+            transform: 'scale(1.15)',
+          }}
+        />
+      )}
+      {/* A soft top-down light wash over the blurred wallpaper so content
+          still reads as sitting on --surface-base, not on a photo. */}
+      {wallpaper.src && !wallpaper.generated && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'linear-gradient(180deg, transparent, var(--surface-base) 65%)' }}
+        />
+      )}
 
-          <div className="grid grid-cols-7 gap-y-1.5 text-center">
-            {MINI_WEEKDAY_LABELS.map((wd, i) => (
-              <div
-                key={`${wd}-${i}`}
-                className="text-text-tertiary text-[10px] font-semibold tracking-wide uppercase"
-              >
-                {wd}
-              </div>
-            ))}
-            {cells.map((cell, i) => {
-              if (cell.day === null || cell.iso === null) {
-                return <div key={`empty-${i}`} className="h-6 w-6" />
-              }
-              const events = getEventsForDate(cell.iso)
-              const isToday = cell.iso === todayISO
-              const isSelected = cell.iso === selectedDate
+      {/*
+        No card background, no card border on the sidebar itself — on
+        Linear/Notion/native sidebars the WINDOW CHROME is the only
+        container; nothing inside it gets its own box. A single hairline on
+        the right edge is the one divider earned, because it separates two
+        genuinely different regions (nav vs. content), not decoration.
+      */}
+      <aside
+        className="relative z-10 flex w-[296px] shrink-0 flex-col gap-7 overflow-y-auto px-6 pb-6 pt-6"
+        style={{
+          borderRight: '1px solid color-mix(in srgb, var(--border-hairline) 70%, transparent)',
+          background: wallpaper.src && !wallpaper.generated ? 'color-mix(in srgb, var(--surface-base) 55%, transparent)' : undefined,
+          backdropFilter: wallpaper.src && !wallpaper.generated ? 'blur(24px)' : undefined,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setEditingEvent(null)
+            setPrefillTime(null)
+            setEventModalDate(today)
+          }}
+          // Flat fill, system-accent-button weight — no gradient, no inset
+          // highlight, no lift-on-hover. A native button changes shade by a
+          // few percent on hover and nothing else.
+          className="bg-accent text-accent-contrast flex h-8 items-center justify-center gap-1.5 rounded-[6px] text-[13px] font-medium transition-[filter] duration-100 hover:brightness-[1.08] active:brightness-[0.94]"
+        >
+          <PlusIcon width={13} height={13} />
+          New event
+        </button>
 
-              return (
-                <motion.button
-                  key={cell.iso}
-                  type="button"
-                  onClick={() => setSelectedDate(cell.iso!)}
-                  whileHover={reduced ? undefined : pressableIcon.whileHover}
-                  whileTap={reduced ? undefined : pressableIcon.whileTap}
-                  transition={pressableIcon.transition}
-                  className={`focus-visible:ring-brand-cyan/60 relative mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
-                    isSelected
-                      ? 'text-white'
-                      : isToday
-                        ? 'text-brand-teal font-semibold'
-                        : 'text-text-secondary hover:bg-glass-hover'
-                  }`}
-                  style={
-                    isSelected ? { background: 'var(--gradient-brand)' } : undefined
-                  }
-                >
-                  {cell.day}
-                  {events.length > 0 && !isSelected && (
-                    <span
-                      className="absolute bottom-0 h-1 w-1 rounded-full"
-                      style={{
-                        backgroundColor: `var(${categoryAccentVar(events[0].category)})`,
-                      }}
-                    />
-                  )}
-                </motion.button>
-              )
-            })}
-          </div>
+        <MiniMonth
+          year={viewYear}
+          month={viewMonth}
+          today={today}
+          datesWithEvents={datesWithEvents}
+          onPick={(d) => {
+            jumpTo(d)
+            handleSelectDate(d)
+          }}
+          onShift={(n) => (n < 0 ? goPrevMonth() : goNextMonth())}
+        />
 
-          <div className="border-glass-border flex flex-wrap gap-1.5 border-t pt-3">
-            {CATEGORY_TAGS.map((tag) => {
-              const active = activeTags.has(tag.id)
-              return (
-                <motion.button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => toggleTag(tag.id)}
-                  whileHover={reduced ? undefined : pressableIcon.whileHover}
-                  whileTap={reduced ? undefined : pressableIcon.whileTap}
-                  transition={pressableIcon.transition}
-                  className="focus-visible:ring-brand-cyan/60 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold outline-none transition-all duration-150 focus-visible:ring-2"
-                  style={{
-                    backgroundColor: active
-                      ? `color-mix(in srgb, var(${categoryAccentVar(tag.id)}) 16%, transparent)`
-                      : 'transparent',
-                    color: active
-                      ? `var(${categoryAccentVar(tag.id)})`
-                      : 'var(--color-text-tertiary)',
-                    border: `1px solid ${active ? `color-mix(in srgb, var(${categoryAccentVar(tag.id)}) 30%, transparent)` : 'var(--color-glass-border)'}`,
-                  }}
-                >
-                  <span
-                    className="h-1.5 w-1.5 rounded-full transition-opacity duration-150"
-                    style={{
-                      backgroundColor: `var(${categoryAccentVar(tag.id)})`,
-                      opacity: active ? 1 : 0.45,
-                    }}
-                  />
-                  {tag.label}
-                </motion.button>
-              )
-            })}
-          </div>
-        </GlassPanel>
-
-        <GlassPanel className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-2">
-            <CalendarIcon width={14} height={14} className="text-brand-teal" />
-            <h2 className="text-text-primary text-[11px] font-semibold tracking-wide uppercase">
-              Today's Events
-            </h2>
-          </div>
-          <div className="flex flex-col gap-2">
-            {upcoming.filter((e) => activeTags.has(e.category)).length === 0 ? (
-              <p className="text-text-tertiary text-[12px]">
-                Nothing coming up.
-              </p>
-            ) : (
-              upcoming
-                .filter((e) => activeTags.has(e.category))
-                .map((event) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => setSelectedDate(event.date)}
-                    className="hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex items-start gap-2 rounded-[8px] px-1.5 py-1 text-left outline-none transition-colors duration-150 focus-visible:ring-2"
-                  >
-                    <span
-                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor: `var(${categoryAccentVar(event.category)})`,
-                      }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-text-primary truncate text-[13px] font-medium">
-                        {event.title}
-                      </div>
-                      <div className="text-text-tertiary text-[11px]">
-                        {new Date(`${event.date}T00:00:00`).toLocaleDateString(
-                          'en-US',
-                          { month: 'short', day: 'numeric' },
-                        )}
-                        {event.startTime ? ` · ${event.startTime}` : ''}
-                      </div>
-                    </div>
-                  </button>
-                ))
-            )}
-          </div>
-        </GlassPanel>
-
-        <GlassPanel className="flex flex-col gap-2.5">
-          <h2 className="text-text-primary text-[11px] font-semibold tracking-wide uppercase">
-            Yesterday's Events
-          </h2>
-          {yesterdayEvents.length === 0 ? (
-            <p className="text-text-tertiary text-[12px]">No events.</p>
+        <section className="min-h-0">
+          <p className="text-text-tertiary mb-2.5 text-[11px] font-medium">Up next</p>
+          {upcoming.length === 0 ? (
+            <p className="text-text-tertiary text-[12.5px]">Nothing coming up</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {yesterdayEvents.map((event) => (
-                <div key={event.id} className="flex items-center gap-2">
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: `var(${categoryAccentVar(event.category)})`,
-                    }}
-                  />
-                  <span className="text-text-secondary truncate text-[12.5px]">
-                    {event.title}
+            <div className="flex flex-col">
+              {upcoming.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => openEventFromList(e)}
+                  // A plain row, selection-highlight on hover only — no
+                  // coloured accent bar standing in for the tag; the tag's
+                  // own colour already shows in the day grid these point
+                  // back to, so this list doesn't need to repeat it.
+                  className="hover:bg-surface-hover -mx-2 flex flex-col gap-0.5 rounded-[5px] px-2 py-2 text-left transition-colors duration-100"
+                >
+                  <span className="text-text-primary truncate text-[13px] leading-tight">{e.title}</span>
+                  <span className="text-text-tertiary text-[11.5px] leading-tight">
+                    {new Date(`${e.date}T12:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {!e.allDay && e.time ? ` · ${e.time}` : ''}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </GlassPanel>
+        </section>
+
+        <p className="text-text-tertiary mt-auto text-[11.5px] leading-relaxed">
+          Ctrl + K to type things like &ldquo;maths test friday 9am&rdquo;.
+        </p>
+      </aside>
+
+      {/*
+        Capped and centred: on a wide window an unconstrained flex-1 column
+        stretched the month grid into a thin letterboxed strip — every cell
+        went wider than it is tall and the whole thing read as flimsy. A
+        calendar's natural proportion is closer to square cells, so the
+        column stops growing past a sensible width and the leftover space
+        on a wide window becomes margin, not a distorted grid.
+      */}
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto px-9 py-7">
+      <div className="flex min-h-0 w-full max-w-[920px] flex-col gap-5">
+        {loadError && (
+          <p className="text-danger shrink-0 text-[12px] font-medium">
+            Couldn&apos;t reach saved events — showing what&apos;s loaded. {loadError}
+          </p>
+        )}
+
+        <div className="flex shrink-0 items-center gap-3">
+          <Button variant="ghost" size="pill-sm" onClick={goToday} className="text-[13px] font-medium">
+            Today
+          </Button>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon-sm" onClick={viewMode === 'month' ? goPrevMonth : goPrevWeek} aria-label="Previous">
+              <ChevronRightIcon width={16} height={16} className="rotate-180" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" onClick={viewMode === 'month' ? goNextMonth : goNextWeek} aria-label="Next">
+              <ChevronRightIcon width={16} height={16} />
+            </Button>
+          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.h1
+              key={viewMode === 'month' ? `${viewYear}-${viewMonth}` : `week-${weekAnchor.toDateString()}`}
+              initial={reducedMotion ? undefined : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducedMotion ? undefined : { opacity: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="flex-1 text-[26px] font-bold tracking-tight"
+            >
+              {viewMode === 'month' ? formatMonthYear(viewYear, viewMonth) : formatMonthYear(weekAnchor.getFullYear(), weekAnchor.getMonth())}
+            </motion.h1>
+          </AnimatePresence>
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+        </div>
+
+        <div className="relative min-h-0 flex-1">
+          <AnimatePresence mode="wait" initial={false}>
+            {viewMode === 'month' ? (
+              <motion.div
+                key="month"
+                initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: -8 }}
+                transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}
+                className="h-full"
+              >
+                <BigMonthGrid
+                  year={viewYear}
+                  month={viewMonth}
+                  today={today}
+                  eventsByDate={eventsByDateSorted}
+                  onSelectDate={handleSelectDate}
+                  onSelectEvent={openEventFromList}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="week"
+                initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, y: -8 }}
+                transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}
+                className="h-full overflow-y-auto"
+              >
+                <WeekView
+                  weekDates={weekDates}
+                  today={today}
+                  events={visibleEvents}
+                  onSelectDate={handleSelectDate}
+                  onSelectEvent={openEventFromList}
+                  onCreateAt={createAtSlot}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
       </div>
 
-      {/* Right column — big month grid, arrow-only navigation */}
-      <GlassPanel className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="font-display text-text-primary text-[20px] font-semibold">
-              {monthLabel} {year}
-            </h1>
-            <div className="flex items-center gap-0.5">
-              <Button
-                type="button"
-                aria-label="Previous month"
-                onClick={() => goMonth(-1)}
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-              >
-                <span className="flex rotate-180">
-                  <ChevronRightIcon width={13} height={13} />
-                </span>
-              </Button>
-              <Button
-                type="button"
-                aria-label="Next month"
-                onClick={() => goMonth(1)}
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full"
-              >
-                <ChevronRightIcon width={13} height={13} />
-              </Button>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            onClick={onAddEvent}
-            variant="brand"
-            size="pill"
-            className="rounded-full"
-          >
-            <PlusIcon width={13} height={13} />
-            New Event
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {WEEKDAY_LABELS.map((wd) => (
-            <div
-              key={wd}
-              className="text-text-tertiary py-1 text-center text-[11px] font-semibold tracking-wide uppercase"
-            >
-              {wd}
-            </div>
-          ))}
-
-          {cells.map((cell, i) => {
-            if (cell.day === null || cell.iso === null) {
-              return <div key={`empty-${i}`} className="h-20" />
+      {eventModalDate && (
+        <EventModal
+          open={!!eventModalDate}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEventModalDate(null)
+              setEditingEvent(null)
+              setPrefillTime(null)
             }
-            const events = getEventsForDate(cell.iso).filter((e) =>
-              activeTags.has(e.category),
-            )
-            const isToday = cell.iso === todayISO
-            const isSelected = cell.iso === selectedDate
-            // Cap at 1 visible event pill + an overflow badge rather than 2 —
-            // 2 pills plus a "+N more" line no longer fit the cell's content
-            // area without clipping/stacking once a day has 2+ real events
-            // (verified against real multi-event days: they used to visually
-            // overlap). A single pill + badge always fits at this cell height.
-            const visible = events.slice(0, 1)
-            const overflow = events.length - visible.length
+          }}
+          initialDate={eventModalDate}
+          today={today}
+          datesWithEvents={datesWithEvents}
+          editingEvent={editingEvent}
+          initialTime={prefillTime}
+          onSave={handleSaveEvent}
+        />
+      )}
 
-            const isDragOver = dragOverISO === cell.iso
+      {dayPanelDate && (
+        <DayEventsPanel
+          open={!!dayPanelDate}
+          onOpenChange={(open) => !open && setDayPanelDate(null)}
+          date={dayPanelDate}
+          events={eventsByDate(toISODate(dayPanelDate))}
+          onAddEvent={handleAddFromDayPanel}
+          onEditEvent={handleEditFromDayPanel}
+          onDeleteEvent={(id) => deleteEvent(id)}
+          onToggleDone={(id) => toggleEventDone(id)}
+        />
+      )}
 
-            return (
-              <motion.div
-                key={cell.iso}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedDate(cell.iso!)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setSelectedDate(cell.iso!)
-                  }
-                }}
-                onDragOver={(e) => {
-                  if (!draggingEventId) return
-                  e.preventDefault()
-                  setDragOverISO(cell.iso)
-                }}
-                onDragLeave={() => setDragOverISO((v) => (v === cell.iso ? null : v))}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  handleDrop(cell.iso!)
-                }}
-                whileHover={reduced ? undefined : { scale: 1.01 }}
-                whileTap={reduced ? undefined : { scale: 0.99 }}
-                transition={spring.micro}
-                className={`focus-visible:ring-brand-cyan/60 relative flex h-20 cursor-pointer flex-col items-start gap-1 rounded-[10px] p-1.5 text-[12.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 ${
-                  isSelected
-                    ? 'bg-glass-hover text-text-primary'
-                    : 'text-text-secondary hover:bg-glass'
-                } ${isToday ? 'ring-brand-teal/60 ring-1' : ''} ${
-                  isDragOver ? 'bg-brand-cyan/10 ring-brand-cyan ring-2' : ''
-                }`}
-              >
-                <span
-                  className={isToday ? 'text-brand-teal font-semibold' : ''}
-                >
-                  {cell.day}
-                </span>
-                <div className="flex w-full flex-1 flex-col justify-end gap-1 overflow-hidden">
-                  {visible.map((e) => (
-                    <QuickEditEvent key={e.id} event={e}>
-                      <span
-                        draggable
-                        onDragStart={(ev) => {
-                          ev.stopPropagation()
-                          ev.dataTransfer.effectAllowed = 'move'
-                          setDraggingEventId(e.id)
-                        }}
-                        onDragEnd={() => {
-                          setDraggingEventId(null)
-                          setDragOverISO(null)
-                        }}
-                        onClick={(ev) => ev.stopPropagation()}
-                        className={`block cursor-grab truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight font-semibold transition-opacity duration-150 active:cursor-grabbing ${
-                          draggingEventId === e.id ? 'opacity-40' : ''
-                        }`}
-                        style={{
-                          backgroundColor: `color-mix(in srgb, var(${categoryAccentVar(e.category)}) 20%, transparent)`,
-                          color: `var(${categoryAccentVar(e.category)})`,
-                        }}
-                      >
-                        {e.title}
-                      </span>
-                    </QuickEditEvent>
-                  ))}
-                  {overflow > 0 && (
-                    <span className="text-text-tertiary self-start rounded-full bg-glass-hover px-1.5 py-0.5 text-[9px] font-semibold">
-                      +{overflow} more
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
+      <CommandBar
+        open={commandBarOpen}
+        onOpenChange={setCommandBarOpen}
+        today={today}
+        events={events}
+        onCreate={addEvent}
+        onDelete={deleteEvent}
+        onReschedule={handleCommandReschedule}
+      />
+    </motion.div>
+  )
+}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedDate}
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={{ duration: duration.micro }}
-            className="border-glass-border flex flex-col gap-2 border-t pt-3"
-          >
-            <h3 className="text-text-tertiary text-[11px] font-semibold tracking-wide uppercase">
-              {new Date(`${selectedDate}T00:00:00`).toLocaleDateString(
-                'en-US',
-                { weekday: 'long', month: 'long', day: 'numeric' },
+/** Small month for the sidebar: click a day to jump there; dots mark busy days. */
+function MiniMonth({ year, month, today, datesWithEvents, onPick, onShift }: { year: number; month: number; today: Date; datesWithEvents: Set<string>; onPick: (d: Date) => void; onShift: (n: number) => void }) {
+  const first = new Date(year, month, 1)
+  const lead = first.getDay()
+  const days = new Date(year, month + 1, 0).getDate()
+  const todayIso = toISODate(today)
+  return (
+    <section>
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <span className="text-[13px] font-semibold">{first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
+        <span className="flex">
+          <Button variant="ghost" size="icon-sm" aria-label="Previous month" onClick={() => onShift(-1)}>
+            <ChevronRightIcon width={13} height={13} className="rotate-180" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Next month" onClick={() => onShift(1)}>
+            <ChevronRightIcon width={13} height={13} />
+          </Button>
+        </span>
+      </div>
+      <div className="grid grid-cols-7 text-center text-[11px]">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+          <span key={i} className="text-text-tertiary pb-1 font-semibold">
+            {d}
+          </span>
+        ))}
+        {Array.from({ length: lead }, (_, i) => (
+          <span key={`l${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const date = new Date(year, month, i + 1)
+          const iso = toISODate(date)
+          const isToday = iso === todayIso
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => onPick(date)}
+              className={cn(
+                'relative mx-auto flex h-7 w-7 items-center justify-center rounded-full tabular-nums transition-colors duration-150',
+                isToday ? 'bg-accent text-accent-contrast font-bold' : 'hover:bg-surface-hover',
               )}
-            </h3>
-            {getEventsForDate(selectedDate).filter((e) => activeTags.has(e.category))
-              .length === 0 ? (
-              <p className="text-text-tertiary text-[12.5px]">
-                No events this day.
-              </p>
-            ) : (
-              getEventsForDate(selectedDate)
-                .filter((e) => activeTags.has(e.category))
-                .map((event) => (
-                  <QuickEditEvent key={event.id} event={event}>
-                    <button
-                      type="button"
-                      className="hover:bg-glass-hover focus-visible:ring-brand-cyan/60 flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left outline-none transition-colors duration-150 focus-visible:ring-2"
-                    >
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: `var(${categoryAccentVar(event.category)})`,
-                        }}
-                      />
-                      <span className="text-text-primary flex-1 truncate text-[13px] font-medium">
-                        {event.title}
-                      </span>
-                      <span className="text-text-tertiary text-[11.5px] font-medium tabular-nums">
-                        {event.startTime
-                          ? `${event.startTime}${event.endTime ? `–${event.endTime}` : ''}`
-                          : 'All day'}
-                      </span>
-                    </button>
-                  </QuickEditEvent>
-                ))
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </GlassPanel>
-    </div>
+            >
+              {i + 1}
+              {datesWithEvents.has(iso) && !isToday && <span className="bg-text-tertiary absolute bottom-[3px] h-[3px] w-[3px] rounded-full" />}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }

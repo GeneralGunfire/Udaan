@@ -45,17 +45,17 @@ export function WorkspacePanel() {
   }
 
   return (
-    <div className="border-(--border-hairline) mb-2 rounded-xl border text-xs">
+    <div className="border-(--border-hairline) mb-2 border-b pb-1 text-xs">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-text-secondary hover:text-text-primary flex w-full items-center gap-1.5 px-3 py-2"
+        className="text-text-secondary hover:text-text-primary hover:bg-surface-hover flex w-full items-center gap-1.5 rounded-lg px-3 py-2"
       >
         <motion.span animate={{ rotate: open_ ? 90 : 0 }} transition={spring.micro} className="flex">
           <ChevronRightIcon width={10} height={10} />
         </motion.span>
         <FolderIcon width={13} height={13} />
-        <span className="font-medium">Agent workspace</span>
+        <span>Agent workspace</span>
         <span className="text-text-tertiary ml-auto">{entries.length > 0 ? `${entries.length} item(s)` : ''}</span>
       </button>
 
@@ -84,9 +84,9 @@ export function WorkspacePanel() {
               )}
 
               {loading ? (
-                <p className="text-text-tertiary">Loading…</p>
+                <p className="text-text-secondary">Loading…</p>
               ) : entries.length === 0 ? (
-                <p className="text-text-tertiary">Empty — nothing here yet.</p>
+                <p className="text-text-secondary">Empty — nothing here yet.</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {entries.map((e) => (
@@ -100,7 +100,7 @@ export function WorkspacePanel() {
 
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="pill-sm"
                 onClick={handleAddFile}
                 className="w-fit rounded-lg"

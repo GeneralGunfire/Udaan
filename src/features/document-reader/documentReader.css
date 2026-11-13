@@ -1,8 +1,8 @@
 .doc-reader-content {
   font-family: Georgia, 'Times New Roman', serif;
-  line-height: 1.7;
-  font-size: 17px;
-  color: #f2f3f5;
+  line-height: 1.8;
+  font-size: 18px;
+  color: var(--color-text-primary);
 }
 
 /* mammoth/marked output can carry its own inline colors (e.g. a docx run
@@ -13,11 +13,13 @@
 .doc-reader-content * {
   color: inherit !important;
   background-color: transparent !important;
-  border-color: rgb(255 255 255 / 15%) !important;
+  border-color: var(--border-strong) !important;
 }
 
 .doc-reader-content a {
-  color: #7dd3fc !important;
+  /* The palette has no blue for links; a link is marked by the accent
+     plus an underline, and the underline is what actually carries it. */
+  color: var(--color-accent-alt) !important;
   text-decoration: underline;
 }
 
@@ -58,9 +60,15 @@
 }
 
 .doc-reader-highlight {
-  background-color: rgb(255 213 79 / 30%) !important;
-  color: #1a1a1a !important;
-  box-shadow: 0 0 0 2px rgb(255 179 0 / 50%);
+  /* Search highlight. No amber in the palette — a highlight is a bone
+     fill with navy text, i.e. the same inversion every other "selected"
+     surface in the app uses. */
+  /* The sentence being read: a soft accent-tinted band with readable text. */
+  background-color: color-mix(in srgb, var(--color-accent) 20%, transparent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 20%, transparent), inset 3px 0 0 var(--color-accent);
+  border-radius: 4px;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .doc-reader-pdf-page {
@@ -80,15 +88,20 @@
    `filter` also recolors box-shadow — the active-page highlight below
    needs to sit on the un-inverted outer element to render its real color. */
 .doc-reader-pdf-page-surface {
-  filter: invert(0.92) hue-rotate(180deg);
+  /* Pages show as printed: inverting turned photos into negatives. */
+  filter: none;
+  background: #fff;
 }
 
 .doc-reader-pdf-page:hover {
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 20%);
+  box-shadow: 0 0 0 2px var(--border-strong);
 }
 
 .doc-reader-pdf-page-active {
-  box-shadow: 0 0 0 3px rgb(255 179 0 / 70%) !important;
+  /* The page currently being read aloud. A flat accent ring, not the
+     amber glow this used to carry — no other surface in the app emits
+     light, and an amber one belonged to no palette here at all. */
+  box-shadow: 0 0 0 3px var(--color-accent) !important;
 }
 
 /* The global scrollbar rule in theme.css already applies here (it targets

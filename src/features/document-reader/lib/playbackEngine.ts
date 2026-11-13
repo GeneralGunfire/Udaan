@@ -3,6 +3,21 @@ import type { Sentence } from './types'
 
 export type PlaybackStatus = 'idle' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error'
 
+function mediaErrorCodeName(code: number): string {
+  switch (code) {
+    case MediaError.MEDIA_ERR_ABORTED:
+      return 'MEDIA_ERR_ABORTED'
+    case MediaError.MEDIA_ERR_NETWORK:
+      return 'MEDIA_ERR_NETWORK'
+    case MediaError.MEDIA_ERR_DECODE:
+      return 'MEDIA_ERR_DECODE'
+    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      return 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+    default:
+      return `MEDIA_ERR_UNKNOWN(${code})`
+  }
+}
+
 export interface PlaybackEngineCallbacks {
   onStatusChange: (status: PlaybackStatus) => void
   onSentenceChange: (index: number) => void
@@ -70,10 +85,15 @@ export class PlaybackEngine {
   }
 
   async resume() {
-    if (this.audioEl) {
+    // After a playback error the element (if any) is left in place but its
+    // source may be permanently unloadable — retry synthesis via play()
+    // rather than re-calling .play() on a dead element, which would just
+    // fail identically without ever re-synthesizing.
+    if (this.audioEl && this.status !== 'error') {
       await this.audioEl.play()
       this.setStatus('playing')
     } else {
+      this.teardownAudio()
       await this.play()
     }
   }
@@ -251,12 +271,26 @@ export class PlaybackEngine {
     audio.onerror = () => {
       URL.revokeObjectURL(url)
       this.setStatus('error')
-      this.callbacks.onError('Audio playback failed unexpectedly for this sentence.')
+      // MediaError.code/message names the real cause (e.g. a blocked source
+      // under CSP surfaces as MEDIA_ERR_SRC_NOT_SUPPORTED) instead of the
+      // generic message this used to report regardless of what went wrong.
+      const mediaError = audio.error
+      const detail = mediaError
+        ? `${mediaErrorCodeName(mediaError.code)}${mediaError.message ? `: ${mediaError.message}` : ''}`
+        : 'unknown error'
+      this.callbacks.onError(`Audio playback failed for this sentence (${detail}).`)
     }
 
     this.callbacks.onSentenceChange(this.currentIndex)
-    void audio.play()
     this.setStatus('playing')
+    audio.play().catch((err) => {
+      // Autoplay rejection (e.g. NotAllowedError) or another play() failure
+      // that onerror won't catch, since the element never started loading.
+      this.setStatus('error')
+      this.callbacks.onError(
+        `Couldn't start playback for this sentence: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    })
 
     // Top up the lookahead buffer for what comes after what we just queued.
     void this.ensureSynthesized(this.currentIndex + 1)

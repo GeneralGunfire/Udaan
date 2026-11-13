@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <rect width="48" height="48" rx="10" fill="#040714"/>
+  <rect width="48" height="48" rx="10" fill="url(#dplus-gradient)"/>
+  <text x="15" y="31" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-weight="700" font-style="italic" fill="#FFFFFF">D</text>
+  <text x="33" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">+</text>
+  <defs>
+    <linearGradient id="dplus-gradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f2f8f"/>
+      <stop offset="1" stop-color="#040714"/>
+    </linearGradient>
+  </defs>
+</svg>

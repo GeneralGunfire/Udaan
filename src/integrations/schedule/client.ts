@@ -11,6 +11,8 @@ interface RawScheduleEvent {
   category: string
   status: string
   created_at: string
+  all_day: boolean
+  duration_minutes: number | null
 }
 
 function eventFromRaw(raw: RawScheduleEvent): ScheduleEvent {
@@ -24,6 +26,8 @@ function eventFromRaw(raw: RawScheduleEvent): ScheduleEvent {
     category: raw.category as EventCategory,
     status: raw.status as EventStatus,
     createdAt: raw.created_at,
+    allDay: raw.all_day,
+    durationMinutes: raw.duration_minutes ?? undefined,
   }
 }
 
@@ -38,6 +42,8 @@ function eventToRaw(event: ScheduleEvent): RawScheduleEvent {
     category: event.category,
     status: event.status,
     created_at: event.createdAt,
+    all_day: event.allDay ?? false,
+    duration_minutes: event.durationMinutes ?? null,
   }
 }
 
@@ -59,6 +65,8 @@ export async function createEvent(input: NewScheduleEvent): Promise<ScheduleEven
     category: input.category,
     status: input.date ? 'planned' : 'unplanned',
     createdAt: new Date().toISOString(),
+    allDay: input.allDay,
+    durationMinutes: input.durationMinutes,
   }
   await invoke('schedule_create_event', { event: eventToRaw(event) })
   return event

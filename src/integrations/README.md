@@ -12,10 +12,12 @@ All four integrations below are real and working, not stubs:
   history, subscribe to live stdout/stderr/status events, open a task's
   working directory in VS Code, and check the `claude` CLI itself is
   installed and resolvable (`checkCli()` → `claude --version`).
-- **`local-model/`** — chat completion against a local Ollama daemon
-  (`isReachable()`, `chat()`, `listRunningModels()` via Ollama's
-  `/api/ps`) and speech-to-text via a bundled faster-whisper script,
-  invoked through Rust commands (`transcribe()` / `transcribeBytes()`).
+- **`local-model/`** — local neural TTS (Piper) for Document Reader
+  (`listTtsVoices()`, `synthesizeSpeech()`), invoked through Rust commands.
+  Formerly also wrapped a local Ollama chat daemon and faster-whisper
+  transcription for General Chat's Local mode and voice input — both were
+  removed along with Ollama itself; General Chat now talks to OmniRoute
+  exclusively (see `omniroute/`).
 - **`schedule/`** — a typed in-memory event/todo data module
   (`scheduleStore.ts`) shared by the Calendar and Schedule features and
   meant to be queryable by a local-model "what's on my schedule" request.

@@ -1,116 +1,66 @@
-import { memo, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { spring } from '@/shared/lib/motion'
-import { ClipboardIcon } from '@/shared/icons'
-import { Button } from '@/shared/components/ui/button'
+import { memo, useMemo } from 'react'
+import { Marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { openWithSystem } from '@/integrations/file-explorer/client'
+import { launchApp } from '@/integrations/installed-apps/client'
+
+const marked = new Marked({ gfm: true, breaks: true })
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+marked.use({
+  renderer: {
+    // Code blocks get a language label and a copy button (wired by event delegation below).
+    code({ text, lang }) {
+      const label = lang ? `<span class="md-code-lang">${escapeHtml(lang)}</span>` : '<span></span>'
+      return `<div class="md-code"><div class="md-code-bar">${label}<button type="button" data-copy>Copy</button></div><pre><code>${escapeHtml(text)}</code></pre></div>`
+    },
+  },
+})
+
+/** Local image paths (C:\...) become asset URLs the webview can load. */
+function localImages(text: string) {
+  return text.replace(/!\[([^\]]*)\]\(((?:[A-Za-z]:[\\/]|file:\/\/\/)[^)]+)\)/g, (_m, alt: string, path: string) => `![${alt}](${convertFileSrc(decodeURI(path.replace(/^file:\/\/\//, '')))})`)
+}
 
 /**
- * Minimal markdown rendering — fenced code blocks and inline `code` spans
- * only, not a full markdown parser. Assistant replies routinely include
- * code, and rendering it as a monospace block (not plain wrapped text) is
- * the single highest-value case for a chat that talks to an LLM.
- *
- * Memoized on `text` — while a reply is streaming, `text` genuinely
- * changes every chunk and re-splitting is real, necessary work, but this
- * also re-rendered (and re-ran both regex splits) on ANY re-render of the
- * message list, not just ones where this particular message's text
- * actually changed. `React.memo` + `useMemo` mean an unrelated re-render
- * (e.g. a sibling message updating, a hover state elsewhere) skips the
- * parse entirely when `text` is unchanged.
+ * Chat message markdown: headings, lists, tables, links, quotes, code
+ * blocks with copy, and images (web or local files). AI output is
+ * untrusted, so everything passes through DOMPurify before rendering.
  */
 export const MessageText = memo(function MessageText({ text }: { text: string }) {
-  const parts = useMemo(() => text.split(/(```[\s\S]*?```)/g), [text])
+  const html = useMemo(() => {
+    const raw = marked.parse(localImages(text), { async: false }) as string
+    return DOMPurify.sanitize(raw, { ADD_ATTR: ['data-copy'], ALLOWED_URI_REGEXP: /^(?:https?:|http:\/\/asset\.localhost|asset:|data:image\/|mailto:)/i })
+  }, [text])
 
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('```')) {
-          const match = /^```(\w*)\n?([\s\S]*?)```$/.exec(part)
-          const code = match ? match[2].replace(/\n$/, '') : part.slice(3, -3)
-          const lang = match?.[1]
-          return <CodeBlock key={i} code={code} lang={lang} />
+    <div
+      className="md-body select-text"
+      onClick={(e) => {
+        const el = e.target as HTMLElement
+        if (el.matches('button[data-copy]')) {
+          const code = el.closest('.md-code')?.querySelector('code')?.textContent ?? ''
+          void navigator.clipboard.writeText(code)
+          el.textContent = 'Copied'
+          setTimeout(() => (el.textContent = 'Copy'), 1400)
+          return
         }
-        return (
-          <InlineCode key={i} text={part} />
-        )
-      })}
-    </>
-  )
-})
-
-/** Code block with a hover-reveal copy button — same reveal pattern ChatMessage uses for its own metadata row. */
-const CodeBlock = memo(function CodeBlock({ code, lang }: { code: string; lang?: string }) {
-  const [copied, setCopied] = useState(false)
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // Clipboard permission denied or unavailable — no user-facing error needed.
-    }
-  }
-
-  return (
-    <pre className="group/code relative my-1.5 overflow-x-auto rounded-md border border-(--border-hairline) bg-(--surface-overlay) p-2.5 text-xs">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        {lang ? (
-          <div className="text-text-tertiary text-xs font-medium uppercase">{lang}</div>
-        ) : (
-          <div />
-        )}
-        <Button
-          type="button"
-          aria-label="Copy code"
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleCopy}
-          className="rounded-md opacity-0 transition-opacity duration-150 group-hover/code:opacity-100 focus-visible:opacity-100"
-        >
-          {copied ? (
-            <motion.svg
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={spring.micro}
-              width="10"
-              height="10"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-accent"
-            >
-              <path d="M4 10l4 4 8-8" />
-            </motion.svg>
-          ) : (
-            <ClipboardIcon width={10} height={10} />
-          )}
-        </Button>
-      </div>
-      <code className="font-mono whitespace-pre">{code}</code>
-    </pre>
-  )
-})
-
-const InlineCode = memo(function InlineCode({ text }: { text: string }) {
-  const segments = useMemo(() => text.split(/(`[^`]+`)/g), [text])
-  return (
-    <p className="whitespace-pre-wrap">
-      {segments.map((seg, i) =>
-        seg.startsWith('`') && seg.endsWith('`') && seg.length > 1 ? (
-          <code
-            key={i}
-            className="rounded-sm bg-(--surface-overlay) px-1 py-0.5 font-mono text-xs"
-          >
-            {seg.slice(1, -1)}
-          </code>
-        ) : (
-          <span key={i}>{seg}</span>
-        ),
-      )}
-    </p>
+        // Links open in the default browser; images open full size.
+        const a = el.closest('a')
+        if (a?.href) {
+          e.preventDefault()
+          void launchApp(a.href)
+          return
+        }
+        if (el instanceof HTMLImageElement) {
+          const local = el.src.match(/^http:\/\/asset\.localhost\/(.+)$/)
+          if (local) void openWithSystem(decodeURIComponent(local[1]))
+          else void launchApp(el.src)
+        }
+      }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 })
