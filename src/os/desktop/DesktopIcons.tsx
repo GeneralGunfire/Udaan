@@ -105,8 +105,8 @@ const IconTile = memo(function IconTile({
       onDoubleClick={() => onDoubleClick(item)}
       className={cn(
         'group absolute flex flex-col items-center gap-1 rounded-[6px] border px-1 pb-1.5 pt-2 outline-none',
-        selected ? 'border-[var(--os-selection-border)] bg-[var(--os-selection-fill)]' : 'border-transparent hover:bg-[var(--os-menu-item-hover)]',
-        dropTarget && 'border-[var(--os-selection-border)] bg-[var(--surface-hover)]',
+        selected ? 'border-[var(--os-selection-border)] bg-[var(--os-selection-fill)]' : 'border-transparent hover:bg-(--os-hover)',
+        dropTarget && 'border-[var(--os-selection-border)] bg-(--os-active)',
         dragging && 'pointer-events-none opacity-70',
       )}
       style={{

@@ -76,7 +76,7 @@ export function ChatHistoryPopup({
                         onClick={() => { onSwitchSession(s.id); setOpen(false) }}
                         className={cn(
                           'flex min-w-0 flex-1 items-center rounded-lg px-2 py-2 text-left text-sm outline-none transition-colors',
-                          isActive ? 'bg-[var(--os-menu-item-hover)] text-text-primary' : 'text-text-secondary hover:bg-[var(--os-menu-item-hover)] hover:text-text-primary',
+                          isActive ? 'bg-(--os-hover) text-text-primary' : 'text-text-secondary hover:bg-(--os-hover) hover:text-text-primary',
                         )}
                       >
                         <span className="truncate">{s.title || 'Untitled chat'}</span>
@@ -85,7 +85,7 @@ export function ChatHistoryPopup({
                         type="button"
                         aria-label={`Delete ${s.title || 'Untitled chat'}`}
                         onClick={(e) => { e.stopPropagation(); onCloseSession(s.id) }}
-                        className="text-text-tertiary hover:bg-[var(--os-menu-item-hover)] hover:text-danger absolute right-1 z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                        className="text-text-tertiary hover:bg-(--os-hover) hover:text-danger absolute right-1 z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                       >
                         <WindowCloseIcon width={10} height={10} />
                       </button>

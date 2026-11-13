@@ -183,7 +183,7 @@ function Inline({
               target="_blank"
               rel="noreferrer noopener"
               title={source.title || source.url}
-              className="text-accent mx-0.5 rounded px-1 text-2xs-alt no-underline transition-colors hover:bg-[var(--os-menu-item-hover)]"
+              className="text-accent mx-0.5 rounded px-1 text-2xs-alt no-underline transition-colors hover:bg-(--os-hover)"
               style={{ verticalAlign: 'super' }}
             >
               {part.index}

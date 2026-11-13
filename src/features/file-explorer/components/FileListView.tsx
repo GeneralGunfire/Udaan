@@ -157,7 +157,7 @@ function FileListRow({
       }}
       className={cn(
         'flex cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors duration-100 select-none',
-        selected ? 'bg-[var(--surface-hover)] text-text-primary' : 'text-text-secondary hover:bg-[var(--os-menu-item-hover)]',
+        selected ? 'bg-[var(--surface-hover)] text-text-primary' : 'text-text-secondary hover:bg-(--os-hover)',
         dragOver && 'bg-accent/20 ring-accent/60 ring-1',
         cut && 'opacity-45',
       )}

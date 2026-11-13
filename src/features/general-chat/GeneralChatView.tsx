@@ -95,14 +95,14 @@ export function GeneralChatView() {
               chat.newChat()
               inputRef.current?.focus()
             }}
-            className="flex h-10 w-full items-center gap-2 rounded-[10px] border border-[var(--border-hairline)] px-3 text-[13.5px] font-medium transition-colors hover:bg-[var(--os-menu-item-hover)]"
+            className="flex h-10 w-full items-center gap-2 rounded-[10px] border border-[var(--border-hairline)] px-3 text-[13.5px] font-medium transition-colors hover:bg-(--os-hover)"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
             New chat
           </button>
-          <label className="mt-2 flex h-9 items-center gap-2 rounded-[9px] bg-[var(--os-menu-item-hover)] px-3">
+          <label className="mt-2 flex h-9 items-center gap-2 rounded-[9px] bg-(--os-hover) px-3">
             <SearchIcon width={13} height={13} className="text-[var(--color-text-tertiary)]" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search chats" className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--color-text-tertiary)]" />
           </label>
@@ -118,7 +118,7 @@ export function GeneralChatView() {
                   role="button"
                   tabIndex={0}
                   onClick={() => chat.switchSession(s.id)}
-                  className={`group flex h-9 cursor-default items-center gap-2 rounded-[8px] px-3 text-[13px] transition-colors ${s.id === chat.sessionId ? 'bg-[var(--os-menu-item-hover)]' : 'hover:bg-[var(--os-menu-item-hover)]'}`}
+                  className={`group flex h-9 cursor-default items-center gap-2 rounded-[8px] px-3 text-[13px] transition-colors ${s.id === chat.sessionId ? 'bg-(--os-hover)' : 'hover:bg-(--os-hover)'}`}
                 >
                   <span className="min-w-0 flex-1 truncate">{s.title}</span>
                   <button
@@ -176,7 +176,7 @@ export function GeneralChatView() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 + i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     onClick={() => send(s.prompt)}
-                    className="rounded-[14px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] p-4 text-left transition-colors hover:bg-[var(--os-menu-item-hover)]"
+                    className="rounded-[14px] border border-[var(--border-hairline)] bg-(--os-hover) p-4 text-left transition-colors hover:bg-(--os-hover)"
                   >
                     <p className="text-[14px] font-semibold">{s.title}</p>
                     <p className="mt-1 line-clamp-2 text-[12.5px] text-[var(--color-text-secondary)]">{s.prompt}</p>
@@ -209,12 +209,12 @@ export function GeneralChatView() {
                                   setCopiedId(m.id)
                                   setTimeout(() => setCopiedId(null), 1400)
                                 }}
-                                className="flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]"
+                                className="flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]"
                               >
                                 <CopyIcon width={12} height={12} /> {copiedId === m.id ? 'Copied' : 'Copy'}
                               </button>
                               {i === chat.messages.length - 1 && lastUserText && (
-                                <button type="button" onClick={() => send(lastUserText)} className="rounded-[6px] px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]">
+                                <button type="button" onClick={() => send(lastUserText)} className="rounded-[6px] px-2 py-1 text-[12px] text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]">
                                   Regenerate
                                 </button>
                               )}
@@ -246,7 +246,7 @@ export function GeneralChatView() {
               </div>
             )}
             <div className="flex items-end gap-2">
-              <button type="button" aria-label="Attach images" title="Attach images" onClick={() => void pickImages()} className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]">
+              <button type="button" aria-label="Attach images" title="Attach images" onClick={() => void pickImages()} className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2L9.8 17.5a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" />
                 </svg>
@@ -257,7 +257,7 @@ export function GeneralChatView() {
                 aria-pressed={web}
                 title={web ? 'Web search on' : 'Search the web for this answer'}
                 onClick={() => setWeb((w) => !w)}
-                className={`mb-0.5 flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium transition-colors ${web ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]'}`}
+                className={`mb-0.5 flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium transition-colors ${web ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]'}`}
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <circle cx="12" cy="12" r="9" />

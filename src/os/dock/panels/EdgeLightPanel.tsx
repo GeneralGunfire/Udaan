@@ -33,7 +33,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       className={cn(
         'rounded-full px-3 py-1 text-[12px] font-medium transition-colors active:scale-95',
-        active ? 'bg-[var(--os-menu-text)] text-[var(--surface-base)]' : 'bg-[var(--os-menu-item-hover)] hover:bg-[var(--surface-hover)]',
+        active ? 'bg-(--os-text) text-[var(--surface-base)]' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]',
       )}
     >
       {children}
@@ -45,9 +45,9 @@ function Slider({ label, value, min, max, step = 1, unit = '', onChange }: { lab
   const pct = ((value - min) / (max - min)) * 100
   return (
     <label className="flex items-center gap-3">
-      <span className="w-[74px] shrink-0 text-[12.5px] text-[var(--os-menu-text-dim)]">{label}</span>
+      <span className="w-[74px] shrink-0 text-[12.5px] text-(--os-text-dim)">{label}</span>
       <input type="range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => onChange(Number(e.target.value))} className="os-slider flex-1" style={{ ['--fill' as string]: `${pct}%` }} />
-      <span className="w-11 text-right text-[12px] tabular-nums text-[var(--os-menu-text-dim)]">
+      <span className="w-11 text-right text-[12px] tabular-nums text-(--os-text-dim)">
         {Number.isInteger(step) ? value : value.toFixed(2)}
         {unit}
       </span>
@@ -65,7 +65,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[12.5px] text-[var(--os-menu-text-dim)]">{label}</span>
+        <span className="text-[12.5px] text-(--os-text-dim)">{label}</span>
         <input
           value={text}
           aria-label={`${label} hex`}
@@ -74,7 +74,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
             setText(e.target.value)
             commit(e.target.value)
           }}
-          className="w-[84px] rounded-[7px] bg-[var(--os-menu-item-hover)] px-2 py-1 text-right text-[12px] tabular-nums outline-none"
+          className="w-[84px] rounded-[7px] bg-(--os-hover) px-2 py-1 text-right text-[12px] tabular-nums outline-none"
         />
       </div>
       <div className="flex gap-1.5">
@@ -115,7 +115,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[12.5px] text-[var(--os-menu-text-dim)]">{label}</span>
+      <span className="text-[12.5px] text-(--os-text-dim)">{label}</span>
       {children}
     </div>
   )
@@ -173,13 +173,13 @@ export function EdgeLightPanel() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[13px] font-semibold">Edge light</p>
-          <p className="text-[11.5px] text-[var(--os-menu-text-dim)]">Reacts to whatever is playing</p>
+          <p className="text-[11.5px] text-(--os-text-dim)">Reacts to whatever is playing</p>
         </div>
         <motion.button
           type="button"
           whileTap={{ scale: 0.95 }}
           onClick={() => setPreview((p) => !p)}
-          className={cn('shrink-0 rounded-full px-3 py-1 text-[12px] font-medium transition-colors', preview ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)]' : 'bg-[var(--os-menu-item-hover)] hover:bg-[var(--surface-hover)]')}
+          className={cn('shrink-0 rounded-full px-3 py-1 text-[12px] font-medium transition-colors', preview ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)]' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]')}
         >
           {preview ? 'Stop preview' : 'Preview'}
         </motion.button>
@@ -196,7 +196,7 @@ export function EdgeLightPanel() {
               aria-pressed={on}
               whileTap={{ scale: 0.94 }}
               onClick={() => update({ ...p.patch, enabled: true })}
-              className={cn('flex flex-col items-center gap-1.5 rounded-[11px] px-1 py-2 text-[11.5px] font-medium transition-colors', on ? 'bg-[var(--surface-hover)] ring-1 ring-[var(--color-accent)]' : 'bg-[var(--os-menu-item-hover)] hover:bg-[var(--surface-hover)]')}
+              className={cn('flex flex-col items-center gap-1.5 rounded-[11px] px-1 py-2 text-[11.5px] font-medium transition-colors', on ? 'bg-[var(--surface-hover)] ring-1 ring-[var(--color-accent)]' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]')}
             >
               <span className="h-5 w-5 rounded-full border border-white/20" style={{ background: swatchOf(p.patch) }} />
               {p.name}
@@ -205,7 +205,7 @@ export function EdgeLightPanel() {
         })}
       </div>
 
-      <div className="flex gap-1 rounded-[10px] bg-[var(--os-menu-item-hover)] p-0.5" role="tablist">
+      <div className="flex gap-1 rounded-[10px] bg-(--os-hover) p-0.5" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -213,7 +213,7 @@ export function EdgeLightPanel() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={cn('flex-1 rounded-[8px] py-1 text-[12px] font-medium transition-colors', tab === t.id ? 'bg-[var(--surface-hover)]' : 'text-[var(--os-menu-text-dim)]')}
+            className={cn('flex-1 rounded-[8px] py-1 text-[12px] font-medium transition-colors', tab === t.id ? 'bg-[var(--surface-hover)]' : 'text-(--os-text-dim)')}
           >
             {t.label}
           </button>
@@ -231,7 +231,7 @@ export function EdgeLightPanel() {
                   title={s.hint}
                   aria-pressed={cfg.style === s.id}
                   onClick={() => update({ style: s.id })}
-                  className={cn('flex flex-col items-center gap-1.5 rounded-[11px] px-1 py-2 text-[12px] font-medium transition-colors active:scale-95', cfg.style === s.id ? 'bg-[var(--surface-hover)] ring-1 ring-[var(--color-accent)]' : 'bg-[var(--os-menu-item-hover)] hover:bg-[var(--surface-hover)]')}
+                  className={cn('flex flex-col items-center gap-1.5 rounded-[11px] px-1 py-2 text-[12px] font-medium transition-colors active:scale-95', cfg.style === s.id ? 'bg-[var(--surface-hover)] ring-1 ring-[var(--color-accent)]' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]')}
                 >
                   <svg viewBox="0 0 36 16" width="36" height="16" fill="currentColor" aria-hidden>
                     {s.id === 'bars' && [3, 9, 15, 21, 27].map((x, i) => <rect key={x} x={x} y={16 - [6, 11, 14, 9, 5][i]} width="4" height={[6, 11, 14, 9, 5][i]} rx="2" />)}
@@ -263,7 +263,7 @@ export function EdgeLightPanel() {
         {tab === 'layout' && (
           <>
             <div>
-              <p className="mb-1.5 text-[12.5px] text-[var(--os-menu-text-dim)]">Edges</p>
+              <p className="mb-1.5 text-[12.5px] text-(--os-text-dim)">Edges</p>
               <div className="flex gap-1.5">
                 {(['top', 'right', 'bottom', 'left'] as const).map((k) => (
                   <Chip key={k} active={cfg.sides[k]} onClick={() => side(k)}>
@@ -273,7 +273,7 @@ export function EdgeLightPanel() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[12.5px] text-[var(--os-menu-text-dim)]">Direction</p>
+              <p className="mb-1.5 text-[12.5px] text-(--os-text-dim)">Direction</p>
               <div className="flex gap-1.5">
                 <Chip active={cfg.direction === 'clockwise'} onClick={() => update({ direction: 'clockwise' })}>
                   Clockwise
@@ -318,7 +318,7 @@ export function EdgeLightPanel() {
         )}
       </div>
 
-      <button type="button" onClick={reset} className="self-start rounded-[8px] px-2.5 py-1 text-[12px] text-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-item-hover)]">
+      <button type="button" onClick={reset} className="self-start rounded-[8px] px-2.5 py-1 text-[12px] text-(--os-text-dim) hover:bg-(--os-hover)">
         Reset to defaults
       </button>
     </div>

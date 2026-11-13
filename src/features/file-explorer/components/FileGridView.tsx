@@ -128,7 +128,7 @@ function FileGridTile({
       }}
       className={cn(
         'flex cursor-default flex-col items-center gap-1.5 rounded-xl p-2.5 text-center transition-colors duration-100 select-none',
-        selected ? 'bg-[var(--surface-hover)]' : 'hover:bg-[var(--os-menu-item-hover)]',
+        selected ? 'bg-[var(--surface-hover)]' : 'hover:bg-(--os-hover)',
         dragOver && 'bg-accent/20 ring-accent/60 ring-1',
         cut && 'opacity-45',
       )}

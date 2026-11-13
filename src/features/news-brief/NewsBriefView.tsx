@@ -168,7 +168,7 @@ function BookmarkButton({ on, onToggle }: { on: boolean; onToggle: () => void })
 
 function Picture({ src, className }: { src: string | null; className: string }) {
   const [failed, setFailed] = useState(false)
-  if (!src || failed) return <div className={cn('bg-gradient-to-br from-[var(--os-menu-item-hover)] to-transparent', className)} />
+  if (!src || failed) return <div className={cn('bg-gradient-to-br from-(--os-hover) to-transparent', className)} />
   return (
     <img
       src={src}
@@ -188,7 +188,7 @@ function Meta({ s }: { s: Story }) {
     <p className="mt-2 flex items-center gap-2 text-[11.5px] text-[var(--color-text-tertiary,rgb(255_255_255/0.45))]">
       <span className="font-semibold uppercase tracking-wide">{s.source}</span>
       {s.link && (
-        <button type="button" onClick={(e) => (e.stopPropagation(), void openWithSystem(s.link!))} className="rounded px-1 hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]">
+        <button type="button" onClick={(e) => (e.stopPropagation(), void openWithSystem(s.link!))} className="rounded px-1 hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]">
           Read source ↗
         </button>
       )}
@@ -299,7 +299,7 @@ export function NewsBriefView(_props: NewsBriefViewProps) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search stories"
               aria-label="Search stories"
-              className="h-9 w-[200px] rounded-[8px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] pl-8 pr-3 text-[13px] outline-none placeholder:text-[var(--color-text-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/60 [&::-webkit-search-cancel-button]:hidden"
+              className="h-9 w-[200px] rounded-[8px] border border-[var(--border-hairline)] bg-(--os-hover) pl-8 pr-3 text-[13px] outline-none placeholder:text-[var(--color-text-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/60 [&::-webkit-search-cancel-button]:hidden"
             />
           </div>
           <Select

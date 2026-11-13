@@ -166,7 +166,7 @@ function SidebarItem({
           'flex h-8 flex-1 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition-[background-color,color,box-shadow] duration-150',
           active
             ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]'
-            : 'text-text-secondary hover:bg-[var(--os-menu-item-hover)] hover:text-text-primary',
+            : 'text-text-secondary hover:bg-(--os-hover) hover:text-text-primary',
         )}
       >
         <FolderIcon width={16} height={16} className="shrink-0" />
@@ -185,7 +185,7 @@ function SidebarItem({
           // it, so it sat visibly off-centre and lighter than every other
           // control — the most obvious instance of the button
           // inconsistency in this view.
-          className="text-text-tertiary hover:text-text-primary hover:bg-[var(--os-menu-item-hover)] absolute right-1.5 hidden h-5 w-5 items-center justify-center rounded-md transition-colors duration-150 group-hover:flex"
+          className="text-text-tertiary hover:text-text-primary hover:bg-(--os-hover) absolute right-1.5 hidden h-5 w-5 items-center justify-center rounded-md transition-colors duration-150 group-hover:flex"
         >
           <WindowCloseIcon width={10} height={10} />
         </button>

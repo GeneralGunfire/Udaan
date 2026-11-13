@@ -117,9 +117,25 @@ export function ToastWindow() {
             <motion.div
               key={n.id}
               layout
-              initial={{ opacity: 0, y: -28, scale: 0.97 }}
+              // Banners drop in from above the screen edge, which is where
+              // they physically come from, and leave to the right.
+              initial={{ opacity: 0, y: -32, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1, transition: springs.flyout }}
-              exit={{ opacity: 0, x: 48, transition: { duration: dur.fast, ease: curve.accelerate } }}
+              exit={{ opacity: 0, x: 56, scale: 0.97, transition: { duration: dur.fast, ease: curve.accelerate } }}
+              // Swipe right to dismiss, as on a phone. Constrained to one
+              // axis so a slightly diagonal flick still reads as a dismissal
+              // rather than dragging the banner around.
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={{ left: 0.02, right: 0.9 }}
+              dragSnapToOrigin
+              onDragStart={() => clearTimeout(timers.current.get(n.id))}
+              onDragEnd={(_, info) => {
+                // Either far enough or fast enough: requiring distance alone
+                // makes a quick flick feel like it was ignored.
+                if (info.offset.x > WIDTH * 0.35 || info.velocity.x > 500) remove(n.id)
+                else schedule(n.id)
+              }}
               onMouseEnter={() => clearTimeout(timers.current.get(n.id))}
               onMouseLeave={() => schedule(n.id)}
               onClick={() => {
@@ -128,8 +144,10 @@ export function ToastWindow() {
                 if (extra?.launch) void launchApp(extra.launch)
                 else void emit('dock:open-notifications')
               }}
-              className="group relative cursor-default overflow-hidden rounded-[20px] border border-[var(--os-acrylic-border)] text-[var(--os-menu-text)]"
-              style={{ width: WIDTH, marginTop: GAP / 2, background: 'var(--os-acrylic)', boxShadow: `${elevation(4)}, var(--os-acrylic-edge)` }}
+              whileHover={{ scale: 1.012 }}
+              whileTap={{ scale: 0.992 }}
+              className="os-panel-material os-sheen group relative cursor-default overflow-hidden rounded-[20px] text-(--os-text)"
+              style={{ width: WIDTH, marginTop: GAP / 2, boxShadow: `${elevation(4)}, var(--os-edge)` }}
             >
               <div className="flex gap-3 px-4 py-3.5">
                 {/* The sender's picture when there is one, with the app as a badge; otherwise just the app. */}
@@ -148,10 +166,10 @@ export function ToastWindow() {
                 <div className="min-w-0 flex-1 pr-5">
                   <div className="flex items-baseline gap-2">
                     <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5">{n.title}</p>
-                    <span className="shrink-0 text-[11px] text-[var(--os-menu-text-dim)]">now</span>
+                    <span className="shrink-0 text-[11px] text-(--os-text-dim)">now</span>
                   </div>
-                  <p className="truncate text-[11.5px] font-medium uppercase tracking-wide text-[var(--os-menu-text-dim)]">{notificationSource(n)}</p>
-                  {n.body && previews && <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-[18px] text-[var(--os-menu-text)]/85">{n.body}</p>}
+                  <p className="truncate text-[11.5px] font-medium uppercase tracking-wide text-(--os-text-dim)">{notificationSource(n)}</p>
+                  {n.body && previews && <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-[18px] text-(--os-text)/85">{n.body}</p>}
                 </div>
               </div>
               <motion.div className="absolute bottom-0 left-0 h-[2px] bg-[var(--color-accent)]/70" initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: visibleMs.current / 1000, ease: 'linear' }} />
@@ -162,7 +180,7 @@ export function ToastWindow() {
                   e.stopPropagation()
                   remove(n.id)
                 }}
-                className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--os-menu-item-hover)] opacity-0 transition-opacity hover:bg-[var(--surface-hover)] group-hover:opacity-100"
+                className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-(--os-hover) opacity-0 transition-opacity hover:bg-(--os-active) group-hover:opacity-100"
               >
                 <WindowCloseIcon width={11} height={11} />
               </button>

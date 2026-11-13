@@ -148,10 +148,10 @@ export function ScreenshotApp(_props: { onClose: () => void }) {
             <button type="button" onClick={() => void capture(0)} className="h-11 rounded-full bg-[var(--color-accent)] px-6 text-[14px] font-semibold hover:brightness-110">
               Capture screen
             </button>
-            <button type="button" onClick={() => void capture(3)} className="h-11 rounded-full bg-[var(--os-menu-item-hover)] px-5 text-[14px] font-medium hover:bg-white/[0.14]">
+            <button type="button" onClick={() => void capture(3)} className="h-11 rounded-full bg-(--os-hover) px-5 text-[14px] font-medium hover:bg-white/[0.14]">
               In 3 s
             </button>
-            <button type="button" onClick={() => void capture(5)} className="h-11 rounded-full bg-[var(--os-menu-item-hover)] px-5 text-[14px] font-medium hover:bg-white/[0.14]">
+            <button type="button" onClick={() => void capture(5)} className="h-11 rounded-full bg-(--os-hover) px-5 text-[14px] font-medium hover:bg-white/[0.14]">
               In 5 s
             </button>
           </div>
@@ -171,7 +171,7 @@ export function ScreenshotApp(_props: { onClose: () => void }) {
             ['box', 'Box'],
           ] as [Tool, string][]
         ).map(([t, label]) => (
-          <button key={t} type="button" onClick={() => setTool(t)} className={`h-8 rounded-[8px] px-3 text-[13px] font-medium ${tool === t ? 'bg-white text-black' : 'text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)]'}`}>
+          <button key={t} type="button" onClick={() => setTool(t)} className={`h-8 rounded-[8px] px-3 text-[13px] font-medium ${tool === t ? 'bg-white text-black' : 'text-[var(--color-text-secondary)] hover:bg-(--os-hover)'}`}>
             {label}
           </button>
         ))}
@@ -180,17 +180,17 @@ export function ScreenshotApp(_props: { onClose: () => void }) {
           <button key={c} type="button" aria-label={`Colour ${c}`} onClick={() => setColor(c)} className={`h-6 w-6 rounded-full ring-offset-2 ring-offset-[var(--surface-base)] ${color === c ? 'ring-2 ring-white' : ''}`} style={{ background: c }} />
         ))}
         <span className="mx-2 h-5 w-px bg-white/10" />
-        <button type="button" onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] disabled:opacity-30">
+        <button type="button" onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-(--os-hover) disabled:opacity-30">
           Undo
         </button>
         {crop && (
-          <button type="button" onClick={() => setCrop(null)} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)]">
+          <button type="button" onClick={() => setCrop(null)} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-(--os-hover)">
             Clear crop
           </button>
         )}
         <span className="flex-1" />
         {status && <span className="text-[12.5px] text-[var(--color-text-secondary)]">{status}</span>}
-        <button type="button" onClick={() => setSrc(null)} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)]">
+        <button type="button" onClick={() => setSrc(null)} className="h-8 rounded-[8px] px-3 text-[13px] text-[var(--color-text-secondary)] hover:bg-(--os-hover)">
           New
         </button>
         <button type="button" onClick={() => void finish(false, true)} className="h-8 rounded-[8px] bg-white/[0.1] px-3.5 text-[13px] font-medium hover:bg-white/[0.16]">

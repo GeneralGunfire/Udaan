@@ -340,23 +340,23 @@ export function Viewer3DApp({ initialPath }: { onClose: () => void; initialPath?
         {info && (
           <div className="os-acrylic absolute right-3 top-3 w-60 rounded-[12px] p-3 text-[12px]">
             <p className="mb-2 truncate text-[13px] font-semibold">{info.name}</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[var(--os-menu-text-dim)]">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-(--os-text-dim)">
               <dt>Size</dt>
-              <dd className="text-right tabular-nums text-[var(--os-menu-text)]">
+              <dd className="text-right tabular-nums text-(--os-text)">
                 {info.size.x.toFixed(2)} × {info.size.y.toFixed(2)} × {info.size.z.toFixed(2)}
               </dd>
               <dt>Vertices</dt>
-              <dd className="text-right tabular-nums text-[var(--os-menu-text)]">{info.vertices.toLocaleString()}</dd>
+              <dd className="text-right tabular-nums text-(--os-text)">{info.vertices.toLocaleString()}</dd>
               <dt>Triangles</dt>
-              <dd className="text-right tabular-nums text-[var(--os-menu-text)]">{info.triangles.toLocaleString()}</dd>
+              <dd className="text-right tabular-nums text-(--os-text)">{info.triangles.toLocaleString()}</dd>
               <dt>Meshes</dt>
-              <dd className="text-right tabular-nums text-[var(--os-menu-text)]">{info.meshes}</dd>
+              <dd className="text-right tabular-nums text-(--os-text)">{info.meshes}</dd>
               <dt>Materials</dt>
-              <dd className="text-right tabular-nums text-[var(--os-menu-text)]">{info.materials}</dd>
+              <dd className="text-right tabular-nums text-(--os-text)">{info.materials}</dd>
             </dl>
             {info.animations.length > 0 && (
               <label className="mt-3 block">
-                <span className="mb-1 block text-[var(--os-menu-text-dim)]">Animation</span>
+                <span className="mb-1 block text-(--os-text-dim)">Animation</span>
                 <Select
                   value={clip === null ? '' : String(clip)}
                   onChange={(v) => setClip(v === '' ? null : Number(v))}

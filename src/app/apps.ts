@@ -4,43 +4,6 @@ import { detectApps, launchApp, launchAppByExeName } from '@/integrations/instal
 import { openApp } from '@/os/kernel/shell'
 import { APP_DEFS, type AppId } from '@/os/kernel/registry'
 
-/**
- * Every real app-logo asset used by a Launchpad tile, in one place —
- * decoded eagerly below rather than left to load lazily the first time
- * each tile's `<img>` actually mounts (i.e. the first time a folder is
- * opened), which is what made some icons visibly pop in a beat late on
- * first open. Vite resolves these imports to real URLs at build time, but
- * the browser doesn't fetch/decode the bytes until something renders an
- * `<img src>` for them — preloading kicks that off immediately at app
- * startup instead, so by the time Launchpad (or a folder inside it) is
- * ever opened every icon is already sitting decoded in the image cache.
- */
-const ALL_APP_ICON_SRCS = [
-  wordIcon,
-  excelIcon,
-  powerpointIcon,
-  outlookIcon,
-  onedriveIcon,
-  powerbiIcon,
-  storeIcon,
-  onenoteIcon,
-  todoIcon,
-  outlookNewIcon,
-  claudeIcon,
-  vscodeIcon,
-  snippingToolIcon,
-  teamviewerIcon,
-  wikipediaIcon,
-  disneyPlusIcon,
-]
-
-if (typeof window !== 'undefined') {
-  for (const src of ALL_APP_ICON_SRCS) {
-    const img = new Image()
-    img.src = src
-  }
-}
-
 export interface AppDefinition {
   id: string
   name: string

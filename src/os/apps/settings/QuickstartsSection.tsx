@@ -93,8 +93,8 @@ function ZonePicker({
                 inPreview || mine
                   ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/25 text-[var(--color-text-primary)]'
                   : other
-                    ? 'border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] text-[var(--color-text-tertiary)]'
-                    : 'border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] text-transparent hover:bg-[var(--os-menu-item-hover)]',
+                    ? 'border-[var(--border-hairline)] bg-(--os-hover) text-[var(--color-text-tertiary)]'
+                    : 'border-[var(--border-hairline)] bg-(--os-hover) text-transparent hover:bg-(--os-hover)',
               )}
             >
               {inPreview || mine ? (active?.label.slice(0, 8) ?? '') : other ? other.label.slice(0, 6) : '·'}
@@ -163,13 +163,13 @@ function Editor({
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
-      className="rounded-[12px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] p-4"
+      className="rounded-[12px] border border-[var(--border-hairline)] bg-(--os-hover) p-4"
     >
       <input
         value={draft.name}
         onChange={(e) => onChange({ ...draft, name: e.target.value })}
         placeholder="Quickstart name (e.g. Work)"
-        className="mb-4 w-full rounded-[9px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] px-3 py-2 text-[13.5px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-accent)]"
+        className="mb-4 w-full rounded-[9px] border border-[var(--border-hairline)] bg-(--os-hover) px-3 py-2 text-[13.5px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-accent)]"
       />
 
       <div className="grid grid-cols-2 gap-4">
@@ -188,14 +188,14 @@ function Editor({
                   <div
                     className={cn(
                       'flex items-center gap-2 rounded-[9px] border px-2.5 py-2 transition-colors',
-                      i === activeIndex ? 'border-[var(--color-accent)]/60 bg-[var(--os-menu-item-hover)]' : 'border-[var(--border-hairline)] hover:bg-[var(--os-menu-item-hover)]',
+                      i === activeIndex ? 'border-[var(--color-accent)]/60 bg-(--os-hover)' : 'border-[var(--border-hairline)] hover:bg-(--os-hover)',
                     )}
                   >
                     <button type="button" onClick={() => setActiveIndex(i)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                       {e.kind === 'udaan' ? (
                         <AppIcon appId={e.ref as AppId} size={20} />
                       ) : (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-[var(--os-menu-item-hover)] text-[9px]">EXE</span>
+                        <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-(--os-hover) text-[9px]">EXE</span>
                       )}
                       <span className="min-w-0 flex-1 truncate text-[12.5px]">{e.label}</span>
                       <span className="shrink-0 text-[10.5px] text-[var(--color-text-tertiary)]">
@@ -206,7 +206,7 @@ function Editor({
                       type="button"
                       onClick={() => removeEntry(i)}
                       aria-label={`Remove ${e.label}`}
-                      className="shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]"
+                      className="shrink-0 rounded p-1 text-[var(--color-text-tertiary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]"
                     >
                       <TrashIcon width={11} height={11} />
                     </button>
@@ -226,7 +226,7 @@ function Editor({
               Add an app first.
             </p>
           ) : draft.entries[activeIndex]?.kind === 'external' ? (
-            <p className="rounded-[9px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] px-3 py-4 text-center text-[12px] text-[var(--color-text-tertiary)]">
+            <p className="rounded-[9px] border border-[var(--border-hairline)] bg-(--os-hover) px-3 py-4 text-center text-[12px] text-[var(--color-text-tertiary)]">
               External programs are launched but not arranged — they open their
               own window on their own schedule.
             </p>
@@ -256,7 +256,7 @@ function Editor({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search…"
-              className="ml-auto w-40 rounded-full border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] px-3 py-1 text-[12px] outline-none placeholder:text-[var(--color-text-tertiary)]"
+              className="ml-auto w-40 rounded-full border border-[var(--border-hairline)] bg-(--os-hover) px-3 py-1 text-[12px] outline-none placeholder:text-[var(--color-text-tertiary)]"
             />
           )}
         </div>
@@ -268,7 +268,7 @@ function Editor({
                   key={id}
                   type="button"
                   onClick={() => addEntry({ kind: 'udaan', ref: id, label: APP_DEFS[id].name })}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] px-2.5 py-1 text-[12px] hover:bg-[var(--os-menu-item-hover)]"
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] px-2.5 py-1 text-[12px] hover:bg-(--os-hover)"
                 >
                   <AppIcon appId={id} size={15} />
                   {APP_DEFS[id].name}
@@ -281,7 +281,7 @@ function Editor({
                     key={a.id}
                     type="button"
                     onClick={() => addEntry({ kind: 'external', ref: `shell:AppsFolder\\${a.id}`, label: a.name })}
-                    className="flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] px-2.5 py-1 text-[12px] hover:bg-[var(--os-menu-item-hover)]"
+                    className="flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] px-2.5 py-1 text-[12px] hover:bg-(--os-hover)"
                   >
                     {a.name}
                   </button>
@@ -293,7 +293,7 @@ function Editor({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-full px-4 py-1.5 text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)]"
+          className="rounded-full px-4 py-1.5 text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-(--os-hover)"
         >
           Cancel
         </button>
@@ -368,7 +368,7 @@ export function QuickstartsSection() {
           {list.map((q) => (
             <li
               key={q.id}
-              className="group flex items-center gap-3 rounded-[11px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] px-3.5 py-3"
+              className="group flex items-center gap-3 rounded-[11px] border border-[var(--border-hairline)] bg-(--os-hover) px-3.5 py-3"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13.5px] font-semibold">{q.name}</p>
@@ -384,7 +384,7 @@ export function QuickstartsSection() {
                   await runQuickstart(q)
                   setTimeout(() => setJustRan(null), 1200)
                 }}
-                className="shrink-0 rounded-full border border-[var(--border-hairline)] px-3 py-1 text-[12px] font-medium hover:bg-[var(--os-menu-item-hover)]"
+                className="shrink-0 rounded-full border border-[var(--border-hairline)] px-3 py-1 text-[12px] font-medium hover:bg-(--os-hover)"
               >
                 {justRan === q.id ? <CheckIcon width={12} height={12} /> : 'Run'}
               </button>
@@ -392,7 +392,7 @@ export function QuickstartsSection() {
                 type="button"
                 onClick={() => setDraft(q)}
                 aria-label={`Edit ${q.name}`}
-                className="shrink-0 rounded p-1.5 text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)] group-hover:opacity-100"
+                className="shrink-0 rounded p-1.5 text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:bg-(--os-hover) hover:text-[var(--color-text-primary)] group-hover:opacity-100"
               >
                 <PencilIcon width={12} height={12} />
               </button>
@@ -400,7 +400,7 @@ export function QuickstartsSection() {
                 type="button"
                 onClick={() => void commit(list.filter((x) => x.id !== q.id))}
                 aria-label={`Delete ${q.name}`}
-                className="shrink-0 rounded p-1.5 text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)] group-hover:opacity-100"
+                className="shrink-0 rounded p-1.5 text-[var(--color-text-tertiary)] opacity-0 transition-opacity hover:bg-(--os-hover) hover:text-[var(--color-text-primary)] group-hover:opacity-100"
               >
                 <TrashIcon width={12} height={12} />
               </button>

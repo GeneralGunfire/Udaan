@@ -138,13 +138,13 @@ export function FocusPill() {
         transition={springs.flyout}
         className={cn(
           'absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full',
-          open ? 'bg-[var(--os-menu-item-hover)]' : live ? 'bg-[var(--os-menu-text)]/20' : 'bg-[var(--os-menu-text)]/10',
+          open ? 'bg-(--os-hover)' : live ? 'bg-(--os-text)/20' : 'bg-(--os-text)/10',
         )}
       >
         {!open && live && (
           <span className="flex h-[4px] items-end gap-[2px]" aria-hidden>
             {[0, 1, 2].map((i) => (
-              <span key={i} className="w-[2px] animate-[eq_0.9s_ease-in-out_infinite] rounded-full bg-[var(--os-menu-text)]/70" style={{ animationDelay: `${i * 0.15}s` }} />
+              <span key={i} className="w-[2px] animate-[eq_0.9s_ease-in-out_infinite] rounded-full bg-(--os-text)/70" style={{ animationDelay: `${i * 0.15}s` }} />
             ))}
           </span>
         )}

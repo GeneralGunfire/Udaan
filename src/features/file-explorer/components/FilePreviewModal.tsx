@@ -102,7 +102,7 @@ export function FilePreviewModal({ entry, onClose }: FilePreviewModalProps) {
                     type="button"
                     onClick={onClose}
                     aria-label="Close preview"
-                    className="text-text-tertiary hover:text-text-primary flex h-7 w-7 items-center justify-center rounded-lg hover:bg-[var(--os-menu-item-hover)]"
+                    className="text-text-tertiary hover:text-text-primary flex h-7 w-7 items-center justify-center rounded-lg hover:bg-(--os-hover)"
                   >
                     <WindowCloseIcon width={14} height={14} />
                   </button>

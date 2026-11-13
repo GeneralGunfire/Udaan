@@ -105,7 +105,7 @@ export function BigMonthGrid({ year, month, today, eventsByDate, onSelectDate, o
                     }}
                     className={cn(
                       'flex min-w-0 items-center gap-1.5 rounded-[6px] px-1.5 py-[3px] text-left text-[11.5px] font-medium leading-tight transition-[filter] duration-150 hover:brightness-125',
-                      'bg-[var(--os-menu-item-hover)] text-[var(--color-text-primary)]',
+                      'bg-(--os-hover) text-[var(--color-text-primary)]',
                       event.done && 'opacity-60',
                     )}
                   >

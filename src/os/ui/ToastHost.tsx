@@ -18,10 +18,10 @@ export function ToastHost({ bottomOffset }: { bottomOffset: number }) {
             className="os-acrylic pointer-events-auto rounded-[var(--os-radius-overlay)] px-4 py-3"
             onClick={() => dismissToast(t.id)}
           >
-            <p className={t.tone === 'error' ? 'text-[13px] font-semibold text-[var(--color-danger)]' : 'text-[13px] font-semibold text-[var(--os-menu-text)]'}>
+            <p className={t.tone === 'error' ? 'text-[13px] font-semibold text-[var(--color-danger)]' : 'text-[13px] font-semibold text-(--os-text)'}>
               {t.title}
             </p>
-            {t.body && <p className="mt-0.5 text-[12px] leading-snug text-[var(--os-menu-text-dim)]">{t.body}</p>}
+            {t.body && <p className="mt-0.5 text-[12px] leading-snug text-(--os-text-dim)">{t.body}</p>}
           </motion.div>
         ))}
       </AnimatePresence>

@@ -161,7 +161,7 @@ function Personalization() {
           ))}
         </div>
         <Row title="Choose a photo" description="Use any picture on this PC as your desktop background.">
-          <button type="button" onClick={() => void browse()} className="rounded-[var(--os-radius-control)] bg-[var(--os-menu-item-hover)] px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
+          <button type="button" onClick={() => void browse()} className="rounded-[var(--os-radius-control)] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
             Browse photos
           </button>
         </Row>
@@ -186,7 +186,7 @@ function Personalization() {
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Colours</h3>
         <Row title="Mode" description="Applies to the dock, menus, and every Udaan app.">
-          <div className="flex rounded-[var(--os-radius-control)] bg-[var(--os-menu-item-hover)] p-0.5">
+          <div className="flex rounded-[var(--os-radius-control)] bg-(--os-hover) p-0.5">
             {(['light', 'dark'] as const).map((t) => (
               <button
                 key={t}
@@ -299,7 +299,7 @@ function WidgetsSection() {
           const scale = Math.min(1, 300 / w, 150 / h)
           const count = placed.filter((p) => p.kind === kind).length
           return (
-            <div key={kind} className="flex flex-col overflow-hidden rounded-[12px] border border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)]">
+            <div key={kind} className="flex flex-col overflow-hidden rounded-[12px] border border-[var(--border-hairline)] bg-(--os-hover)">
               <div className="flex h-[190px] items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgb(90_120_200/0.35),rgb(20_22_30/0.6))]">
                 <div className="pointer-events-none" style={{ width: w * scale, height: h * scale }}>
                   <div style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{createElement(WIDGET_VIEWS[kind])}</div>
@@ -553,7 +553,7 @@ function SearchResults({ query, onPick }: { query: string; onPick: (s: Section) 
   return (
     <Group>
       {hits.map((e) => (
-        <button key={e.title} type="button" onClick={() => onPick(e.section)} className="flex w-full items-center justify-between px-4 py-3 text-left outline-none hover:bg-[var(--os-menu-item-hover)] focus-visible:bg-[var(--os-menu-item-hover)]">
+        <button key={e.title} type="button" onClick={() => onPick(e.section)} className="flex w-full items-center justify-between px-4 py-3 text-left outline-none hover:bg-(--os-hover) focus-visible:bg-(--os-hover)">
           <span className="text-[13px] font-medium text-[var(--color-text-primary)]">{e.title}</span>
           <span className="text-[12px] text-[var(--color-text-secondary)]">{SECTIONS.find((x) => x.id === e.section)?.label}</span>
         </button>
@@ -604,7 +604,7 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
                   onClick={() => pick(id)}
                   className={cn(
                     'flex h-9 items-center gap-2.5 rounded-[var(--os-radius-control)] px-2 text-left text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/60',
-                    active ? 'bg-[var(--color-accent)] font-medium text-[var(--color-accent-contrast)]' : 'text-[var(--color-text-primary)] hover:bg-[var(--os-menu-item-hover)]',
+                    active ? 'bg-[var(--color-accent)] font-medium text-[var(--color-accent-contrast)]' : 'text-[var(--color-text-primary)] hover:bg-(--os-hover)',
                   )}
                 >
                   <IconTile icon={icon} />

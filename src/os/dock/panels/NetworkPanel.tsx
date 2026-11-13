@@ -53,34 +53,34 @@ export function NetworkPanel() {
         </span>
         <div className="min-w-0">
           <p className="text-[15px] font-semibold leading-tight">{title}</p>
-          <p className="truncate text-[13px] text-[var(--os-menu-text-dim)]">{via}</p>
+          <p className="truncate text-[13px] text-(--os-text-dim)">{via}</p>
         </div>
         {s?.connected && <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-[#30d158] shadow-[0_0_0_3px_rgb(48_209_88/20%)]" />}
       </div>
 
       {s?.connected && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-[10px] bg-[var(--os-menu-item-hover)] px-3.5 py-3 text-[12.5px]">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-[10px] bg-(--os-hover) px-3.5 py-3 text-[12.5px]">
           {s.adapter && (
             <>
-              <dt className="text-[var(--os-menu-text-dim)]">Adapter</dt>
+              <dt className="text-(--os-text-dim)">Adapter</dt>
               <dd className="truncate text-right">{s.adapter}</dd>
             </>
           )}
           {s.ipv4 && (
             <>
-              <dt className="text-[var(--os-menu-text-dim)]">IP address</dt>
+              <dt className="text-(--os-text-dim)">IP address</dt>
               <dd className="text-right tabular-nums">{s.ipv4}</dd>
             </>
           )}
           {s.speedMbps && (
             <>
-              <dt className="text-[var(--os-menu-text-dim)]">Link speed</dt>
+              <dt className="text-(--os-text-dim)">Link speed</dt>
               <dd className="text-right tabular-nums">{s.speedMbps >= 1000 ? `${s.speedMbps / 1000} Gbps` : `${s.speedMbps} Mbps`}</dd>
             </>
           )}
           {s.signal != null && (
             <>
-              <dt className="text-[var(--os-menu-text-dim)]">Signal</dt>
+              <dt className="text-(--os-text-dim)">Signal</dt>
               <dd className="text-right tabular-nums">{s.signal}%</dd>
             </>
           )}
@@ -90,7 +90,7 @@ export function NetworkPanel() {
       <button
         type="button"
         onClick={() => void launchApp('ms-settings:network')}
-        className="rounded-[9px] py-2 text-[13px] font-medium hover:bg-[var(--os-menu-item-hover)] active:bg-[var(--surface-hover)]"
+        className="rounded-[9px] py-2 text-[13px] font-medium hover:bg-(--os-hover) active:bg-[var(--surface-hover)]"
       >
         Network settings…
       </button>

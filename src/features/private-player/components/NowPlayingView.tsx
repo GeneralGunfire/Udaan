@@ -42,7 +42,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
         <button
           type="button"
           onClick={onCollapse}
-          className="text-text-secondary hover:text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--os-menu-item-hover)]"
+          className="text-text-secondary hover:text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover)"
         >
           <ChevronDownIcon width={20} height={20} />
         </button>
@@ -53,7 +53,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             onClick={() => setDjOpen(true)}
             disabled={!track}
             title="DJ effects"
-            className="text-text-secondary hover:text-text-primary hover:bg-[var(--os-menu-item-hover)] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-30"
+            className="text-text-secondary hover:text-text-primary hover:bg-(--os-hover) flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-30"
           >
             <FilterSweepIcon width={14} height={14} />
             DJ
@@ -63,7 +63,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             onClick={() => track && player.toggleFavorite(track.path)}
             disabled={!track}
             className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:opacity-30 ${
-              isFavorite ? 'text-accent' : 'text-text-tertiary hover:bg-[var(--os-menu-item-hover)] hover:text-text-secondary'
+              isFavorite ? 'text-accent' : 'text-text-tertiary hover:bg-(--os-hover) hover:text-text-secondary'
             }`}
           >
             {isFavorite ? <HeartFilledIcon width={18} height={18} /> : <HeartIcon width={18} height={18} />}
@@ -114,7 +114,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             onClick={player.toggleShuffle}
             title="Shuffle"
             className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-              player.shuffle ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:bg-[var(--os-menu-item-hover)] hover:text-text-secondary'
+              player.shuffle ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:bg-(--os-hover) hover:text-text-secondary'
             }`}
           >
             <ShuffleIcon width={15} height={15} />
@@ -123,7 +123,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             type="button"
             onClick={player.prev}
             disabled={!track}
-            className="text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--os-menu-item-hover)] disabled:opacity-30"
+            className="text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover) disabled:opacity-30"
           >
             <SkipBackIcon width={19} height={19} />
           </button>
@@ -139,7 +139,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             type="button"
             onClick={player.next}
             disabled={!track}
-            className="text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--os-menu-item-hover)] disabled:opacity-30"
+            className="text-text-primary flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover) disabled:opacity-30"
           >
             <SkipForwardIcon width={19} height={19} />
           </button>
@@ -148,7 +148,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
             onClick={player.toggleRepeat}
             title="Loop this track"
             className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-              player.repeat ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:bg-[var(--os-menu-item-hover)] hover:text-text-secondary'
+              player.repeat ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:bg-(--os-hover) hover:text-text-secondary'
             }`}
           >
             <RepeatIcon width={15} height={15} />

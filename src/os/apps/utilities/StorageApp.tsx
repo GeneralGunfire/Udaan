@@ -119,13 +119,13 @@ export function StorageApp(_props: { onClose: () => void }) {
         {trail.map((p, i) => (
           <span key={p} className="flex items-center gap-1">
             {i > 0 && <span className="text-[var(--color-text-tertiary)]">›</span>}
-            <button type="button" onClick={() => void browse(p, trail.slice(0, i + 1))} className={`rounded px-1.5 py-0.5 hover:bg-[var(--os-menu-item-hover)] ${i === trail.length - 1 ? 'font-semibold' : 'text-[var(--color-text-secondary)]'}`}>
+            <button type="button" onClick={() => void browse(p, trail.slice(0, i + 1))} className={`rounded px-1.5 py-0.5 hover:bg-(--os-hover) ${i === trail.length - 1 ? 'font-semibold' : 'text-[var(--color-text-secondary)]'}`}>
               {i === 0 ? p : p.split('\\').pop()}
             </button>
           </span>
         ))}
         {current && (
-          <button type="button" onClick={() => void openWithSystem(current)} className="ml-auto rounded-[8px] px-3 py-1 text-[12.5px] text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]">
+          <button type="button" onClick={() => void openWithSystem(current)} className="ml-auto rounded-[8px] px-3 py-1 text-[12.5px] text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]">
             Open in Explorer
           </button>
         )}

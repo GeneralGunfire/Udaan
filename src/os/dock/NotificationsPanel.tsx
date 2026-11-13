@@ -55,18 +55,18 @@ export function NotificationsPanel() {
   const clearAll = () => void Promise.all((items ?? []).map((n) => dismissNotification(n.id))).then(reload)
 
   return (
-    <div className="flex max-h-[600px] flex-col text-[var(--os-menu-text)]">
+    <div className="flex max-h-[600px] flex-col text-(--os-text)">
       <header className="flex items-center gap-2 px-4 pb-2 pt-3.5">
         <h2 className="flex-1 text-[15px] font-semibold">Notifications</h2>
         <button
           type="button"
           onClick={() => void setDnd(!dnd)}
-          className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${dnd ? 'bg-[#bf5af2] text-white' : 'bg-[var(--os-menu-item-hover)] text-[var(--os-menu-text-dim)] hover:bg-[var(--surface-hover)]'}`}
+          className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${dnd ? 'bg-[#bf5af2] text-white' : 'bg-(--os-hover) text-(--os-text-dim) hover:bg-[var(--surface-hover)]'}`}
         >
           {dnd ? 'Do not disturb: on' : 'Do not disturb'}
         </button>
         {!!items?.length && (
-          <button type="button" onClick={clearAll} className="rounded-full bg-[var(--os-menu-item-hover)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--os-menu-text-dim)] hover:bg-[var(--surface-hover)]">
+          <button type="button" onClick={clearAll} className="rounded-full bg-(--os-hover) px-2.5 py-1 text-[11.5px] font-medium text-(--os-text-dim) hover:bg-[var(--surface-hover)]">
             Clear all
           </button>
         )}
@@ -75,15 +75,15 @@ export function NotificationsPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {items === null ? null : items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--os-menu-item-hover)] text-[var(--os-menu-text-dim)]">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-(--os-hover) text-(--os-text-dim)">
               <BellIcon width={20} height={20} />
             </span>
-            <p className="text-[13.5px] text-[var(--os-menu-text-dim)]">You're all caught up</p>
+            <p className="text-[13.5px] text-(--os-text-dim)">You're all caught up</p>
           </div>
         ) : (
           groups.map(([source, list]) => (
             <section key={source} className="mt-2">
-              <p className="flex items-center gap-2 px-1 pb-1.5 text-[12px] font-semibold text-[var(--os-menu-text-dim)]">
+              <p className="flex items-center gap-2 px-1 pb-1.5 text-[12px] font-semibold text-(--os-text-dim)">
                 <NotificationIcon n={list[0]} size={20} />
                 {notificationSource(list[0])}
               </p>
@@ -98,15 +98,15 @@ export function NotificationsPanel() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: 40, transition: { duration: 0.15 } }}
                       onClick={() => open(n)}
-                      className={`group relative mb-1.5 flex cursor-default gap-3 rounded-[12px] border border-[var(--border-hairline)] p-3 transition-colors hover:bg-[var(--os-menu-item-hover)] ${n.readAt ? 'bg-transparent' : 'bg-[var(--os-menu-item-hover)]'}`}
+                      className={`group relative mb-1.5 flex cursor-default gap-3 rounded-[12px] border border-[var(--border-hairline)] p-3 transition-colors hover:bg-(--os-hover) ${n.readAt ? 'bg-transparent' : 'bg-(--os-hover)'}`}
                     >
                       {extra?.image && <img src={extra.image} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2 pr-5">
                           <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{n.title}</p>
-                          <span className="shrink-0 text-[11px] tabular-nums text-[var(--os-menu-text-dim)]">{ago(n.createdAt)}</span>
+                          <span className="shrink-0 text-[11px] tabular-nums text-(--os-text-dim)">{ago(n.createdAt)}</span>
                         </div>
-                        {n.body && <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-[12.5px] leading-snug text-[var(--os-menu-text-dim)]">{n.body}</p>}
+                        {n.body && <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-[12.5px] leading-snug text-(--os-text-dim)">{n.body}</p>}
                       </div>
                       <button
                         type="button"
@@ -115,7 +115,7 @@ export function NotificationsPanel() {
                           e.stopPropagation()
                           void dismissNotification(n.id).then(reload)
                         }}
-                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--os-menu-item-hover)] opacity-0 transition-opacity hover:bg-[var(--surface-hover)] group-hover:opacity-100"
+                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-(--os-hover) opacity-0 transition-opacity hover:bg-[var(--surface-hover)] group-hover:opacity-100"
                       >
                         <WindowCloseIcon width={9} height={9} />
                       </button>

@@ -32,7 +32,7 @@ export function Tips({ onClose }: { onClose: () => void }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-        className="w-[560px] overflow-hidden rounded-[18px] border border-[var(--os-acrylic-border)] bg-[var(--os-acrylic)] text-[var(--os-menu-text)] shadow-[0_30px_80px_rgb(0_0_0/0.5)]"
+        className="w-[560px] overflow-hidden rounded-[18px] border border-[var(--os-acrylic-border)] bg-[var(--os-acrylic)] text-(--os-text) shadow-[0_30px_80px_rgb(0_0_0/0.5)]"
       >
         <div className="flex h-44 items-center justify-center bg-gradient-to-br from-[#23324d] to-[#191a1f] text-[64px]">
           <AnimatePresence mode="wait">
@@ -46,16 +46,16 @@ export function Tips({ onClose }: { onClose: () => void }) {
             Tip {i + 1} of {TIPS.length}
           </p>
           <h2 className="mt-1 text-[24px] font-semibold tracking-tight">{tip.title}</h2>
-          <p className="mt-3 inline-block rounded-[8px] bg-[var(--os-menu-item-hover)] px-3 py-1.5 text-[13.5px] font-medium">{tip.how}</p>
-          <p className="mt-3 text-[14px] leading-relaxed text-[var(--os-menu-text-dim)]">{tip.detail}</p>
+          <p className="mt-3 inline-block rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[13.5px] font-medium">{tip.how}</p>
+          <p className="mt-3 text-[14px] leading-relaxed text-(--os-text-dim)">{tip.detail}</p>
           <div className="mt-6 flex items-center gap-2">
             <div className="flex flex-1 gap-1.5">
               {TIPS.map((_, k) => (
-                <button key={k} type="button" aria-label={`Tip ${k + 1}`} onClick={() => setI(k)} className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-[var(--os-menu-text)]' : 'w-1.5 bg-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-text)]'}`} />
+                <button key={k} type="button" aria-label={`Tip ${k + 1}`} onClick={() => setI(k)} className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-(--os-text)' : 'w-1.5 bg-(--os-text-dim) hover:bg-(--os-text)'}`} />
               ))}
             </div>
             {i > 0 && (
-              <button type="button" onClick={() => setI(i - 1)} className="h-9 rounded-[9px] px-4 text-[13px] font-medium text-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-item-hover)]">
+              <button type="button" onClick={() => setI(i - 1)} className="h-9 rounded-[9px] px-4 text-[13px] font-medium text-(--os-text-dim) hover:bg-(--os-hover)">
                 Back
               </button>
             )}

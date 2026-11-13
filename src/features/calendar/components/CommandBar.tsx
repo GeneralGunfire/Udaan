@@ -221,7 +221,7 @@ export function CommandBar({
                           key={event.id}
                           type="button"
                           onClick={() => pickCandidate(i)}
-                          className="bg-[var(--surface-raised)] hover:bg-[var(--os-menu-item-hover)] hover:border-hairline flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-left transition-colors duration-150"
+                          className="bg-[var(--surface-raised)] hover:bg-(--os-hover) hover:border-hairline flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-left transition-colors duration-150"
                         >
                           <span className="text-text-tertiary flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--surface-raised)] text-2xs-alt font-semibold">
                             {i + 1}

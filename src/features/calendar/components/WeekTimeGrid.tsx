@@ -224,7 +224,7 @@ export function WeekTimeGrid({
                     type="button"
                     aria-label={`Add an event at ${formatHour(hour)} on ${date.toLocaleDateString()}`}
                     onClick={() => onCreateAt?.(date, `${String(hour).padStart(2, '0')}:00`)}
-                    className="absolute inset-x-0 border-t border-(--border-hairline) transition-colors hover:bg-[var(--os-menu-item-hover)]"
+                    className="absolute inset-x-0 border-t border-(--border-hairline) transition-colors hover:bg-(--os-hover)"
                     style={{ top: index * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                   />
                 ))}

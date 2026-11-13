@@ -6,7 +6,7 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window'
 import { prefersReducedMotion } from '@/shared/lib/motion'
-import { curve, dur, flyoutMotion, flyoutMotionReduced } from '@/os/motion/systemMotion'
+import { curve, dur, flyoutFromBottom, flyoutFromTop, flyoutMotionReduced } from '@/os/motion/systemMotion'
 import { NetworkPanel } from './panels/NetworkPanel'
 import { SoundPanel } from './panels/SoundPanel'
 import { MediaPanel } from './panels/MediaPanel'
@@ -17,16 +17,17 @@ import { NotificationsPanel } from './NotificationsPanel'
 import { ContextMenuList } from './ContextMenuList'
 import type { FlyoutMenuItem, FlyoutPlacement, ShowTaskbarPopupPayload } from './taskbarPopupTypes'
 
+/**
+ * A sheet sliding in from the right edge of the screen.
+ *
+ * Springs rather than a tween, because a sheet is large enough that a
+ * linear arrival reads as mechanical. The exit stays a tween: an exit that
+ * overshoots reads as indecision.
+ */
 const sheetMotion = {
-  initial: { opacity: 0, x: 40 },
-  animate: { opacity: 1, x: 0, transition: { duration: dur.normal, ease: curve.decelerate } },
+  initial: { opacity: 0, x: 48 },
+  animate: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 440, damping: 38, mass: 0.9 } },
   exit: { opacity: 0, x: 40, transition: { duration: dur.fast, ease: curve.accelerate } },
-}
-// A quick, flat drop from the menu bar.
-const dropMotion = {
-  initial: { opacity: 0, y: -6 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.12, ease: [0.2, 0.8, 0.2, 1] } },
-  exit: { opacity: 0, transition: { duration: 0.08 } },
 }
 
 const WIDTH = { 'notifications-panel': 320, calendar: 300, layouts: 380, network: 280, sound: 340, media: 320, edgelight: 300, 'context-menu': 220 } as const
@@ -193,12 +194,30 @@ export function FlyoutWindow() {
           <motion.div
             key={kind}
             ref={cardRef}
-            {...(reduced ? flyoutMotionReduced : placement === 'sheet-right' ? sheetMotion : placement === 'below' || placement === 'point' ? dropMotion : flyoutMotion)}
+            {...(reduced
+              ? flyoutMotionReduced
+              : placement === 'sheet-right'
+                ? sheetMotion
+                : // Unfold from the edge the flyout is anchored to, so it
+                  // visibly belongs to the control that opened it rather
+                  // than appearing from its own centre.
+                  placement === 'below' || placement === 'point'
+                  ? flyoutFromTop
+                  : flyoutFromBottom)}
             className={cn(
-              'os-acrylic text-[var(--os-menu-text)]',
-              kind === 'context-menu' ? 'overflow-hidden rounded-[var(--os-radius-overlay)]' : 'max-h-full overflow-y-auto rounded-[14px]',
+              'os-panel-material os-sheen text-(--os-text)',
+              kind === 'context-menu' ? 'overflow-hidden rounded-(--os-radius-overlay)' : 'max-h-full overflow-y-auto rounded-(--os-radius-overlay)',
             )}
-            style={{ width: kind === 'context-menu' ? undefined : WIDTH[kind], minWidth: kind === 'context-menu' ? WIDTH[kind] : undefined, height: placement === 'sheet-right' ? '100%' : undefined }}
+            style={{
+              width: kind === 'context-menu' ? undefined : WIDTH[kind],
+              minWidth: kind === 'context-menu' ? WIDTH[kind] : undefined,
+              height: placement === 'sheet-right' ? '100%' : undefined,
+              // Grow from the anchored edge. Scaling from the centre makes a
+              // flyout look like it zoomed in from nowhere; scaling from the
+              // edge it is attached to looks like it unfolded.
+              transformOrigin:
+                placement === 'sheet-right' ? 'right center' : placement === 'below' || placement === 'point' ? 'top center' : 'bottom center',
+            }}
           >
             <div ref={contentRef} className={kind === 'context-menu' ? 'p-1' : undefined}>
               {kind === 'network' ? (

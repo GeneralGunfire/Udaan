@@ -36,7 +36,7 @@ export function RecentRecordings({ refreshKey }: { refreshKey: unknown }) {
                 {new Date(f.modifiedMs).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {size(f.sizeBytes)}
               </p>
             </div>
-            <button type="button" onClick={() => void openWithSystem(f.path)} className="rounded-[8px] bg-[var(--os-menu-item-hover)] px-3 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] hover:bg-white/[0.14]">
+            <button type="button" onClick={() => void openWithSystem(f.path)} className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] hover:bg-white/[0.14]">
               Play
             </button>
           </div>

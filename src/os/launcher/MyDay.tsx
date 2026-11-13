@@ -148,9 +148,9 @@ function Card({ title, action, onAction, children, className = '' }: { title: st
   return (
     <section className={`flex shrink-0 flex-col rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 ${className}`}>
       <header className="mb-3 flex items-center justify-between">
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--os-menu-text-dim)]">{title}</h3>
+        <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-(--os-text-dim)">{title}</h3>
         {action && (
-          <button type="button" onClick={onAction} className="flex items-center gap-0.5 rounded-[6px] px-2 py-0.5 text-[12px] text-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--os-menu-text)]">
+          <button type="button" onClick={onAction} className="flex items-center gap-0.5 rounded-[6px] px-2 py-0.5 text-[12px] text-(--os-text-dim) hover:bg-(--os-hover) hover:text-(--os-text)">
             {action}
             <ChevronRightIcon width={12} height={12} />
           </button>
@@ -187,7 +187,7 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
           {greeting(now.getHours())}
           {user ? `, ${user}` : ''}
         </p>
-        <p className="text-[13px] text-[var(--os-menu-text-dim)]">
+        <p className="text-[13px] text-(--os-text-dim)">
           {now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
           {events && ` · ${events.length === 0 ? 'Nothing scheduled' : `${events.length} ${events.length === 1 ? 'event' : 'events'} today`}`}
         </p>
@@ -201,11 +201,11 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
                 <span className="text-[44px] leading-none">{weatherCodeToGlyph(weather.code)}</span>
                 <div>
                   <p className="text-[34px] font-light leading-none tabular-nums">{weather.temp}°</p>
-                  <p className="mt-1 text-[12.5px] text-[var(--os-menu-text-dim)]">
+                  <p className="mt-1 text-[12.5px] text-(--os-text-dim)">
                     {weatherCodeToLabel(weather.code)} · feels {weather.feels}°
                   </p>
                 </div>
-                <div className="ml-auto text-right text-[12.5px] tabular-nums text-[var(--os-menu-text-dim)]">
+                <div className="ml-auto text-right text-[12.5px] tabular-nums text-(--os-text-dim)">
                   <p>
                     H {weather.high}° · L {weather.low}°
                   </p>
@@ -215,7 +215,7 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
               <div className="mt-4 grid grid-cols-6 gap-1 border-t border-[var(--border-hairline)] pt-3 text-center">
                 {weather.hours.map((h) => (
                   <div key={h.time} className="flex flex-col items-center gap-1">
-                    <span className="text-[11px] text-[var(--os-menu-text-dim)]">{h.time?.slice(11, 16)}</span>
+                    <span className="text-[11px] text-(--os-text-dim)">{h.time?.slice(11, 16)}</span>
                     <span className="text-[16px]">{weatherCodeToGlyph(h.code)}</span>
                     <span className="text-[12.5px] tabular-nums">{h.temp}°</span>
                   </div>
@@ -224,27 +224,27 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
               <div className="mt-3 flex justify-between border-t border-[var(--border-hairline)] pt-3">
                 {weather.days.map((d) => (
                   <div key={d.date} className="flex flex-col items-center gap-0.5 text-[12px] tabular-nums">
-                    <span className="text-[11px] text-[var(--os-menu-text-dim)]">{new Date(`${d.date}T12:00`).toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                    <span className="text-[11px] text-(--os-text-dim)">{new Date(`${d.date}T12:00`).toLocaleDateString(undefined, { weekday: 'short' })}</span>
                     <span className="text-[15px]">{weatherCodeToGlyph(d.code)}</span>
                     <span>
-                      {d.high}° <span className="text-[var(--os-menu-text-dim)]">{d.low}°</span>
+                      {d.high}° <span className="text-(--os-text-dim)">{d.low}°</span>
                     </span>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <p className="text-[13px] text-[var(--os-menu-text-dim)]">{error ? 'Weather is unavailable right now.' : 'Getting the forecast…'}</p>
+            <p className="text-[13px] text-(--os-text-dim)">{error ? 'Weather is unavailable right now.' : 'Getting the forecast…'}</p>
           )}
         </Card>
 
         <Card title="Today" action="Calendar" onAction={open(() => void openApp('calendar'))}>
           {events === null ? (
-            <p className="text-[13px] text-[var(--os-menu-text-dim)]">Loading…</p>
+            <p className="text-[13px] text-(--os-text-dim)">Loading…</p>
           ) : events.length === 0 ? (
             <div className="flex flex-1 flex-col items-start justify-center gap-2">
               <p className="text-[14px]">A clear day.</p>
-              <p className="text-[12.5px] text-[var(--os-menu-text-dim)]">No events on your calendar.</p>
+              <p className="text-[12.5px] text-(--os-text-dim)">No events on your calendar.</p>
             </div>
           ) : (
             <ol className="flex flex-col gap-1.5 overflow-y-auto">
@@ -255,7 +255,7 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
                     <span className="mt-[3px] h-8 w-[3px] shrink-0 rounded-full" style={{ background: CATEGORY_COLOUR[e.category] }} />
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-medium">{e.title}</span>
-                      <span className="block text-[11.5px] tabular-nums text-[var(--os-menu-text-dim)]">{e.allDay || !e.startTime ? 'All day' : `${e.startTime}${e.endTime ? ` – ${e.endTime}` : ''}`}</span>
+                      <span className="block text-[11.5px] tabular-nums text-(--os-text-dim)">{e.allDay || !e.startTime ? 'All day' : `${e.startTime}${e.endTime ? ` – ${e.endTime}` : ''}`}</span>
                     </span>
                   </li>
                 )
@@ -267,16 +267,16 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
 
       <Card title="Your news brief" action="Open News" onAction={open(() => void openApp('news-brief'))}>
         {brief === undefined ? (
-          <p className="text-[13px] text-[var(--os-menu-text-dim)]">Loading…</p>
+          <p className="text-[13px] text-(--os-text-dim)">Loading…</p>
         ) : stories.length === 0 ? (
           <div className="flex items-center gap-3">
             <AppIcon appId="news-brief" size={32} />
-            <p className="text-[13px] text-[var(--os-menu-text-dim)]">{brief?.degraded ? "Today's brief couldn't be written — open News to retry." : "Today's brief hasn't been written yet. It's generated in the background each morning."}</p>
+            <p className="text-[13px] text-(--os-text-dim)">{brief?.degraded ? "Today's brief couldn't be written — open News to retry." : "Today's brief hasn't been written yet. It's generated in the background each morning."}</p>
           </div>
         ) : (
           <div className="grid grid-cols-[1.1fr_1fr] gap-4">
             {stories[0] && (
-              <button type="button" onClick={open(() => void openApp('news-brief'))} className="group flex flex-col overflow-hidden rounded-[10px] bg-[var(--surface-raised)] text-left transition-colors hover:bg-[var(--os-menu-item-hover)]">
+              <button type="button" onClick={open(() => void openApp('news-brief'))} className="group flex flex-col overflow-hidden rounded-[10px] bg-[var(--surface-raised)] text-left transition-colors hover:bg-(--os-hover)">
                 {stories[0].image ? (
                   <img src={stories[0].image} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[16/9] w-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ) : (
@@ -285,7 +285,7 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
                 <span className="block p-3">
                   <span className="block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">{stories[0].section}</span>
                   <span className="mt-1 line-clamp-2 block text-[15px] font-semibold leading-snug">{stories[0].headline}</span>
-                  {stories[0].body[0] && <span className="mt-1.5 line-clamp-3 block text-[12.5px] leading-snug text-[var(--os-menu-text-dim)]">{stories[0].body[0].replace(/\*/g, '')}</span>}
+                  {stories[0].body[0] && <span className="mt-1.5 line-clamp-3 block text-[12.5px] leading-snug text-(--os-text-dim)">{stories[0].body[0].replace(/\*/g, '')}</span>}
                 </span>
               </button>
             )}

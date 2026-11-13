@@ -413,7 +413,6 @@ interface AppTileProps {
 }
 
 function AppTile({ app, onLaunch, highlighted, onHover }: AppTileProps) {
-  const Icon = app.icon
   // The app's real icon, read from its own file. Falls back to a monogram
   // rather than a redrawn brand logo — see os/ui/useAppIcon.
   const extracted = useAppIcon(app.iconSrc ? null : (app.iconPath ?? app.path))
@@ -427,7 +426,7 @@ function AppTile({ app, onLaunch, highlighted, onHover }: AppTileProps) {
         onMouseEnter={onHover}
         {...pressable}
         className={`flex flex-col items-center gap-2 rounded-xl px-2 py-3.5 text-center transition-colors duration-100 ${
-          highlighted ? 'bg-[var(--os-menu-item-hover)]' : 'hover:bg-[var(--os-menu-item-hover)]'
+          highlighted ? 'bg-(--os-hover)' : 'hover:bg-(--os-hover)'
         }`}
       >
         {isAppId(app.id) ? (

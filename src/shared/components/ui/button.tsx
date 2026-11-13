@@ -59,7 +59,7 @@ const buttonVariants = cva(
         // A wash alone is enough to say "this is a target".
         ghost: [
           'border-transparent bg-transparent text-text-secondary',
-          'hover:bg-[var(--os-menu-item-hover)] hover:text-text-primary',
+          'hover:bg-(--os-hover) hover:text-text-primary',
           'active:bg-[var(--surface-hover)]',
         ].join(' '),
         surface: [

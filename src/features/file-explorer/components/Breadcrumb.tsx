@@ -60,7 +60,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className="hover:bg-[var(--os-menu-item-hover)] flex h-8 min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg px-2 text-left transition-colors duration-150"
+      className="hover:bg-(--os-hover) flex h-8 min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg px-2 text-left transition-colors duration-150"
       aria-label="Edit address"
     >
       {segments.map((seg, i) => (
@@ -73,7 +73,7 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
               e.stopPropagation()
               onNavigate(seg.path)
             }}
-            className="text-text-secondary hover:text-text-primary hover:bg-[var(--os-menu-item-hover)] rounded px-1.5 py-1 text-sm transition-colors duration-150"
+            className="text-text-secondary hover:text-text-primary hover:bg-(--os-hover) rounded px-1.5 py-1 text-sm transition-colors duration-150"
           >
             {seg.name}
           </span>

@@ -46,7 +46,7 @@ function Preview({ zones, active, assigned, onZone, size = 'small' }: { zones: Z
           type="button"
           tabIndex={onZone ? 0 : -1}
           onClick={onZone ? () => onZone(i) : undefined}
-          className={`absolute flex items-center justify-center overflow-hidden rounded-[5px] border transition-colors ${onZone ? 'cursor-default' : 'pointer-events-none'} ${active === i ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20' : 'border-[var(--border-hairline)] bg-[var(--os-menu-item-hover)] hover:bg-[var(--surface-hover)]'}`}
+          className={`absolute flex items-center justify-center overflow-hidden rounded-[5px] border transition-colors ${onZone ? 'cursor-default' : 'pointer-events-none'} ${active === i ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20' : 'border-[var(--border-hairline)] bg-(--os-hover) hover:bg-[var(--surface-hover)]'}`}
           style={{ left: `calc(${z.x * 100}% + 2px)`, top: `calc(${z.y * 100}% + 2px)`, width: `calc(${z.w * 100}% - 4px)`, height: `calc(${z.h * 100}% - 4px)` }}
         >
           {big && (
@@ -54,7 +54,7 @@ function Preview({ zones, active, assigned, onZone, size = 'small' }: { zones: Z
               <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-black" style={{ background: ZONE_COLOURS[i % 4] }}>
                 {i + 1}
               </span>
-              <span className="line-clamp-2 text-[11px] font-medium text-[var(--os-menu-text)]">{assigned?.[i] ?? 'Choose an app'}</span>
+              <span className="line-clamp-2 text-[11px] font-medium text-(--os-text)">{assigned?.[i] ?? 'Choose an app'}</span>
             </span>
           )}
         </button>
@@ -115,9 +115,9 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
 
   if (!layout) {
     return (
-      <div className="p-4 text-[var(--os-menu-text)]">
+      <div className="p-4 text-(--os-text)">
         <h2 className="text-[15px] font-semibold">Arrange windows</h2>
-        <p className="mb-3 text-[12.5px] text-[var(--os-menu-text-dim)]">Pick a layout, then choose an app for each space.</p>
+        <p className="mb-3 text-[12.5px] text-(--os-text-dim)">Pick a layout, then choose an app for each space.</p>
         <div className="grid grid-cols-3 gap-2.5">
           {LAYOUTS.map((l, i) => (
             <motion.button
@@ -127,10 +127,10 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.025, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col gap-1.5 rounded-[10px] p-2 text-left transition-colors hover:bg-[var(--os-menu-item-hover)]"
+              className="flex flex-col gap-1.5 rounded-[10px] p-2 text-left transition-colors hover:bg-(--os-hover)"
             >
               <Preview zones={l.zones(0.5)} />
-              <span className="text-[11.5px] font-medium text-[var(--os-menu-text)]">{l.name}</span>
+              <span className="text-[11.5px] font-medium text-(--os-text)">{l.name}</span>
             </motion.button>
           ))}
         </div>
@@ -140,28 +140,28 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
 
   const filled = assign.filter(Boolean).length
   return (
-    <div className="p-4 text-[var(--os-menu-text)]">
+    <div className="p-4 text-(--os-text)">
       <div className="mb-3 flex items-center gap-2">
-        <button type="button" onClick={() => setLayout(null)} className="rounded-[7px] px-2 py-1 text-[12.5px] text-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--os-menu-text)]">
+        <button type="button" onClick={() => setLayout(null)} className="rounded-[7px] px-2 py-1 text-[12.5px] text-(--os-text-dim) hover:bg-(--os-hover) hover:text-(--os-text)">
           ‹ Layouts
         </button>
         <h2 className="flex-1 text-[14px] font-semibold">{layout.name}</h2>
       </div>
       <Preview size="large" zones={zones} active={zone} assigned={assign.map((a) => a?.title || a?.processName || null)} onZone={setZone} />
       {layout.adjustable && (
-        <label className="mt-3 flex items-center gap-3 text-[12px] text-[var(--os-menu-text-dim)]">
+        <label className="mt-3 flex items-center gap-3 text-[12px] text-(--os-text-dim)">
           Split
           <input type="range" min={30} max={70} step={5} value={Math.round(ratio * 100)} onChange={(e) => setRatio(Number(e.target.value) / 100)} className="os-slider flex-1" />
-          <span className="w-16 text-right tabular-nums text-[var(--os-menu-text)]">
+          <span className="w-16 text-right tabular-nums text-(--os-text)">
             {Math.round(ratio * 100)} / {100 - Math.round(ratio * 100)}
           </span>
         </label>
       )}
-      <p className="mb-1.5 mt-3 text-[12px] font-semibold text-[var(--os-menu-text-dim)]">
+      <p className="mb-1.5 mt-3 text-[12px] font-semibold text-(--os-text-dim)">
         Choose an app for space <span style={{ color: ZONE_COLOURS[zone % 4] }}>{zone + 1}</span>
       </p>
-      <div className="max-h-[220px] overflow-y-auto rounded-[10px] bg-[var(--os-menu-item-hover)]">
-        {windows.length === 0 && <p className="p-3 text-[12.5px] text-[var(--os-menu-text-dim)]">No windows open.</p>}
+      <div className="max-h-[220px] overflow-y-auto rounded-[10px] bg-(--os-hover)">
+        {windows.length === 0 && <p className="p-3 text-[12.5px] text-(--os-text-dim)">No windows open.</p>}
         {windows.map((w) => {
           const at = assign.findIndex((a) => a?.handle === w.handle)
           return (
@@ -199,5 +199,5 @@ function WindowIcon({ handle }: { handle: number }) {
       setSrc(r[handle] ?? null)
     })
   }, [handle])
-  return src ? <img src={src} alt="" className="h-5 w-5" /> : <span className="h-5 w-5 rounded bg-[var(--os-menu-item-hover)]" />
+  return src ? <img src={src} alt="" className="h-5 w-5" /> : <span className="h-5 w-5 rounded bg-(--os-hover)" />
 }

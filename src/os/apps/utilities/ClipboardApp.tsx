@@ -61,7 +61,7 @@ export function ClipboardApp(_props: { onClose: () => void }) {
         <button
           type="button"
           onClick={() => window.confirm('Clear everything except pinned items?') && void invoke('clip_history_delete', { id: null })}
-          className="h-9 rounded-[9px] px-3.5 text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]"
+          className="h-9 rounded-[9px] px-3.5 text-[13px] font-medium text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]"
         >
           Clear history
         </button>
@@ -92,7 +92,7 @@ export function ClipboardApp(_props: { onClose: () => void }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 onClick={() => void copy(i)}
-                className={`group relative flex h-[130px] cursor-default flex-col overflow-hidden rounded-[14px] border bg-white/[0.04] p-3.5 transition-colors hover:bg-[var(--os-menu-item-hover)] ${i.pinned ? 'border-[#e8c547]/40' : 'border-white/[0.07]'}`}
+                className={`group relative flex h-[130px] cursor-default flex-col overflow-hidden rounded-[14px] border bg-white/[0.04] p-3.5 transition-colors hover:bg-(--os-hover) ${i.pinned ? 'border-[#e8c547]/40' : 'border-white/[0.07]'}`}
               >
                 {i.kind === 'image' && i.imagePath ? (
                   <img src={convertFileSrc(i.imagePath)} alt="" className="min-h-0 flex-1 rounded-[8px] object-contain" />

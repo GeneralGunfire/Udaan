@@ -69,7 +69,7 @@ export function SnapLayouts({ onDone, onMaximize }: { onDone: () => void; onMaxi
           onDone()
           onMaximize()
         }}
-        className="mt-2 w-full rounded-[6px] py-1.5 text-[12px] text-[var(--os-menu-text)] hover:bg-[var(--os-menu-item-hover)]"
+        className="mt-2 w-full rounded-[6px] py-1.5 text-[12px] text-(--os-text) hover:bg-(--os-hover)"
       >
         Fill screen
       </button>

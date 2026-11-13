@@ -1,34 +1,110 @@
+import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
+import { prefersReducedMotion } from '@/shared/lib/motion'
+import { staggerDelay } from '@/os/motion/systemMotion'
 import type { FlyoutMenuItem } from './taskbarPopupTypes'
 
 /**
- * Renders a context menu's item list inside the shared taskbar-popup
- * window, styled to match the Radix menus used elsewhere (Start, desktop).
+ * A context menu's items, inside the shared taskbar-popup window.
+ *
  * Plain data in, plain `id` out — this window is a separate webview from
- * whichever surface (dock, launcher, menu bar) opened the menu, so it can't
- * hold the real onSelect closures; the opener matches the returned id back
- * to its own handler.
+ * whichever surface (dock, launcher, menu bar) opened the menu, so it
+ * cannot hold the real onSelect closures; the opener matches the returned
+ * id back to its own handler.
+ *
+ * WHAT A REAL CONTEXT MENU DOES THAT A STYLED LIST DOES NOT
+ * ---------------------------------------------------------
+ *  1. KEYBOARD. Arrow keys move, Home/End jump, Enter selects, and typing a
+ *     letter jumps to the next item starting with it. A menu you cannot
+ *     drive from the keyboard is a list of buttons wearing a menu's clothes.
+ *  2. ONE HIGHLIGHT. Pointer and keyboard share a single active item, so
+ *     moving the mouse after arrowing does not leave two things lit.
+ *  3. ITEMS ARRIVE IN ORDER. A very short stagger down the list reads as
+ *     the menu unrolling. It is capped, so a long menu still lands quickly.
  */
 export function ContextMenuList({ items, onSelect }: { items: FlyoutMenuItem[]; onSelect: (id: string) => void }) {
+  const reduced = prefersReducedMotion()
+  const [active, setActive] = useState<number>(-1)
+  const typed = useRef({ text: '', at: 0 })
+
+  // Indices that can actually be focused — separators and disabled items
+  // are skipped by every form of navigation.
+  const selectable = items.flatMap((it, i) => (it.label !== undefined && !it.disabled ? [i] : []))
+
+  useEffect(() => {
+    const step = (delta: number) => {
+      if (!selectable.length) return
+      const at = selectable.indexOf(active)
+      // From nothing, Down goes to the first item and Up to the last.
+      const next = at === -1 ? (delta > 0 ? 0 : selectable.length - 1) : (at + delta + selectable.length) % selectable.length
+      setActive(selectable[next])
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          return step(1)
+        case 'ArrowUp':
+          e.preventDefault()
+          return step(-1)
+        case 'Home':
+          e.preventDefault()
+          return setActive(selectable[0] ?? -1)
+        case 'End':
+          e.preventDefault()
+          return setActive(selectable.at(-1) ?? -1)
+        case 'Enter':
+        case ' ': {
+          const it = items[active]
+          if (!it?.id) return
+          e.preventDefault()
+          return onSelect(it.id)
+        }
+        default: {
+          // Typeahead: letters typed within a second accumulate, so "do"
+          // reaches "Downloads" rather than cycling D-items.
+          if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return
+          const now = Date.now()
+          typed.current = { text: now - typed.current.at > 1000 ? e.key : typed.current.text + e.key, at: now }
+          const q = typed.current.text.toLowerCase()
+          const hit = selectable.find((i) => items[i].label?.toLowerCase().startsWith(q))
+          if (hit !== undefined) setActive(hit)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [active, items, onSelect, selectable])
+
   return (
-    <div className="flex flex-col gap-px text-[13px]">
+    <div className="flex flex-col gap-px text-[13px]" role="menu">
       {items.map((it, i) =>
         it.label === undefined ? (
-          <div key={i} className="mx-2 my-1 h-px bg-[var(--os-menu-separator)]" />
+          <div key={i} className="mx-2 my-1 h-px bg-(--os-separator)" role="separator" />
         ) : (
-          <button
+          <motion.button
             key={i}
             type="button"
+            role="menuitem"
             disabled={it.disabled}
+            initial={reduced ? false : { opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: staggerDelay(i, 0.012, 8), duration: 0.14, ease: [0, 0, 0, 1] }}
+            whileTap={reduced || it.disabled ? undefined : { scale: 0.985 }}
+            onPointerEnter={() => !it.disabled && setActive(i)}
             onClick={() => it.id && onSelect(it.id)}
             className={cn(
-              'relative flex h-8 w-full cursor-default select-none items-center rounded-[var(--os-radius-control)] px-3 text-left outline-none hover:bg-[var(--os-menu-item-hover)] focus:bg-[var(--os-menu-item-hover)]',
-              it.danger && 'text-[var(--color-danger)]',
+              'relative flex h-8 w-full cursor-default select-none items-center rounded-(--os-radius-control) px-3 text-left outline-none transition-colors duration-100',
+              active === i && 'bg-(--os-hover)',
+              it.danger && 'text-(--color-danger)',
               it.disabled && 'pointer-events-none opacity-40',
             )}
           >
             <span className="flex-1 truncate">{it.label}</span>
-          </button>
+          </motion.button>
         ),
       )}
     </div>

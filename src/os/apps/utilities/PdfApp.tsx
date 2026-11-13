@@ -114,7 +114,7 @@ export function PdfApp(_props: { onClose: () => void }) {
                     setPages('')
                     setResult(null)
                   }}
-                  className="flex flex-col items-start gap-3 rounded-[16px] border border-[var(--border-hairline)] bg-white/[0.04] p-5 text-left transition-colors hover:bg-[var(--os-menu-item-hover)]"
+                  className="flex flex-col items-start gap-3 rounded-[16px] border border-[var(--border-hairline)] bg-white/[0.04] p-5 text-left transition-colors hover:bg-(--os-hover)"
                 >
                   <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#e5534b]/20 text-[20px] text-[#ff8a80]">{t.icon}</span>
                   <span>
@@ -135,7 +135,7 @@ export function PdfApp(_props: { onClose: () => void }) {
 
             <div className="mt-5 rounded-[14px] border border-dashed border-white/15 p-4">
               {files.length === 0 ? (
-                <button type="button" onClick={() => void pick(tool === 'merge')} className="h-11 w-full rounded-[10px] bg-[var(--os-menu-item-hover)] text-[14px] font-medium hover:bg-white/[0.14]">
+                <button type="button" onClick={() => void pick(tool === 'merge')} className="h-11 w-full rounded-[10px] bg-(--os-hover) text-[14px] font-medium hover:bg-white/[0.14]">
                   {tool === 'merge' ? 'Choose PDFs…' : 'Choose a PDF…'}
                 </button>
               ) : (
@@ -167,13 +167,13 @@ export function PdfApp(_props: { onClose: () => void }) {
             {(tool === 'split' || tool === 'rotate' || tool === 'delete' || tool === 'stamp') && (
               <label className="mt-4 block text-[13px] text-[var(--color-text-secondary)]">
                 {tool === 'split' ? 'Page ranges, one file each (e.g. 1-3, 4-6) — leave empty for one file per page' : tool === 'stamp' ? 'Page number' : tool === 'rotate' ? 'Pages (e.g. 1-3, 5) — leave empty for all' : 'Pages to remove (e.g. 2, 5-7)'}
-                <input value={pages} onChange={(e) => setPages(e.target.value)} className="mt-1.5 h-10 w-full rounded-[10px] bg-[var(--os-menu-item-hover)] px-3 text-[14px] text-[var(--color-text-primary)] outline-none" />
+                <input value={pages} onChange={(e) => setPages(e.target.value)} className="mt-1.5 h-10 w-full rounded-[10px] bg-(--os-hover) px-3 text-[14px] text-[var(--color-text-primary)] outline-none" />
               </label>
             )}
             {tool === 'rotate' && (
               <div className="mt-3 flex gap-2">
                 {[90, 180, 270].map((d) => (
-                  <button key={d} type="button" onClick={() => setDegrees(d)} className={`h-9 rounded-full px-4 text-[13px] font-medium ${degrees === d ? 'bg-white text-black' : 'bg-[var(--os-menu-item-hover)]'}`}>
+                  <button key={d} type="button" onClick={() => setDegrees(d)} className={`h-9 rounded-full px-4 text-[13px] font-medium ${degrees === d ? 'bg-white text-black' : 'bg-(--os-hover)'}`}>
                     {d === 270 ? '90° left' : d === 90 ? '90° right' : '180°'}
                   </button>
                 ))}
@@ -182,7 +182,7 @@ export function PdfApp(_props: { onClose: () => void }) {
             {tool === 'stamp' && (
               <label className="mt-3 block text-[13px] text-[var(--color-text-secondary)]">
                 Text
-                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Tess — Grade 11" className="mt-1.5 h-10 w-full rounded-[10px] bg-[var(--os-menu-item-hover)] px-3 text-[14px] text-[var(--color-text-primary)] outline-none" />
+                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Tess — Grade 11" className="mt-1.5 h-10 w-full rounded-[10px] bg-(--os-hover) px-3 text-[14px] text-[var(--color-text-primary)] outline-none" />
               </label>
             )}
 

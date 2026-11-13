@@ -371,7 +371,7 @@ export const stagger = {
  * a 40-item list take 1.6s to finish appearing, which reads as broken; this
  * compresses the tail so the whole list always lands in about the same time.
  */
-export function staggerDelay(index: number, step = stagger.normal, cap = 12): number {
+export function staggerDelay(index: number, step: number = stagger.normal, cap = 12): number {
   return Math.min(index, cap) * step + Math.max(0, index - cap) * (step / 4)
 }
 

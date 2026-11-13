@@ -55,8 +55,8 @@ function Control({ label, path, onClick, disabled, big }: { label: string; path:
       onClick={onClick}
       className={
         big
-          ? 'flex h-12 w-12 items-center justify-center rounded-full bg-[var(--os-menu-text)] text-[var(--surface-base)] transition-transform hover:scale-105 active:scale-95'
-          : 'flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--os-menu-item-hover)] active:scale-95 disabled:opacity-30'
+          ? 'flex h-12 w-12 items-center justify-center rounded-full bg-(--os-text) text-[var(--surface-base)] transition-transform hover:scale-105 active:scale-95'
+          : 'flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover) active:scale-95 disabled:opacity-30'
       }
     >
       <svg viewBox="0 0 24 24" width={big ? 22 : 18} height={big ? 22 : 18} fill="currentColor">
@@ -87,7 +87,7 @@ export function MediaPanel() {
     return (
       <div className="flex flex-col items-center gap-1 p-6 text-center">
         <p className="text-[13px] font-medium">Nothing is playing</p>
-        <p className="text-[12px] text-[var(--os-menu-text-dim)]">Play something in a browser or music app and it shows up here.</p>
+        <p className="text-[12px] text-(--os-text-dim)">Play something in a browser or music app and it shows up here.</p>
       </div>
     )
   }
@@ -104,14 +104,14 @@ export function MediaPanel() {
           <p className="truncate text-[15px] font-semibold" title={m.title}>
             {m.title}
           </p>
-          <p className="truncate text-[13px] text-[var(--os-menu-text-dim)]">{m.artist || m.album || 'Unknown artist'}</p>
-          <p className="truncate text-[11.5px] text-[var(--os-menu-text-dim)] opacity-75">{sourceName(m.source)}</p>
+          <p className="truncate text-[13px] text-(--os-text-dim)">{m.artist || m.album || 'Unknown artist'}</p>
+          <p className="truncate text-[11.5px] text-(--os-text-dim) opacity-75">{sourceName(m.source)}</p>
         </div>
       </div>
 
       {hasTimeline && (
         <div className="flex items-center gap-2.5">
-          <span className="w-9 text-right text-[11.5px] tabular-nums text-[var(--os-menu-text-dim)]">{formatClock(positionMs!)}</span>
+          <span className="w-9 text-right text-[11.5px] tabular-nums text-(--os-text-dim)">{formatClock(positionMs!)}</span>
           <input
             type="range"
             min={0}
@@ -126,7 +126,7 @@ export function MediaPanel() {
             className="os-slider flex-1"
             style={{ ['--fill' as string]: `${pct}%` }}
           />
-          <span className="w-9 text-[11.5px] tabular-nums text-[var(--os-menu-text-dim)]">{formatClock(m.durationMs!)}</span>
+          <span className="w-9 text-[11.5px] tabular-nums text-(--os-text-dim)">{formatClock(m.durationMs!)}</span>
         </div>
       )}
 
@@ -139,7 +139,7 @@ export function MediaPanel() {
       <button
         type="button"
         onClick={openLiveDj}
-        className="flex items-center justify-center gap-2 rounded-[10px] bg-[var(--os-menu-item-hover)] py-2 text-[13px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
+        className="flex items-center justify-center gap-2 rounded-[10px] bg-(--os-hover) py-2 text-[13px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="8.5" />

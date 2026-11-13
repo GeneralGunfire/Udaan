@@ -7,12 +7,12 @@ export const ContextMenu = CM.Root
 export const ContextMenuTrigger = CM.Trigger
 
 const panel =
-  'os-acrylic z-[60] min-w-[220px] rounded-[var(--os-radius-overlay)] p-1 text-[13px] text-[var(--os-menu-text)] outline-none ' +
+  'os-acrylic z-[60] min-w-[220px] rounded-[var(--os-radius-overlay)] p-1 text-[13px] text-(--os-text) outline-none ' +
   'data-[state=open]:animate-[os-menu-in_140ms_cubic-bezier(0,0,0,1)]'
 
 const item =
   'relative flex h-8 cursor-default select-none items-center gap-2.5 rounded-[var(--os-radius-control)] px-2.5 outline-none ' +
-  'data-[highlighted]:bg-[var(--os-menu-item-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+  'data-[highlighted]:bg-(--os-hover) data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>
 
@@ -49,7 +49,7 @@ export function ContextMenuItem({
     <CM.Item disabled={disabled} onSelect={onSelect} className={cn(item, danger && 'text-[var(--color-danger)]')}>
       <Leading icon={icon} />
       <span className="flex-1 truncate">{children}</span>
-      {shortcut && <span className="pl-6 text-[12px] text-[var(--os-menu-text-dim)]">{shortcut}</span>}
+      {shortcut && <span className="pl-6 text-[12px] text-(--os-text-dim)">{shortcut}</span>}
     </CM.Item>
   )
 }
@@ -103,7 +103,7 @@ export function ContextMenuRadioGroup<T extends string>({
 export function ContextMenuSub({ icon, label, children }: { icon?: Icon; label: string; children: ReactNode }) {
   return (
     <CM.Sub>
-      <CM.SubTrigger className={cn(item, 'data-[state=open]:bg-[var(--os-menu-item-hover)]')}>
+      <CM.SubTrigger className={cn(item, 'data-[state=open]:bg-(--os-hover)')}>
         <Leading icon={icon} />
         <span className="flex-1">{label}</span>
         <ChevronRightIcon className="h-3.5 w-3.5 opacity-60" />
@@ -118,9 +118,9 @@ export function ContextMenuSub({ icon, label, children }: { icon?: Icon; label: 
 }
 
 export function ContextMenuSeparator() {
-  return <CM.Separator className="mx-2 my-1 h-px bg-[var(--os-menu-separator)]" />
+  return <CM.Separator className="mx-2 my-1 h-px bg-(--os-separator)" />
 }
 
 export function ContextMenuLabel({ children }: { children: ReactNode }) {
-  return <CM.Label className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-[var(--os-menu-text-dim)]">{children}</CM.Label>
+  return <CM.Label className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-(--os-text-dim)">{children}</CM.Label>
 }

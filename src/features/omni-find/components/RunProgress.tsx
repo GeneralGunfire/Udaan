@@ -110,7 +110,7 @@ export function RunProgress({ run }: { run: ResearchRun }) {
                       target="_blank"
                       rel="noreferrer noopener"
                       title={source.title || source.url}
-                      className="text-text-tertiary hover:text-text-secondary max-w-[180px] truncate rounded bg-[var(--surface-raised)] px-1.5 py-0.5 text-2xs-alt transition-colors hover:bg-[var(--os-menu-item-hover)]"
+                      className="text-text-tertiary hover:text-text-secondary max-w-[180px] truncate rounded bg-[var(--surface-raised)] px-1.5 py-0.5 text-2xs-alt transition-colors hover:bg-(--os-hover)"
                     >
                       {hostOf(source.url)}
                     </a>

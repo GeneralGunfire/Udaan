@@ -60,7 +60,7 @@ export function QueueDrawer({ open, queue, currentIndex, onReorder, onJumpTo, on
                 <Reorder.Item key={track.path} value={track} className="mb-1">
                   <div
                     className={`group flex items-center gap-2 rounded-lg px-2 py-2.5 ${
-                      index === currentIndex ? 'bg-[var(--os-menu-item-hover)]' : 'hover:bg-[var(--os-menu-item-hover)]'
+                      index === currentIndex ? 'bg-(--os-hover)' : 'hover:bg-(--os-hover)'
                     }`}
                   >
                     <button type="button" onClick={() => onJumpTo(index)} className="flex min-w-0 flex-1 items-center gap-2 text-left">

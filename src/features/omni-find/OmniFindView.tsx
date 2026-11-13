@@ -153,7 +153,7 @@ export function OmniFindView(_props: { onClose: () => void }) {
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             {history.length === 0 && <p className="px-3 py-2 text-[12px] text-[var(--color-text-tertiary)]">Finished research is kept here.</p>}
             {history.map((h) => (
-              <div key={h.id} role="button" tabIndex={0} onClick={() => setRun(h)} className={`group mb-0.5 flex cursor-default items-center gap-2 rounded-[8px] px-3 py-2 text-[12.5px] transition-colors ${run?.id === h.id ? 'bg-white/[0.1]' : 'hover:bg-[var(--os-menu-item-hover)]'}`}>
+              <div key={h.id} role="button" tabIndex={0} onClick={() => setRun(h)} className={`group mb-0.5 flex cursor-default items-center gap-2 rounded-[8px] px-3 py-2 text-[12.5px] transition-colors ${run?.id === h.id ? 'bg-white/[0.1]' : 'hover:bg-(--os-hover)'}`}>
                 <span className="line-clamp-2 min-w-0 flex-1 leading-snug">{h.question.split('\n\n(Follow-up')[0]}</span>
                 <button
                   type="button"
@@ -386,7 +386,7 @@ function SourceList({ sources }: { sources: ReturnType<typeof allSources> }) {
           href={source.url}
           target="_blank"
           rel="noreferrer noopener"
-          className="group flex items-baseline gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--os-menu-item-hover)]"
+          className="group flex items-baseline gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-(--os-hover)"
         >
           <span className="text-text-tertiary shrink-0 text-2xs tabular-nums">{index + 1}</span>
           <span className="flex min-w-0 flex-1 flex-col">
@@ -430,7 +430,7 @@ function EmptyState({ onPick }: { onPick: (question: string) => void }) {
             key={example}
             type="button"
             onClick={() => onPick(example)}
-            className="text-text-secondary hover:text-text-primary rounded-lg px-3 py-2.5 text-left text-sm font-light transition-colors duration-200 hover:bg-[var(--os-menu-item-hover)]"
+            className="text-text-secondary hover:text-text-primary rounded-lg px-3 py-2.5 text-left text-sm font-light transition-colors duration-200 hover:bg-(--os-hover)"
           >
             {example}
           </button>

@@ -21,7 +21,7 @@ export function WallpaperPicker({ onClose }: { onClose: () => void }) {
   }
 
   const tile = (active: boolean) =>
-    cn('relative shrink-0 overflow-hidden rounded-[10px] outline-none transition', active ? 'ring-[3px] ring-[var(--color-accent)]' : 'ring-1 ring-[var(--border-hairline)] hover:ring-[var(--os-menu-text-dim)]')
+    cn('relative shrink-0 overflow-hidden rounded-[10px] outline-none transition', active ? 'ring-[3px] ring-[var(--color-accent)]' : 'ring-1 ring-[var(--border-hairline)] hover:ring-(--os-text-dim)')
 
   return (
     <motion.div className="fixed inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: dur.fade } }} exit={{ opacity: 0 }} onMouseDown={onClose}>
@@ -34,12 +34,12 @@ export function WallpaperPicker({ onClose }: { onClose: () => void }) {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
         tabIndex={-1}
-        className="os-acrylic absolute bottom-[110px] left-1/2 w-[min(1100px,calc(100vw-48px))] -translate-x-1/2 rounded-[16px] p-5 text-[var(--os-menu-text)] outline-none"
+        className="os-acrylic absolute bottom-[110px] left-1/2 w-[min(1100px,calc(100vw-48px))] -translate-x-1/2 rounded-[16px] p-5 text-(--os-text) outline-none"
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold">Wallpaper</h2>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void browse()} className="flex items-center gap-1.5 rounded-[8px] bg-[var(--surface-raised)] px-3 py-1.5 text-[12.5px] hover:bg-[var(--os-menu-item-hover)]">
+            <button type="button" onClick={() => void browse()} className="flex items-center gap-1.5 rounded-[8px] bg-[var(--surface-raised)] px-3 py-1.5 text-[12.5px] hover:bg-(--os-hover)">
               <ImageIcon width={14} height={14} /> Choose a photo…
             </button>
             <button
@@ -48,7 +48,7 @@ export function WallpaperPicker({ onClose }: { onClose: () => void }) {
                 onClose()
                 void openApp('settings', { section: 'personalization' })
               }}
-              className="rounded-[8px] px-3 py-1.5 text-[12.5px] hover:bg-[var(--os-menu-item-hover)]"
+              className="rounded-[8px] px-3 py-1.5 text-[12.5px] hover:bg-(--os-hover)"
             >
               More in Settings
             </button>
@@ -63,7 +63,7 @@ export function WallpaperPicker({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <span className="mr-1 text-[12px] text-[var(--os-menu-text-dim)]">Solid colour</span>
+          <span className="mr-1 text-[12px] text-(--os-text-dim)">Solid colour</span>
           {SOLID_COLOURS.map((c) => (
             <button
               key={c}

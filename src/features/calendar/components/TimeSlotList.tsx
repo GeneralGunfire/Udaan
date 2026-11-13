@@ -35,7 +35,7 @@ export function TimeSlotList({
           'w-full shrink-0 rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-[background-color,color,transform,box-shadow] duration-150 active:scale-[0.98]',
           allDay
             ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]'
-            : 'bg-[var(--surface-raised)] text-text-secondary hover:bg-[var(--os-menu-item-hover)] hover:text-text-primary',
+            : 'bg-[var(--surface-raised)] text-text-secondary hover:bg-(--os-hover) hover:text-text-primary',
         )}
       >
         All day
@@ -60,7 +60,7 @@ export function TimeSlotList({
               'w-full shrink-0 rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-[background-color,color,transform,box-shadow] duration-150 active:scale-[0.98]',
               selected
                 ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]'
-                : 'bg-[var(--surface-raised)] text-text-secondary hover:bg-[var(--os-menu-item-hover)] hover:text-text-primary',
+                : 'bg-[var(--surface-raised)] text-text-secondary hover:bg-(--os-hover) hover:text-text-primary',
             )}
           >
             {formatTime12h(slot)}

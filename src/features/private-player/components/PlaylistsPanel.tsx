@@ -110,7 +110,7 @@ export function PlaylistsPanel({ tracks, onPlayQueue }: PlaylistsPanelProps) {
             </p>
           ) : (
             selectedTracks.map((track, idx) => (
-              <div key={track.path} className="group hover:bg-[var(--os-menu-item-hover)] flex items-center gap-3 rounded-lg px-3 py-2.5">
+              <div key={track.path} className="group hover:bg-(--os-hover) flex items-center gap-3 rounded-lg px-3 py-2.5">
                 <button type="button" onClick={() => onPlayQueue(selectedTracks, idx)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <div className="min-w-0 flex-1">
                     <p className="text-text-primary truncate text-[13px] font-medium">{track.title}</p>
@@ -169,7 +169,7 @@ export function PlaylistsPanel({ tracks, onPlayQueue }: PlaylistsPanelProps) {
           </div>
         ) : (
           playlists.map((playlist) => (
-            <div key={playlist.id} className="group hover:bg-[var(--os-menu-item-hover)] flex items-center gap-3 rounded-lg px-3 py-2">
+            <div key={playlist.id} className="group hover:bg-(--os-hover) flex items-center gap-3 rounded-lg px-3 py-2">
               <button type="button" onClick={() => setSelectedId(playlist.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                 <div className="bg-[var(--surface-raised)] flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
                   <PlayIcon width={16} height={16} className="text-text-secondary" />

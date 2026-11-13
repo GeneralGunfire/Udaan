@@ -252,7 +252,7 @@ export function ActivityMonitorApp(_props: { onClose: () => void }) {
         </label>
         <div className="flex-1" />
         {selectedRow?.exe && (
-          <button type="button" onClick={() => void openWithSystem(selectedRow.exe!.replace(/[\\/][^\\/]+$/, ''))} className="rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--os-menu-item-hover)] hover:text-[var(--color-text-primary)]">
+          <button type="button" onClick={() => void openWithSystem(selectedRow.exe!.replace(/[\\/][^\\/]+$/, ''))} className="rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-text-secondary)] hover:bg-(--os-hover) hover:text-[var(--color-text-primary)]">
             Open location
           </button>
         )}
@@ -278,7 +278,7 @@ export function ActivityMonitorApp(_props: { onClose: () => void }) {
               key={r.key}
               onClick={() => setSelected(r.key)}
               onDoubleClick={() => bringToFront(r)}
-              className={cn('grid cursor-default grid-cols-[1fr_90px_220px] items-center border-b border-[var(--border-hairline)] text-[13px] transition-colors', selected === r.key ? 'bg-[var(--color-accent)]/25' : 'hover:bg-[var(--os-menu-item-hover)]')}
+              className={cn('grid cursor-default grid-cols-[1fr_90px_220px] items-center border-b border-[var(--border-hairline)] text-[13px] transition-colors', selected === r.key ? 'bg-[var(--color-accent)]/25' : 'hover:bg-(--os-hover)')}
             >
               <span className="flex min-w-0 items-center gap-2.5 px-3 py-2">
                 <ProcIcon exe={r.exe} />

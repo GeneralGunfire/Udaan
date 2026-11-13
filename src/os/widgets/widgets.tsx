@@ -91,8 +91,27 @@ export async function addWidget(kind: WidgetKind) {
   await setPref('desktop.widgets', JSON.stringify([...list, { id: `${kind}-${Date.now().toString(36)}`, kind, x, y }]))
 }
 
+/**
+ * A widget's surface.
+ *
+ * Uses the real window material rather than a hardcoded dark tint with
+ * `backdrop-blur`: the desktop is a transparent OS window, so a CSS
+ * backdrop filter there has nothing of the wallpaper to sample and only
+ * costs GPU every frame. The compositor does the blur instead; see
+ * os/kernel/material.ts.
+ *
+ * The tint also had to be hardcoded dark because it was the only way to
+ * stay legible, which meant widgets stayed black in light mode. Now they
+ * follow the theme like every other surface.
+ */
 export function Tile({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`h-full w-full overflow-hidden rounded-[22px] border border-[var(--border-hairline)] bg-[rgb(28_30_36/0.62)] p-4 text-[var(--os-menu-text)] shadow-[0_12px_40px_rgb(0_0_0/0.3)] backdrop-blur-2xl ${className}`}>{children}</div>
+  return (
+    <div
+      className={`os-widget-material os-sheen h-full w-full overflow-hidden rounded-(--os-radius-widget) p-4 text-(--os-text) ${className}`}
+    >
+      {children}
+    </div>
+  )
 }
 
 function useNow(everyMs: number) {
@@ -162,7 +181,7 @@ function CalendarWidget() {
 
 function WeatherWidget() {
   const { weather, error } = useWeather()
-  if (!weather) return <Tile className="flex items-center justify-center text-[13px] text-[var(--os-menu-text-dim)]">{error ? 'Weather unavailable' : 'Loading weather…'}</Tile>
+  if (!weather) return <Tile className="flex items-center justify-center text-[13px] text-(--os-text-dim)">{error ? 'Weather unavailable' : 'Loading weather…'}</Tile>
   return (
     <Tile className="bg-gradient-to-b from-[rgb(40_90_160/0.7)] to-[rgb(30_50_100/0.7)]">
       <div className="flex items-start justify-between">
@@ -173,7 +192,7 @@ function WeatherWidget() {
         <div className="text-right">
           <p className="text-[24px]">{weatherCodeToGlyph(weather.code)}</p>
           <p className="text-[12px] font-medium">{weatherCodeToLabel(weather.code)}</p>
-          <p className="text-[12px] tabular-nums text-[var(--os-menu-text-dim)]">
+          <p className="text-[12px] tabular-nums text-(--os-text-dim)">
             H:{weather.high}° L:{weather.low}°
           </p>
         </div>
@@ -181,7 +200,7 @@ function WeatherWidget() {
       <div className="mt-3 grid grid-cols-6 text-center text-[11.5px] tabular-nums">
         {weather.hours.map((h) => (
           <div key={h.time} className="flex flex-col items-center gap-0.5">
-            <span className="text-[var(--os-menu-text-dim)]">{h.time?.slice(11, 13)}</span>
+            <span className="text-(--os-text-dim)">{h.time?.slice(11, 13)}</span>
             <span className="text-[15px]">{weatherCodeToGlyph(h.code)}</span>
             <span>{h.temp}°</span>
           </div>
@@ -211,7 +230,7 @@ function WorldClockWidget() {
           <div key={z.city} className="flex flex-col items-center gap-1.5">
             <span className={`flex h-16 w-16 items-center justify-center rounded-full text-[17px] font-semibold tabular-nums ${hour >= 7 && hour < 19 ? 'bg-white text-black' : 'bg-black/60 text-white ring-1 ring-white/15'}`}>{parts}</span>
             <span className="text-[12.5px] font-medium">{z.city}</span>
-            <span className="text-[11px] text-[var(--os-menu-text-dim)]">{diff === 0 ? 'Same time' : `${diff > 0 ? '+' : ''}${diff}h`}</span>
+            <span className="text-[11px] text-(--os-text-dim)">{diff === 0 ? 'Same time' : `${diff > 0 ? '+' : ''}${diff}h`}</span>
           </div>
         )
       })}
@@ -237,7 +256,7 @@ function Ring({ value, color, label }: { value: number; color: string; label: st
           {Math.round(value)}%
         </text>
       </svg>
-      <span className="text-[11px] font-medium text-[var(--os-menu-text-dim)]">{label}</span>
+      <span className="text-[11px] font-medium text-(--os-text-dim)">{label}</span>
     </div>
   )
 }
@@ -252,7 +271,7 @@ function SystemWidget() {
   }, [])
   return (
     <Tile className="flex flex-col !p-3.5">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--os-menu-text-dim)]">System</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-(--os-text-dim)">System</p>
       <div className="flex flex-1 items-center justify-around">
         <Ring value={load?.cpu ?? 0} color="#30d158" label="CPU" />
         <Ring value={load ? (load.memoryUsed / Math.max(1, load.memoryTotal)) * 100 : 0} color="#0a84ff" label="Memory" />
@@ -277,16 +296,16 @@ function NowPlayingWidget() {
         </svg>
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--os-menu-text-dim)]">{np ? sourceName(np.source) : 'Now Playing'}</p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-(--os-text-dim)">{np ? sourceName(np.source) : 'Now Playing'}</p>
         <p className="mt-0.5 truncate text-[15px] font-semibold">{np?.title || 'Nothing playing'}</p>
-        <p className="truncate text-[13px] text-[var(--os-menu-text-dim)]">{np?.artist || ' '}</p>
+        <p className="truncate text-[13px] text-(--os-text-dim)">{np?.artist || ' '}</p>
         <div className="mt-2 flex items-center gap-1">
           {[
             { label: 'Previous', d: 'M18.5 6v12L10 12ZM6 6h2.5v12H6z', cmd: 'previous' as const, off: !np?.canPrevious },
             { label: np?.playing ? 'Pause' : 'Play', d: np?.playing ? 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z' : 'M8 5.5v13l10.5-6.5Z', cmd: 'play-pause' as const, off: !np },
             { label: 'Next', d: 'M5.5 6v12l8.5-6ZM15.5 6h2.5v12h-2.5z', cmd: 'next' as const, off: !np?.canNext },
           ].map((b) => (
-            <button key={b.cmd} type="button" aria-label={b.label} disabled={b.off} onClick={() => void mediaCommand(b.cmd)} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--os-menu-item-hover)] disabled:opacity-30">
+            <button key={b.cmd} type="button" aria-label={b.label} disabled={b.off} onClick={() => void mediaCommand(b.cmd)} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-(--os-hover) disabled:opacity-30">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d={b.d} />
               </svg>
@@ -309,14 +328,14 @@ function AgendaWidget() {
       <p className="text-[26px] font-light leading-tight">{now.getDate()}</p>
       <div className="mt-1 flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
         {upcoming.length === 0 ? (
-          <p className="text-[12px] text-[var(--os-menu-text-dim)]">No more events today</p>
+          <p className="text-[12px] text-(--os-text-dim)">No more events today</p>
         ) : (
           upcoming.slice(0, 3).map((e) => (
             <div key={e.id} className="flex gap-2">
               <span className="w-[3px] shrink-0 rounded-full" style={{ background: CATEGORY_COLOUR[e.category] }} />
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-medium">{e.title}</span>
-                <span className="block text-[10.5px] tabular-nums text-[var(--os-menu-text-dim)]">{e.allDay || !e.startTime ? 'All day' : e.startTime}</span>
+                <span className="block text-[10.5px] tabular-nums text-(--os-text-dim)">{e.allDay || !e.startTime ? 'All day' : e.startTime}</span>
               </span>
             </div>
           ))
@@ -342,7 +361,7 @@ function BatteryWidget() {
   return (
     <Tile className="flex flex-col items-center justify-center !p-3">
       {!bat?.hasBattery ? (
-        <p className="text-[13px] text-[var(--os-menu-text-dim)]">No battery</p>
+        <p className="text-[13px] text-(--os-text-dim)">No battery</p>
       ) : (
         <>
           <svg viewBox="0 0 100 100" width="92" height="92">
@@ -378,16 +397,16 @@ function StorageWidget() {
   const fmt = (b: number) => `${(b / 1_000_000_000).toFixed(0)} GB`
   return (
     <Tile className="flex flex-col !p-3.5">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--os-menu-text-dim)]">Storage</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-(--os-text-dim)">Storage</p>
       {!drive ? (
-        <p className="mt-2 text-[12px] text-[var(--os-menu-text-dim)]">Loading…</p>
+        <p className="mt-2 text-[12px] text-(--os-text-dim)">Loading…</p>
       ) : (
         <>
           <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-[rgb(255_255_255/0.1)]">
             <div className="h-full rounded-full bg-[#0a84ff]" style={{ width: `${pct}%`, transition: 'width 600ms ease' }} />
           </div>
-          <p className="mt-2 text-[13px] font-semibold tabular-nums">{fmt(used)} <span className="font-normal text-[var(--os-menu-text-dim)]">of {fmt(drive.total)}</span></p>
-          <p className="mt-0.5 text-[11px] text-[var(--os-menu-text-dim)]">{fmt(drive.free)} free</p>
+          <p className="mt-2 text-[13px] font-semibold tabular-nums">{fmt(used)} <span className="font-normal text-(--os-text-dim)">of {fmt(drive.total)}</span></p>
+          <p className="mt-0.5 text-[11px] text-(--os-text-dim)">{fmt(drive.free)} free</p>
         </>
       )}
     </Tile>
@@ -418,21 +437,21 @@ function QuickNoteWidget() {
     <Tile className="flex flex-col !p-3.5">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-wide text-[#ffd60a]">{note?.title || 'Quick Note'}</p>
-        <button type="button" aria-label="Open in Notes" onClick={() => void openApp('notes')} className="rounded-full px-1.5 py-0.5 text-[11px] text-[var(--os-menu-text-dim)] hover:bg-[var(--os-menu-item-hover)]">
+        <button type="button" aria-label="Open in Notes" onClick={() => void openApp('notes')} className="rounded-full px-1.5 py-0.5 text-[11px] text-(--os-text-dim) hover:bg-(--os-hover)">
           Open
         </button>
       </div>
       {!loaded ? (
-        <p className="mt-2 text-[12px] text-[var(--os-menu-text-dim)]">Loading…</p>
+        <p className="mt-2 text-[12px] text-(--os-text-dim)">Loading…</p>
       ) : note ? (
         <textarea
           value={body}
           onChange={(e) => commit(e.target.value)}
           placeholder="Type a note…"
-          className="mt-1.5 flex-1 resize-none bg-transparent text-[12.5px] leading-snug text-[var(--os-menu-text)] outline-none placeholder:text-[var(--os-menu-text-dim)]"
+          className="mt-1.5 flex-1 resize-none bg-transparent text-[12.5px] leading-snug text-(--os-text) outline-none placeholder:text-(--os-text-dim)"
         />
       ) : (
-        <p className="mt-2 text-[12px] text-[var(--os-menu-text-dim)]">No notes yet — open Notes to create one.</p>
+        <p className="mt-2 text-[12px] text-(--os-text-dim)">No notes yet — open Notes to create one.</p>
       )}
     </Tile>
   )
@@ -448,7 +467,7 @@ const QUICK_ACTIONS = [
 function QuickActionsWidget() {
   return (
     <Tile className="flex flex-col !p-3.5">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--os-menu-text-dim)]">Quick Actions</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-(--os-text-dim)">Quick Actions</p>
       <div className="mt-2 grid flex-1 grid-cols-2 gap-2">
         {QUICK_ACTIONS.map((a) => (
           <button

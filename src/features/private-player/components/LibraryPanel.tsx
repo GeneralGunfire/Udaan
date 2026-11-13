@@ -120,7 +120,7 @@ export function LibraryPanel({
               <button
                 type="button"
                 onClick={showMore}
-                className="text-text-secondary hover:text-text-primary hover:bg-[var(--os-menu-item-hover)] mt-1 w-full rounded-lg py-2.5 text-center text-sm font-medium transition-colors"
+                className="text-text-secondary hover:text-text-primary hover:bg-(--os-hover) mt-1 w-full rounded-lg py-2.5 text-center text-sm font-medium transition-colors"
               >
                 Load {Math.min(20, remaining)} more
               </button>
