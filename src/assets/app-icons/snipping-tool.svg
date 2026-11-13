@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="10" fill="#1a1a1a"/>
-  <!-- Crop-corner marks, the Windows 11 Snipping Tool motif — flat white on
-       near-black, matching the app's monochrome icon language instead of
-       the previous purple-to-pink gradient badge, which was the one
-       saturated-color tile in an otherwise black/white Launchpad. -->
-  <path d="M14 12v14a4 4 0 0 0 4 4h14" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M34 36V22a4 4 0 0 0-4-4H16" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
-</svg>

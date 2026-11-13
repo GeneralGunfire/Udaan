@@ -29,6 +29,8 @@
  * elements.
  */
 
+import { createEqualizer, type EqualizerChain } from '@/os/sound/equalizer'
+
 export interface MasterBus {
   ctx: AudioContext
   /** Where each deck connects its output. Sums Deck A + Deck B. */
@@ -43,6 +45,12 @@ export interface MasterBus {
   output: GainNode
   /** FFT tap on the summed post-master signal — for a master level meter. */
   analyser: AnalyserNode
+  /**
+   * The system sound mode (Settings → Sound), as real filters in this
+   * graph. Follows the saved mode on its own; nothing here has to retune
+   * it. See os/sound/equalizer.ts.
+   */
+  equalizer: EqualizerChain
 }
 
 export interface MasterSettings {
@@ -129,15 +137,22 @@ export function ensureMasterBus(): MasterBus | null {
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.55
 
+    // The system sound mode, as real DSP. It sits after the limiter and
+    // before the meter so the meter reports what actually leaves the app,
+    // and so the mode's own preamp cut cannot push the limiter into gain
+    // reduction it was not asked for.
+    const equalizer = createEqualizer(ctx)
+
     input.connect(low)
     low.connect(mid)
     mid.connect(high)
     high.connect(limiter)
     limiter.connect(output)
-    output.connect(analyser)
+    output.connect(equalizer.input)
+    equalizer.output.connect(analyser)
     analyser.connect(ctx.destination)
 
-    sharedBus = { ctx, input, low, mid, high, limiter, output, analyser }
+    sharedBus = { ctx, input, low, mid, high, limiter, output, analyser, equalizer }
     return sharedBus
   } catch (err) {
     console.error('Failed to create shared audio context / master bus:', err)

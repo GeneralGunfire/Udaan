@@ -30,8 +30,10 @@ export function notificationSource(n: Notification): string {
 }
 
 /**
- * Initials for a sender with no real icon. Two letters from two words
- * ("Phone Link" → PL) reads as a brand; one letter reads as a placeholder.
+ * Initials for a sender with no real icon.
+ *
+ * Two letters from two words ("Phone Link" → PL) reads as a brand; one
+ * letter reads as a placeholder.
  */
 function initials(name: string): string {
   const words = name.trim().split(/[\s_-]+/).filter(Boolean)
@@ -40,14 +42,17 @@ function initials(name: string): string {
 }
 
 /**
- * A stable, pleasant colour per sender. Hue comes from the name, but
- * saturation and lightness are fixed, so every generated tile sits in the
- * same tonal family instead of some being neon and others muddy.
+ * A stable colour per sender.
+ *
+ * Hue comes from the name, but saturation and lightness are fixed, so every
+ * generated tile sits in the same tonal family. Deriving all three from the
+ * hash is the usual mistake: it yields some neon tiles and some muddy ones,
+ * and the set stops looking designed.
  */
 function tileColours(name: string): [string, string] {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360
-  return [`hsl(${h} 48% 54%)`, `hsl(${(h + 24) % 360} 52% 38%)`]
+  return [`hsl(${h} 46% 55%)`, `hsl(${(h + 22) % 360} 50% 38%)`]
 }
 
 const cache = new Map<string, string | null>()
@@ -55,15 +60,22 @@ const cache = new Map<string, string | null>()
 /**
  * Who sent a notification.
  *
- * Only two sources of truth are allowed here: Udaan's own app icon for its
- * own apps, and the *real* icon Windows holds for a third-party app, read
- * off the executable or the AppsFolder entry. When neither exists we draw a
- * neutral monogram tile.
+ * Only two sources of truth are allowed: Udaan's own app icon for its own
+ * apps, and the *real* icon Windows holds for a third-party app, read off
+ * the executable or its AppsFolder entry. When neither exists, a neutral
+ * monogram tile.
  *
- * We deliberately do not ship hand-drawn imitations of other companies'
- * logos. A redrawn Claude or Word mark is not that product's icon: it is a
- * near-miss that misrepresents the brand and looks wrong beside the real
- * thing. A clean monogram is honest about not knowing.
+ * WHY THERE ARE NO BUNDLED BRAND LOGOS HERE
+ * -----------------------------------------
+ * This used to ship hand-drawn approximations of a dozen other companies'
+ * marks — Claude, Word, Excel, Outlook, OneDrive and so on — matched by a
+ * regex on the sender's name. Every one of them was wrong: a redrawn logo
+ * is not that product's logo, it is a near-miss that misrepresents the
+ * brand, and it looked especially wrong sitting beside the real icons
+ * Windows supplies for everything else.
+ *
+ * The real icon is already available for any installed app. When it is not,
+ * an honest monogram is better than a convincing forgery.
  */
 export function NotificationIcon({ n, size = 22 }: { n: Notification; size?: number }) {
   const extra = windowsExtra(n)
@@ -98,7 +110,7 @@ export function NotificationIcon({ n, size = 22 }: { n: Notification; size?: num
 
   if (isAppId(n.sourceApp)) return <AppIcon appId={n.sourceApp} size={size} />
 
-  // The real icon, extracted from the app itself.
+  // The app's real icon, extracted from the app itself.
   if (src) return <img src={src} alt="" draggable={false} className="shrink-0 object-contain" style={{ width: size, height: size }} />
 
   const [from, to] = tileColours(name)
@@ -108,13 +120,12 @@ export function NotificationIcon({ n, size = 22 }: { n: Notification; size?: num
       style={{
         width: size,
         height: size,
-        // Matches the app-icon silhouette so a monogram sits correctly in a
-        // row of real icons rather than reading as a different kind of object.
+        // Matches the app-icon silhouette, so a monogram sits correctly in a
+        // row of real icons instead of reading as a different kind of object.
         borderRadius: size * 0.26,
         fontSize: size * 0.42,
-        letterSpacing: size * 0.01,
         background: `linear-gradient(145deg, ${from}, ${to})`,
-        boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(0 0 0 / 0.2)',
+        boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(0 0 0 / 0.2)',
       }}
     >
       {initials(name)}

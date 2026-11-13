@@ -46,6 +46,7 @@
  *   space     a short reverb tail, so sounds sit in a room
  */
 import { getPref } from '@/os/kernel/prefs'
+import { createEqualizer } from './equalizer'
 
 export type SoundId =
   | 'tap' | 'open' | 'close' | 'notify' | 'unlock' | 'lock' | 'error'
@@ -100,7 +101,12 @@ function build(): Engine {
 
   const bus = ctx.createGain()
   bus.gain.value = 1
-  bus.connect(comp)
+  // UI sounds run through the system sound mode too, so a Night or Clarity
+  // setting shapes the whole interface rather than only music. The chain
+  // follows the saved mode by itself.
+  const equalizer = createEqualizer(ctx)
+  bus.connect(equalizer.input)
+  equalizer.output.connect(comp)
 
   // ── Reverb: a short, bright room ──
   const verb = ctx.createConvolver()

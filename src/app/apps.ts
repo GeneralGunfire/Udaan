@@ -3,22 +3,6 @@ import { ExplorerIcon } from '@/shared/icons'
 import { detectApps, launchApp, launchAppByExeName } from '@/integrations/installed-apps/client'
 import { openApp } from '@/os/kernel/shell'
 import { APP_DEFS, type AppId } from '@/os/kernel/registry'
-import wordIcon from '@/assets/app-icons/word.svg'
-import excelIcon from '@/assets/app-icons/excel.svg'
-import powerpointIcon from '@/assets/app-icons/powerpoint.svg'
-import outlookIcon from '@/assets/app-icons/outlook.svg'
-import onedriveIcon from '@/assets/app-icons/onedrive.svg'
-import powerbiIcon from '@/assets/app-icons/powerbi.svg'
-import storeIcon from '@/assets/app-icons/store.svg'
-import onenoteIcon from '@/assets/app-icons/onenote.svg'
-import todoIcon from '@/assets/app-icons/todo.svg'
-import outlookNewIcon from '@/assets/app-icons/outlook-new.svg'
-import claudeIcon from '@/assets/app-icons/claude.svg'
-import vscodeIcon from '@/assets/app-icons/vscode.png'
-import snippingToolIcon from '@/assets/app-icons/snipping-tool.svg'
-import teamviewerIcon from '@/assets/app-icons/teamviewer.svg'
-import wikipediaIcon from '@/assets/app-icons/wikipedia.svg'
-import disneyPlusIcon from '@/assets/app-icons/disney-plus.svg'
 
 /**
  * Every real app-logo asset used by a Launchpad tile, in one place —
@@ -62,7 +46,15 @@ export interface AppDefinition {
   name: string
   /** Stroke-icon fallback — always required so a tile never renders empty. */
   icon: ComponentType<SVGProps<SVGSVGElement>>
-  /** Real app logo, when we have one (see src/assets/app-icons/) — takes priority over `icon` in the tile. */
+  /**
+   * The app's own file on disk. Its real icon is extracted from it at
+   * render time (see useAppIcon), which is why Udaan ships no redrawn
+   * brand logos: a hand-drawn imitation of another product's mark is not
+   * that mark, and it reads as wrong beside the genuine icons Windows
+   * supplies for every other app.
+   */
+  iconPath?: string
+  /** An already-resolved icon URL, for the rare app with no file to read. */
   iconSrc?: string
   /** May return a promise (e.g. launching a real external process) — callers should await it to surface a real failure instead of assuming a synchronous void call always succeeds. */
   launch: () => void | Promise<void>
@@ -95,7 +87,14 @@ export interface AppFolderDefinition {
    * a result that was never actually asynchronous to begin with.
    */
   staticApps?: AppDefinition[]
-  /** Up to 4 logos shown in the closed folder tile's stacked preview — known ahead of detection since these are just the group's iconography, not the detected/launchable set. */
+  /**
+   * Up to 4 icons shown in the closed folder tile's stacked preview.
+   *
+   * These are resolved from the folder's real contents once it has been
+   * loaded, not hardcoded: the preview used to be a fixed list of redrawn
+   * brand logos, which meant the Microsoft folder showed Word, Excel,
+   * PowerPoint and Outlook whether or not any of them were installed.
+   */
   previewIconSrcs?: string[]
 }
 
@@ -137,14 +136,12 @@ const ALWAYS_SHOWN_OTHER_APPS: AppDefinition[] = [
     id: 'claude',
     name: 'Claude',
     icon: ExplorerIcon,
-    iconSrc: claudeIcon,
     launch: () => launchAppByExeName('Claude.exe'),
   },
   {
     id: 'teamviewer',
     name: 'TeamViewer',
     icon: ExplorerIcon,
-    iconSrc: teamviewerIcon,
     launch: () => launchAppByExeName('TeamViewer.exe'),
   },
   {
@@ -158,7 +155,6 @@ const ALWAYS_SHOWN_OTHER_APPS: AppDefinition[] = [
     id: 'snipping-tool',
     name: 'Snipping Tool',
     icon: ExplorerIcon,
-    iconSrc: snippingToolIcon,
     launch: () => launchAppByExeName('SnippingTool.exe'),
   },
   {
@@ -210,25 +206,10 @@ export const PINNED_APPS: AppDefinition[] = [
     id: 'wikipedia',
     name: 'Wikipedia',
     icon: ExplorerIcon,
-    iconSrc: wikipediaIcon,
     launch: () => launchApp('https://www.wikipedia.org'),
   },
   ...ALWAYS_SHOWN_OTHER_APPS,
 ]
-
-/** Real Microsoft app logos (see src/assets/app-icons/) — keyed by the `id` src-tauri/src/installed_apps/mod.rs's `known_apps_for_group` assigns each app, so a detected app with no entry here is a real gap to fix, not expected. */
-const MICROSOFT_APP_ICONS: Record<string, string> = {
-  word: wordIcon,
-  excel: excelIcon,
-  powerpoint: powerpointIcon,
-  outlook: outlookIcon,
-  onenote: onenoteIcon,
-  onedrive: onedriveIcon,
-  powerbi: powerbiIcon,
-  store: storeIcon,
-  todo: todoIcon,
-  'outlook-new': outlookNewIcon,
-}
 
 async function loadMicrosoftApps(): Promise<AppDefinition[]> {
   const detected = await detectApps('microsoft')
@@ -236,7 +217,7 @@ async function loadMicrosoftApps(): Promise<AppDefinition[]> {
     id: `microsoft-${app.id}`,
     name: app.name,
     icon: ExplorerIcon,
-    iconSrc: MICROSOFT_APP_ICONS[app.id],
+    iconPath: app.path,
     launch: async () => {
       try {
         await launchApp(app.path)
@@ -264,15 +245,8 @@ export const APP_FOLDERS: AppFolderDefinition[] = [
     id: 'microsoft',
     name: 'Microsoft',
     loadApps: loadMicrosoftApps,
-    previewIconSrcs: [wordIcon, excelIcon, powerpointIcon, outlookIcon],
   },
 ]
-
-/** Real logos for the standalone apps pinned at Launchpad's top level (not grouped into a folder) — keyed by the `id` src-tauri/src/installed_apps/mod.rs's `AppGroup::Other` assigns each app. Claude/Norton/Norton Private Browser/TeamViewer/Snipping Tool are no longer detection-based (see `ALWAYS_SHOWN_OTHER_APPS` above), so they're not looked up through this map — their icons are set directly on their static `AppDefinition` entries instead. */
-const OTHER_APP_ICONS: Record<string, string> = {
-  vscode: vscodeIcon,
-  'disney-plus': disneyPlusIcon,
-}
 
 /**
  * Standalone apps at Launchpad's top level, detected the same way the
@@ -287,7 +261,7 @@ export async function loadOtherApps(): Promise<AppDefinition[]> {
     id: `other-${app.id}`,
     name: app.name,
     icon: ExplorerIcon,
-    iconSrc: OTHER_APP_ICONS[app.id],
+    iconPath: app.path,
     launch: async () => {
       try {
         await launchApp(app.path)

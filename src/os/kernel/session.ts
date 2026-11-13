@@ -4,7 +4,6 @@ import { setWindowWatcherEnabled } from '@/integrations/window-watcher/client'
 import { CORNER_KEYS, getPref } from './prefs'
 import { getTaskbarPref, setTaskbarPref } from '@/integrations/taskbar-prefs/client'
 import { inTauri, shell } from './shell'
-import { applySoundMode, parseCustomEq, type CustomEq } from '@/os/dock/panels/SoundPanel'
 
 const DOCK_LABEL = 'taskbar'
 
@@ -43,10 +42,9 @@ export async function applyStartupPrefs(): Promise<void> {
     getPref('dock.enabled'),
   ])
   await shell.setKeyboardHook(winKey)
-  // Keep the speakers awake through quiet passages (see sound_fx.rs).
+  // Keep the speakers awake through quiet passages (see sound_fx/keepalive.rs).
   const [keepAwake, keepLevel] = await Promise.all([getPref('sound.keepAwake'), getPref('sound.keepAwakeLevel')])
   void invoke('speaker_keepalive_set', { enabled: keepAwake, level: keepLevel }).catch(() => {})
-  void restoreSoundMode()
   await syncHotCorners()
   // First run: start with Windows, like a real shell. Only seeded once, so
   // turning it off in Settings sticks.
@@ -65,17 +63,3 @@ export async function syncHotCorners(): Promise<void> {
   await shell.setHotCorners(actions.some((a) => a !== 'none'))
 }
 
-
-/** Puts your saved sound mode back (Equalizer APO keeps its own file, but this repairs it if anything changed it). */
-async function restoreSoundMode(): Promise<void> {
-  try {
-    const status = await invoke<{ installed: boolean; preset: string | null }>('sound_fx_status')
-    if (!status.installed) return
-    const [preset, strength, custom] = await Promise.all([getPref('sound.preset'), getPref('sound.strength'), getPref('sound.custom')])
-    if (status.preset === preset) return
-    const eq: CustomEq = parseCustomEq(custom)
-    await applySoundMode(preset, strength, eq)
-  } catch {
-    /* Equalizer APO missing or read-only: the panel explains it */
-  }
-}

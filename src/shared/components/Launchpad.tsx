@@ -6,6 +6,7 @@ import { isAppId } from '@/os/kernel/registry'
 import { duration, zIndex, prefersReducedMotion, pressable, ease } from '@/shared/lib/motion'
 import { SearchIcon, WindowCloseIcon, FolderIcon, ChevronRightIcon } from '@/shared/icons'
 import { AppTileContextMenu } from '@/os/ui/AppTileContextMenu'
+import { monogram, prefetchAppIcons, useAppIcon } from '@/os/ui/useAppIcon'
 import {
   PINNED_APPS,
   APP_FOLDERS,
@@ -413,6 +414,11 @@ interface AppTileProps {
 
 function AppTile({ app, onLaunch, highlighted, onHover }: AppTileProps) {
   const Icon = app.icon
+  // The app's real icon, read from its own file. Falls back to a monogram
+  // rather than a redrawn brand logo — see os/ui/useAppIcon.
+  const extracted = useAppIcon(app.iconSrc ? null : (app.iconPath ?? app.path))
+  const iconUrl = app.iconSrc ?? extracted
+  const mark = monogram(app.name)
   return (
     <AppTileContextMenu action={{ path: app.path, onOpen: onLaunch }}>
       <motion.button
@@ -426,16 +432,48 @@ function AppTile({ app, onLaunch, highlighted, onHover }: AppTileProps) {
       >
         {isAppId(app.id) ? (
           <AppIcon appId={app.id} size={56} />
-        ) : app.iconSrc ? (
-          <img src={app.iconSrc} alt="" className="h-14 w-14 object-contain drop-shadow-[0_2px_4px_rgb(0_0_0/30%)]" draggable={false} />
+        ) : iconUrl ? (
+          <img src={iconUrl} alt="" className="h-14 w-14 object-contain drop-shadow-[0_2px_4px_rgb(0_0_0/30%)]" draggable={false} />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-[14px] bg-[var(--os-menu-item-hover)] text-[var(--os-menu-text)]">
-            <Icon width={24} height={24} />
-          </div>
+          // No icon could be read from the app. A monogram in the app's own
+          // colour, shaped like the other icons so it sits in the grid.
+          <span
+            className="flex h-14 w-14 items-center justify-center text-[20px] font-semibold text-white"
+            style={{
+              borderRadius: '26%',
+              background: mark.background,
+              boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.22), 0 2px 4px rgb(0 0 0 / 0.25)',
+            }}
+          >
+            {mark.initials}
+          </span>
         )}
-        <span className="w-full truncate text-[12px] text-[var(--os-menu-text)]">{app.name}</span>
+        <span className="w-full truncate text-[12px] text-[var(--os-text)]">{app.name}</span>
       </motion.button>
     </AppTileContextMenu>
+  )
+}
+
+/** One app's icon in a closed folder's 2×2 preview. */
+function FolderPreviewIcon({ app }: { app: AppDefinition }) {
+  const extracted = useAppIcon(app.iconSrc ? null : (app.iconPath ?? app.path))
+  const iconUrl = app.iconSrc ?? extracted
+  const mark = monogram(app.name)
+  return (
+    <span className="bg-surface-overlay flex h-5.5 w-5.5 items-center justify-center overflow-hidden rounded-[5px] p-0.5 shadow-[0_1px_2px_rgb(0_0_0/30%)]">
+      {isAppId(app.id) ? (
+        <AppIcon appId={app.id} size={18} />
+      ) : iconUrl ? (
+        <img src={iconUrl} alt="" className="h-full w-full object-contain" draggable={false} />
+      ) : (
+        <span
+          className="flex h-full w-full items-center justify-center text-[7px] font-bold text-white"
+          style={{ borderRadius: '22%', background: mark.background }}
+        >
+          {mark.initials}
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -453,7 +491,29 @@ interface FolderTileProps {
  * "opens more" rather than "launches something" at a glance.
  */
 function FolderTile({ folder, onOpen, highlighted, onHover }: FolderTileProps) {
-  const previews = folder.previewIconSrcs?.slice(0, 4)
+  // The folder's real contents. Loaded lazily so the closed tile shows what
+  // is actually inside it on this machine, rather than a fixed list of
+  // logos for apps that may not be installed.
+  const [contents, setContents] = useState<AppDefinition[]>(() => folder.staticApps ?? [])
+  useEffect(() => {
+    if (folder.staticApps?.length) return
+    let off = false
+    void folder.loadApps().then(
+      (apps) => !off && setContents(apps),
+      () => {},
+    )
+    return () => {
+      off = true
+    }
+  }, [folder])
+
+  const previewApps = contents.slice(0, 4)
+  // Warm the icon cache in one batch rather than one call per tile.
+  useEffect(() => {
+    void prefetchAppIcons(previewApps.map((a) => a.iconPath ?? a.path))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contents])
+
   return (
     <motion.button
       type="button"
@@ -465,15 +525,10 @@ function FolderTile({ folder, onOpen, highlighted, onHover }: FolderTileProps) {
       }`}
     >
       <div className="border-hairline bg-surface-raised relative flex h-16 w-16 items-center justify-center rounded-2xl border">
-        {previews && previews.length > 0 ? (
+        {previewApps.length > 0 ? (
           <div className="grid grid-cols-2 gap-1 p-2">
-            {previews.map((src, i) => (
-              <div
-                key={i}
-                className="bg-surface-overlay flex h-5.5 w-5.5 items-center justify-center rounded-[5px] p-0.5 shadow-[0_1px_2px_rgb(0_0_0/30%)]"
-              >
-                <img src={src} alt="" className="h-full w-full object-contain" draggable={false} />
-              </div>
+            {previewApps.map((app) => (
+              <FolderPreviewIcon key={app.id} app={app} />
             ))}
           </div>
         ) : (

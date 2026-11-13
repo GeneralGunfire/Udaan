@@ -1,17 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { APP_DEFS, type AppId } from '@/os/kernel/registry'
 import { groupKeyOf, shell, subscribeShell, useShell, type ShellWindow } from '@/os/kernel/shell'
-import claudeLogo from '@/assets/app-icons/claude.svg'
-import vscodeLogo from '@/assets/app-icons/vscode.png'
-import nortonBrowserLogo from '@/assets/app-icons/norton-private-browser.svg'
 import { baseName, exeKey, loadPins, onPinsChanged, type Pin } from './pins'
-
-/** Official logos for programs whose icon we can't read while they're closed (packaged apps). */
-const BRAND_LOGOS: Record<string, string> = {
-  [exeKey('claude.exe')]: claudeLogo,
-  [exeKey('code.exe')]: vscodeLogo,
-  [exeKey('nortonbrowser.exe')]: nortonBrowserLogo,
-}
 
 /** Names for programs whose version resource says something less useful. */
 const BRAND_NAMES: Record<string, string> = { [exeKey('explorer.exe')]: 'File Explorer' }
@@ -122,7 +112,12 @@ export function useDockItems() {
       const resolvedPath = launch && !isPath(launch) ? resolved[launch] : launch
       const exePath = ws[0]?.exePath ?? (resolvedPath && /\.exe$/i.test(resolvedPath) ? resolvedPath : null)
       const name = appId ? APP_DEFS[appId].name : (BRAND_NAMES[key] ?? pin?.name ?? (exePath && names[exePath]) ?? baseName(ws[0]?.processName ?? 'App').replace(/\.exe$/i, ''))
-      const iconUrl = appId ? null : ((exePath && icons[exePath]) || BRAND_LOGOS[key] || (ws[0] && winIcons[ws[0].handle]) || null)
+      // The app's own icon, read off its executable or its live window. We
+      // never substitute a hand-drawn imitation of a brand's logo: a redrawn
+      // mark is not that product's mark, and it reads as wrong beside the
+      // real icons Windows supplies for everything else. Where no icon can
+      // be read, the dock draws a neutral monogram tile instead.
+      const iconUrl = appId ? null : ((exePath && icons[exePath]) || (ws[0] && winIcons[ws[0].handle]) || null)
       return {
         key,
         name,
