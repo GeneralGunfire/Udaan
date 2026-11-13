@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
+use crate::db::configure_connection;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
   pub id: String,
@@ -27,6 +29,7 @@ pub struct Store {
 impl Store {
   pub fn open(db_path: PathBuf) -> rusqlite::Result<Self> {
     let conn = Connection::open(db_path)?;
+    configure_connection(&conn)?;
     conn.execute_batch(
       "CREATE TABLE IF NOT EXISTS templates (
         id TEXT PRIMARY KEY,

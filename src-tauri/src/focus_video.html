@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Focus video</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  iframe { border: 0; width: 100%; height: 100%; }
+</style>
+<!--
+  Served by Udaan on 127.0.0.1. YouTube refuses to embed into the app's own
+  internal origin, but accepts a plain local web address, so the player lives
+  here and the menu bar pill talks to it by message: commands go in, player
+  state and errors come back out unchanged.
+-->
+<iframe id="p" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<script>
+  const VIDEO = 'vxAe5Qpqc54'
+  const YT = 'https://www.youtube.com'
+  const paused = new URLSearchParams(location.search).get('paused') === '1'
+  const p = document.getElementById('p')
+  p.src = YT + '/embed/' + VIDEO + '?enablejsapi=1&autoplay=' + (paused ? 0 : 1) +
+    '&loop=1&playlist=' + VIDEO + '&controls=0&playsinline=1&rel=0&modestbranding=1&origin=' + encodeURIComponent(location.origin)
+
+  addEventListener('message', (e) => {
+    if (e.source === parent) p.contentWindow.postMessage(e.data, YT)
+    else if (e.source === p.contentWindow) parent.postMessage(e.data, '*')
+  })
+  p.addEventListener('load', () => {
+    p.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), YT)
+    if (paused) p.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), YT)
+  })
+</script>

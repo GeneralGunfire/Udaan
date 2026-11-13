@@ -1,4 +1,4 @@
-mod exe;
+pub mod exe;
 mod runner;
 mod store;
 mod vscode;

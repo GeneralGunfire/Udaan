@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::db::configure_connection;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
@@ -41,6 +43,13 @@ pub struct ChatSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryFact {
+  pub key: String,
+  pub value: String,
+  pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
   pub id: String,
   pub session_id: String,
@@ -58,6 +67,7 @@ pub struct Store {
 impl Store {
   pub fn open(db_path: PathBuf) -> rusqlite::Result<Self> {
     let conn = Connection::open(db_path)?;
+    configure_connection(&conn)?;
     conn.execute_batch(
       "PRAGMA foreign_keys = ON;
       CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -75,7 +85,12 @@ impl Store {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id, created_at);
-      CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at);",
+      CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at);
+      CREATE TABLE IF NOT EXISTS chat_memory_facts (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );",
     )?;
 
     // Retrofit `provider` onto a chat_sessions table created before this
@@ -174,6 +189,40 @@ impl Store {
        FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
     )?;
     let rows = stmt.query_map(rusqlite::params![session_id], |row| row_to_message(row))?;
+    rows.collect()
+  }
+
+  /// Upserts one key fact (e.g. "name" -> "Tess") — a flat, cross-session
+  /// key/value store, not a transcript. Overwrites any prior value for the
+  /// same key rather than accumulating history.
+  pub fn set_memory_fact(&self, key: &str, value: &str, updated_at: &str) -> rusqlite::Result<()> {
+    let conn = self.conn.lock().unwrap();
+    conn.execute(
+      "INSERT INTO chat_memory_facts (key, value, updated_at) VALUES (?1, ?2, ?3)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+      rusqlite::params![key, value, updated_at],
+    )?;
+    Ok(())
+  }
+
+  pub fn delete_memory_fact(&self, key: &str) -> rusqlite::Result<()> {
+    let conn = self.conn.lock().unwrap();
+    conn.execute("DELETE FROM chat_memory_facts WHERE key = ?1", rusqlite::params![key])?;
+    Ok(())
+  }
+
+  /// All facts, most recently updated first — small by design (a handful
+  /// of key facts, not a transcript), so no pagination.
+  pub fn list_memory_facts(&self) -> rusqlite::Result<Vec<MemoryFact>> {
+    let conn = self.conn.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT key, value, updated_at FROM chat_memory_facts ORDER BY updated_at DESC")?;
+    let rows = stmt.query_map([], |row| {
+      Ok(MemoryFact {
+        key: row.get(0)?,
+        value: row.get(1)?,
+        updated_at: row.get(2)?,
+      })
+    })?;
     rows.collect()
   }
 }
@@ -288,5 +337,25 @@ mod tests {
     assert_eq!(sessions[0].id, "old-1");
 
     let _ = std::fs::remove_file(&path);
+  }
+
+  #[test]
+  fn memory_facts_upsert_and_delete() {
+    let store = Store::open(PathBuf::from(":memory:")).unwrap();
+    store.set_memory_fact("name", "Tess", "2026-01-01T00:00:00Z").unwrap();
+    store.set_memory_fact("timezone", "SAST", "2026-01-01T00:00:01Z").unwrap();
+
+    let facts = store.list_memory_facts().unwrap();
+    assert_eq!(facts.len(), 2);
+
+    // Overwrite, not accumulate.
+    store.set_memory_fact("name", "Tess C", "2026-01-02T00:00:00Z").unwrap();
+    let facts = store.list_memory_facts().unwrap();
+    assert_eq!(facts.len(), 2, "setting an existing key should overwrite, not duplicate");
+    let name_fact = facts.iter().find(|f| f.key == "name").unwrap();
+    assert_eq!(name_fact.value, "Tess C");
+
+    store.delete_memory_fact("timezone").unwrap();
+    assert_eq!(store.list_memory_facts().unwrap().len(), 1);
   }
 }

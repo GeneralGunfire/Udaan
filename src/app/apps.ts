@@ -1,18 +1,8 @@
 import type { ComponentType, SVGProps } from 'react'
-import {
-  WaveformIcon,
-  ExplorerIcon,
-  BookOpenIcon,
-  FileTextIcon,
-  DiscIcon,
-  GaugeIcon,
-  NewspaperIcon,
-  RecordIcon,
-  GraduationCapIcon,
-  SearchIcon,
-  DatabaseIcon,
-} from '@/shared/icons'
-import { detectApps, launchApp, launchAppByExeName, openFileWith } from '@/integrations/installed-apps/client'
+import { ExplorerIcon } from '@/shared/icons'
+import { detectApps, launchApp, launchAppByExeName } from '@/integrations/installed-apps/client'
+import { openApp } from '@/os/kernel/shell'
+import { APP_DEFS, type AppId } from '@/os/kernel/registry'
 import wordIcon from '@/assets/app-icons/word.svg'
 import excelIcon from '@/assets/app-icons/excel.svg'
 import powerpointIcon from '@/assets/app-icons/powerpoint.svg'
@@ -23,11 +13,9 @@ import storeIcon from '@/assets/app-icons/store.svg'
 import onenoteIcon from '@/assets/app-icons/onenote.svg'
 import todoIcon from '@/assets/app-icons/todo.svg'
 import outlookNewIcon from '@/assets/app-icons/outlook-new.svg'
-import claudeIcon from '@/assets/app-icons/claude-code.png'
+import claudeIcon from '@/assets/app-icons/claude.svg'
 import vscodeIcon from '@/assets/app-icons/vscode.png'
 import snippingToolIcon from '@/assets/app-icons/snipping-tool.svg'
-import nortonPrivateBrowserIcon from '@/assets/app-icons/norton-private-browser.svg'
-import nortonIcon from '@/assets/app-icons/norton.svg'
 import teamviewerIcon from '@/assets/app-icons/teamviewer.svg'
 import wikipediaIcon from '@/assets/app-icons/wikipedia.svg'
 import disneyPlusIcon from '@/assets/app-icons/disney-plus.svg'
@@ -57,8 +45,6 @@ const ALL_APP_ICON_SRCS = [
   claudeIcon,
   vscodeIcon,
   snippingToolIcon,
-  nortonPrivateBrowserIcon,
-  nortonIcon,
   teamviewerIcon,
   wikipediaIcon,
   disneyPlusIcon,
@@ -80,6 +66,13 @@ export interface AppDefinition {
   iconSrc?: string
   /** May return a promise (e.g. launching a real external process) — callers should await it to surface a real failure instead of assuming a synchronous void call always succeeds. */
   launch: () => void | Promise<void>
+  /**
+   * The real file path or `shell:AppsFolder\<id>` launch target, when one
+   * exists — lets the right-click menu offer "Run as administrator"
+   * (`shell.invokeVerb(path, 'runas')`) and "Properties". Absent for
+   * Udaan's own built-in apps (React views with nothing on disk to elevate).
+   */
+  path?: string
 }
 
 /**
@@ -106,102 +99,14 @@ export interface AppFolderDefinition {
   previewIconSrcs?: string[]
 }
 
-let launchStudio: (() => void) | null = null
-let launchFileExplorer: (() => void) | null = null
-let launchDocumentReader: ((filePath?: string) => void) | null = null
-let launchNotes: (() => void) | null = null
-let launchAgriTrack: (() => void) | null = null
-let launchCncModSwitcher: (() => void) | null = null
-let launchClaudeUsage: (() => void) | null = null
-let launchPrivatePlayer: (() => void) | null = null
-let launchNewsBrief: (() => void) | null = null
-let launchAudioRecorder: (() => void) | null = null
-let launchStudy: (() => void) | null = null
-let launchOmniFind: (() => void) | null = null
-
-/** Registered by whatever owns Studio's open/close state (App.tsx) once mounted. */
-export function registerStudioLauncher(fn: () => void) {
-  launchStudio = fn
-}
-
-/** Registered by whatever owns OmniFind's open/close state (App.tsx) once mounted. */
-export function registerOmniFindLauncher(fn: () => void) {
-  launchOmniFind = fn
-}
-
-/** Registered by whatever owns File Explorer's open/close state (App.tsx) once mounted. */
-export function registerFileExplorerLauncher(fn: () => void) {
-  launchFileExplorer = fn
-}
-
-/** Registered by whatever owns Document Reader's open/close state (App.tsx) once mounted. Accepts an optional file path so File Explorer's "Read Aloud" action can open a specific document directly. */
-export function registerDocumentReaderLauncher(fn: (filePath?: string) => void) {
-  launchDocumentReader = fn
-}
-
-/** Registered by whatever owns the C&C mod switcher's open/close state (App.tsx) once mounted. */
-export function registerCncModSwitcherLauncher(fn: () => void) {
-  launchCncModSwitcher = fn
-}
-
-/** Opens Document Reader, optionally with a document already loaded — used by both the Launchpad tile (no path) and File Explorer's "Read Aloud" context menu action (with a path). */
-export function openDocumentReader(filePath?: string) {
-  launchDocumentReader?.(filePath)
-}
-
-/** Registered by whatever owns Notes' open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Studio/File Explorer/Document Reader. */
-export function registerNotesLauncher(fn: () => void) {
-  launchNotes = fn
-}
-
-/** Registered by whatever owns AgriTrack's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes. */
-export function registerAgriTrackLauncher(fn: () => void) {
-  launchAgriTrack = fn
-}
-
-/** Registered by whatever owns the Claude Code usage dashboard's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes. */
-export function registerClaudeUsageLauncher(fn: () => void) {
-  launchClaudeUsage = fn
-}
-
-/** Registered by whatever owns Private Player's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes. */
-export function registerPrivatePlayerLauncher(fn: () => void) {
-  launchPrivatePlayer = fn
-}
-
 /** Opens Private Player — used by both the Launchpad tile and the TopBar's now-playing chip (clicking the chip should reopen the full view). */
 export function openPrivatePlayer() {
-  launchPrivatePlayer?.()
-}
-
-/** Registered by whatever owns the News Brief app's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes/Private Player. */
-export function registerNewsBriefLauncher(fn: () => void) {
-  launchNewsBrief = fn
+  void openApp('private-player')
 }
 
 /** Opens the News Brief app to today's report — used by both the Launchpad tile and General Chat's news-brief button. */
 export function openNewsBrief() {
-  launchNewsBrief?.()
-}
-
-/** Registered by whatever owns the System Audio Recorder's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes/Private Player. */
-export function registerAudioRecorderLauncher(fn: () => void) {
-  launchAudioRecorder = fn
-}
-
-/** Opens the System Audio Recorder — used by both the Launchpad tile and the taskbar's quick-record toggle. */
-export function openAudioRecorder() {
-  launchAudioRecorder?.()
-}
-
-/** Registered by whatever owns Study's open/close state (App.tsx) once mounted — same lazy full-screen overlay pattern as Notes/Private Player. */
-export function registerStudyLauncher(fn: () => void) {
-  launchStudy = fn
-}
-
-/** Opens Study — used by the Launchpad tile. */
-export function openStudy() {
-  launchStudy?.()
+  void openApp('news-brief')
 }
 
 /**
@@ -236,25 +141,25 @@ const ALWAYS_SHOWN_OTHER_APPS: AppDefinition[] = [
     launch: () => launchAppByExeName('Claude.exe'),
   },
   {
-    id: 'norton',
-    name: 'Norton',
-    icon: ExplorerIcon,
-    iconSrc: nortonIcon,
-    launch: () => launchAppByExeName('NortonSecurity.exe'),
-  },
-  {
-    id: 'norton-private-browser',
-    name: 'Norton Private Browser',
-    icon: ExplorerIcon,
-    iconSrc: nortonPrivateBrowserIcon,
-    launch: () => launchAppByExeName('NortonPrivateBrowser.exe'),
-  },
-  {
     id: 'teamviewer',
     name: 'TeamViewer',
     icon: ExplorerIcon,
     iconSrc: teamviewerIcon,
     launch: () => launchAppByExeName('TeamViewer.exe'),
+  },
+  {
+    // Snipping Tool is also already detected via loadOtherApps() below
+    // (AppGroup::Other in the backend), but pinned here too for the same
+    // reason as Claude/Norton/TeamViewer: on a machine where the
+    // detection pass doesn't find it, the tile would otherwise just never
+    // render with no visible explanation. A genuinely-not-installed click
+    // still surfaces Launchpad's existing launch-failure message instead
+    // of pretending the tile isn't real.
+    id: 'snipping-tool',
+    name: 'Snipping Tool',
+    icon: ExplorerIcon,
+    iconSrc: snippingToolIcon,
+    launch: () => launchAppByExeName('SnippingTool.exe'),
   },
   {
     // Windows' own File Explorer (explorer.exe) — distinct from Udaan's
@@ -276,81 +181,19 @@ const ALWAYS_SHOWN_OTHER_APPS: AppDefinition[] = [
  * as the Microsoft group below. Unlike Microsoft's folder these don't need
  * detection (they always exist, bundled with Udaan itself), so `loadApps`
  * just resolves immediately with this fixed list.
+ *
+ * Every `launch` calls the window manager's `openApp` directly with the
+ * app's registry id (see src/app/window-manager/registry.ts) — this used
+ * to go through a per-app mutable-singleton `register*Launcher`/`launch*`
+ * pair that only worked once App.tsx had mounted and run its registration
+ * effect; `openApp` reads the zustand store directly, so it works the
+ * instant this module loads.
  */
-const UDAAN_APPS: AppDefinition[] = [
-  {
-    id: 'omni-find',
-    name: 'OmniFind',
-    icon: SearchIcon,
-    launch: () => launchOmniFind?.(),
-  },
-  {
-    id: 'studio',
-    name: 'Studio',
-    icon: WaveformIcon,
-    launch: () => launchStudio?.(),
-  },
-  {
-    id: 'file-explorer',
-    name: 'File Explorer',
-    icon: ExplorerIcon,
-    launch: () => launchFileExplorer?.(),
-  },
-  {
-    id: 'document-reader',
-    name: 'Document Reader',
-    icon: BookOpenIcon,
-    launch: () => openDocumentReader(),
-  },
-  {
-    id: 'notes',
-    name: 'Notes',
-    icon: FileTextIcon,
-    launch: () => launchNotes?.(),
-  },
-  {
-    id: 'agritrack',
-    name: 'AgriTrack',
-    icon: DatabaseIcon,
-    launch: () => launchAgriTrack?.(),
-  },
-  {
-    id: 'cnc-mod-switcher',
-    name: 'C&C Generals Mods',
-    icon: DiscIcon,
-    launch: () => launchCncModSwitcher?.(),
-  },
-  {
-    id: 'claude-usage',
-    name: 'Claude Code Usage',
-    icon: GaugeIcon,
-    launch: () => launchClaudeUsage?.(),
-  },
-  {
-    id: 'private-player',
-    name: 'Private Player',
-    icon: DiscIcon,
-    launch: () => launchPrivatePlayer?.(),
-  },
-  {
-    id: 'news-brief',
-    name: 'Daily News Brief',
-    icon: NewspaperIcon,
-    launch: () => openNewsBrief(),
-  },
-  {
-    id: 'audio-recorder',
-    name: 'System Audio Recorder',
-    icon: RecordIcon,
-    launch: () => openAudioRecorder(),
-  },
-  {
-    id: 'study',
-    name: 'Study',
-    icon: GraduationCapIcon,
-    launch: () => openStudy(),
-  },
-]
+const udaanApp = (id: AppId): AppDefinition => ({ id, name: APP_DEFS[id].name, icon: APP_DEFS[id].icon, launch: () => openApp(id) })
+
+const UDAAN_APPS: AppDefinition[] = (
+  ['file-explorer', 'chat', 'calendar', 'private-player', 'notes', 'studio', 'omni-find', 'news-brief', 'audio-recorder', 'claude-usage', 'cnc-mod-switcher', 'viewer-3d', 'settings'] as AppId[]
+).map(udaanApp)
 
 export const PINNED_APPS: AppDefinition[] = [
   {
@@ -425,25 +268,10 @@ export const APP_FOLDERS: AppFolderDefinition[] = [
   },
 ]
 
-/** Real logos for the standalone apps pinned at Launchpad's top level (not grouped into a folder) — keyed by the `id` src-tauri/src/installed_apps/mod.rs's `AppGroup::Other` assigns each app. Claude/Norton/Norton Private Browser/TeamViewer are no longer detection-based (see `ALWAYS_SHOWN_OTHER_APPS` above), so they're not looked up through this map — their icons are set directly on their static `AppDefinition` entries instead. */
+/** Real logos for the standalone apps pinned at Launchpad's top level (not grouped into a folder) — keyed by the `id` src-tauri/src/installed_apps/mod.rs's `AppGroup::Other` assigns each app. Claude/Norton/Norton Private Browser/TeamViewer/Snipping Tool are no longer detection-based (see `ALWAYS_SHOWN_OTHER_APPS` above), so they're not looked up through this map — their icons are set directly on their static `AppDefinition` entries instead. */
 const OTHER_APP_ICONS: Record<string, string> = {
   vscode: vscodeIcon,
-  'snipping-tool': snippingToolIcon,
   'disney-plus': disneyPlusIcon,
-}
-
-/**
- * Only VS Code needs a pre-launch step (pick which folder to open as the
- * workspace) — every other standalone app just launches directly. Kept as
- * a lookup by app id rather than a per-app flag on `AppDefinition` since
- * this is the only entry with special pre-launch behavior; a second one
- * showing up would be the moment to generalize this into a real field.
- */
-async function launchVsCodeWithFolderPicker(exePath: string): Promise<void> {
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const folder = await open({ directory: true, multiple: false, title: 'Open Folder in VS Code' })
-  if (!folder || Array.isArray(folder)) return
-  await openFileWith(exePath, folder)
 }
 
 /**
@@ -462,11 +290,7 @@ export async function loadOtherApps(): Promise<AppDefinition[]> {
     iconSrc: OTHER_APP_ICONS[app.id],
     launch: async () => {
       try {
-        if (app.id === 'vscode') {
-          await launchVsCodeWithFolderPicker(app.path)
-        } else {
-          await launchApp(app.path)
-        }
+        await launchApp(app.path)
       } catch (err) {
         throw new Error(
           err instanceof Error

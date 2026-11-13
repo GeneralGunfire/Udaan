@@ -3,7 +3,7 @@ mod store;
 use std::sync::Arc;
 
 use chrono::Utc;
-pub use store::{ChatMessage, ChatSession, MessageRole};
+pub use store::{ChatMessage, ChatSession, MemoryFact, MessageRole};
 use tauri::{AppHandle, Manager, State};
 
 pub struct GeneralChatState {
@@ -51,8 +51,8 @@ pub fn general_chat_create_session(
   Ok(session)
 }
 
-/// Lists sessions for one provider ("local" | "claude") — Local and Claude
-/// chats are separate lists, never merged into one thread.
+/// Lists sessions for one provider ("local" | "omniroute") — Local and
+/// OmniRoute chats are separate lists, never merged into one thread.
 #[tauri::command]
 pub fn general_chat_list_sessions(state: State<GeneralChatState>, provider: String) -> Result<Vec<ChatSession>, String> {
   state.store.list_sessions(&provider).map_err(|e| e.to_string())
@@ -95,4 +95,24 @@ pub fn general_chat_add_message(
 #[tauri::command]
 pub fn general_chat_update_message(state: State<GeneralChatState>, id: String, content: String) -> Result<(), String> {
   state.store.update_message_content(&id, &content).map_err(|e| e.to_string())
+}
+
+/// Sets/overwrites one cross-session key fact (e.g. "name", "timezone",
+/// "current_project"). This is a flat fact store, not a transcript — the
+/// model reads all facts back as short bullet lines prepended to its
+/// system prompt on every new chat.
+#[tauri::command]
+pub fn general_chat_set_memory_fact(state: State<GeneralChatState>, key: String, value: String) -> Result<(), String> {
+  let now = Utc::now().to_rfc3339();
+  state.store.set_memory_fact(&key, &value, &now).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn general_chat_delete_memory_fact(state: State<GeneralChatState>, key: String) -> Result<(), String> {
+  state.store.delete_memory_fact(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn general_chat_list_memory_facts(state: State<GeneralChatState>) -> Result<Vec<MemoryFact>, String> {
+  state.store.list_memory_facts().map_err(|e| e.to_string())
 }

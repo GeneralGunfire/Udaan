@@ -1,5 +1,6 @@
 mod agent_workspace;
-mod agritrack;
+mod scholar;
+mod ai_fallback;
 mod asset_library;
 mod audio_library;
 mod audio_recorder;
@@ -17,11 +18,13 @@ mod general_chat;
 mod installed_apps;
 mod local_model;
 mod notes;
+mod notifications;
 mod omniroute;
 mod pdf_tool;
 mod power_state;
 mod quick_settings;
 mod schedule;
+mod shell;
 mod shell_replace;
 mod omni_find;
 mod studio;
@@ -29,6 +32,11 @@ mod study;
 mod system_health;
 mod taskbar;
 mod taskbar_prefs;
+mod focus_video;
+mod news_image;
+mod sound_fx;
+mod tv;
+mod utilities;
 mod template_library;
 mod webview_permissions;
 mod window_watcher;
@@ -36,8 +44,42 @@ mod window_watcher;
 use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// WebView2 keeps HTTP and compiled-script caches between runs. After a new
+/// build those can hand a window pieces of the previous frontend, so the
+/// first launch of a changed exe clears them. Only caches are removed: local
+/// storage, IndexedDB and cookies (settings, pins, layouts) are untouched.
+/// Runs before any webview exists, and only when the exe actually changed,
+/// which can only happen with no other instance running.
+fn clear_stale_webview_cache() {
+  let Ok(exe) = std::env::current_exe() else { return };
+  let Ok(meta) = std::fs::metadata(&exe) else { return };
+  let stamp = format!(
+    "{}-{}",
+    meta.len(),
+    meta.modified().ok().and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0)
+  );
+  let Some(base) = dirs::data_local_dir().map(|d| d.join("dev.udaan.workstation")) else { return };
+  let stamp_file = base.join("build.stamp");
+  if std::fs::read_to_string(&stamp_file).map(|s| s == stamp).unwrap_or(false) {
+    return;
+  }
+  for dir in ["Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache"] {
+    let _ = std::fs::remove_dir_all(base.join("EBWebView").join("Default").join(dir));
+  }
+  let _ = std::fs::create_dir_all(&base);
+  let _ = std::fs::write(&stamp_file, stamp);
+}
+
 pub fn run() {
+  eprintln!("[udaan] run() entered");
+  clear_stale_webview_cache();
+  eprintln!("[udaan] clear_stale_webview_cache done");
   tauri::Builder::default()
+    // Exactly one Udaan: a second launch just brings up Start in the running one.
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+      use tauri::Emitter;
+      let _ = app.emit("launcher:toggle", ());
+    }))
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_shell::init())
@@ -67,12 +109,41 @@ pub fn run() {
         .build(),
     )
     .invoke_handler(tauri::generate_handler![
+      focus_video::focus_video_port,
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,
       claude_code::claude_code_get_task,
       claude_code::claude_code_open_in_vscode,
       claude_code::claude_code_check_cli,
       omniroute::omniroute_start,
+      ai_fallback::ai_claude_complete,
+      tv::tv_host_open,
+      tv::tv_host_show,
+      tv::tv_host_running,
+      tv::tv_host_close,
+      tv::tv_host_nav,
+      sound_fx::speaker_keepalive_set,
+      sound_fx::sound_fx_status,
+      sound_fx::sound_fx_apply,
+      sound_fx::sound_fx_apply_custom,
+      sound_fx::sound_fx_download_installer,
+      news_image::news_page_image,
+      tv::tv_top_movies,
+      utilities::clip_history_list,
+      utilities::clip_history_copy,
+      utilities::clip_history_pin,
+      utilities::clip_history_delete,
+      utilities::screenshot_capture,
+      utilities::screenshot_save,
+      utilities::photos_scan,
+      utilities::photos_thumb,
+      utilities::photos_save_copy,
+      utilities::storage_scan,
+      utilities::storage_cleanables,
+      utilities::storage_clean,
+      utilities::storage_drives,
+      ai_fallback::chat_save_image,
+      ai_fallback::chat_download_image,
       omniroute::omniroute_stop,
       omniroute::omniroute_started_by_app,
       local_model::tts_list_voices,
@@ -88,12 +159,12 @@ pub fn run() {
       notes::notes_set_order,
       notes::notes_get_active,
       notes::notes_set_active,
-      agritrack::agritrack_list_tables,
-      agritrack::agritrack_query_table,
-      agritrack::agritrack_run_collector_now,
-      agritrack::agritrack_available_dates,
-      agritrack::agritrack_province_snapshot,
-      agritrack::agritrack_crop_detail,
+      notifications::notifications_list,
+      notifications::notifications_unread_count,
+      notifications::notifications_mark_read,
+      notifications::notifications_mark_all_read,
+      notifications::notifications_dismiss,
+      notifications::notifications_push,
       claude_usage::claude_usage_get_report,
       general_chat::general_chat_create_session,
       general_chat::general_chat_list_sessions,
@@ -232,16 +303,123 @@ pub fn run() {
       pdf_tool::pdf_tool_merge,
       pdf_tool::pdf_tool_split,
       pdf_tool::pdf_tool_stamp_text,
+      pdf_tool::pdf_tool_rotate,
+      pdf_tool::pdf_tool_delete_pages,
+      pdf_tool::pdf_tool_compress,
       pdf_tool::pdf_tool_generate_sample,
       schedule::schedule_list_events,
       schedule::schedule_create_event,
       schedule::schedule_update_event,
       schedule::schedule_delete_event,
       schedule::schedule_set_status,
+      shell::shell_snapshot,
+      shell::shell_focus_window,
+      shell::shell_minimize_window,
+      shell::shell_set_windows_hidden,
+      shell::shell_toggle_maximize_window,
+      shell::shell_close_window,
+      shell::shell_toggle_desktop,
+      shell::shell_set_explorer_chrome_hidden,
+      shell::shell_set_keyboard_hook,
+      shell::shell_reserve_bottom_edge,
+      shell::shell_place_at_bottom,
+      shell::shell_keep_at_top,
+      shell::shell_set_material,
+      shell::shell_set_window_rect,
+      shell::shell_reserve_top_edge,
+      shell::shell_monitor_of,
+      shell::shell_open_app,
+      shell::shell_prewarm_apps,
+      shell::shell_take_app_args,
+      shell::shell_file_icons,
+      shell::shell_invalidate_icon,
+      shell::shell_app_names,
+      shell::shell_resolve_launch,
+      shell::shell_window_sizes,
+      shell::shell_window_icons,
+      shell::shell_snap_window,
+      shell::shell_snap_self,
+      shell::apps::shell_installed_apps,
+      shell::apps::shell_installed_app_icons,
+      shell::fs::shell_recycle,
+      shell::fs::shell_recycle_bin_info,
+      shell::fs::shell_empty_recycle_bin,
+      shell::fs::shell_watch_dirs,
+      shell::clipboard::shell_clipboard_set_files,
+      shell::clipboard::shell_clipboard_get_files,
+      shell::verbs::shell_invoke_verb,
+      shell::verbs::shell_idle_ms,
+      shell::verbs::shell_power,
+      shell::session::shell_autostart_enabled,
+      shell::session::shell_set_autostart,
+      shell::corners::shell_set_hot_corners,
+      shell::media::shell_volume,
+      shell::procs::shell_processes,
+      shell::procs::shell_system_load,
+      shell::gesture::shell_set_gesture,
+      shell::gesture::shell_set_dock_band,
+      webview_permissions::shell_set_webview_memory_low,
+      shell::gesture::shell_window_snapshots,
+      shell::network::shell_network_status,
+      shell::procs::shell_end_process,
+      shell::media::shell_set_volume,
+      shell::media::shell_now_playing,
+      shell::media::shell_media_command,
+      shell::media::shell_media_seek,
+      shell::live_audio::live_audio_sources,
+      shell::live_audio::live_audio_start,
+      shell::live_audio::live_audio_stop,
+      shell::live_audio::live_audio_set_level,
+      shell::live_audio::live_audio_ping,
+      shell::edge_light::edge_light_set_enabled,
+      shell::verbs::shell_user_name,
       shell_replace::shell_backup_current_value,
       shell_replace::shell_status,
       shell_replace::shell_restore_default,
       shell_replace::shell_set_to_udaan,
+      scholar::scholar_list_subjects,
+      scholar::scholar_create_subject,
+      scholar::scholar_update_subject,
+      scholar::scholar_delete_subject,
+      scholar::scholar_list_blocks_for_week,
+      scholar::scholar_list_blocks_for_date,
+      scholar::scholar_create_block,
+      scholar::scholar_update_block,
+      scholar::scholar_set_block_completed,
+      scholar::scholar_delete_block,
+      scholar::scholar_get_reflection,
+      scholar::scholar_set_reflection,
+      scholar::scholar_list_streaks,
+      scholar::scholar_update_streak,
+      scholar::scholar_list_resources,
+      scholar::scholar_create_resource,
+      scholar::scholar_delete_resource,
+      scholar::scholar_get_setting,
+      scholar::scholar_set_setting,
+      scholar::scholar_list_chapters,
+      scholar::scholar_create_chapter,
+      scholar::scholar_set_chapter_status,
+      scholar::scholar_set_chapter_completed,
+      scholar::scholar_rename_chapter,
+      scholar::scholar_delete_chapter,
+      scholar::scholar_list_lessons,
+      scholar::scholar_list_lessons_for_subject,
+      scholar::scholar_replace_lessons,
+      scholar::scholar_set_lesson_mastery,
+      scholar::scholar_list_notes,
+      scholar::scholar_upsert_note,
+      scholar::scholar_delete_note,
+      scholar::scholar_list_tests,
+      scholar::scholar_list_results,
+      scholar::scholar_create_test,
+      scholar::scholar_record_test_result,
+      scholar::scholar_delete_test,
+      scholar::scholar_list_past_papers,
+      scholar::scholar_create_past_paper,
+      scholar::scholar_set_past_paper_chapters,
+      scholar::scholar_delete_past_paper,
+      scholar::scholar_verify_pages,
+      scholar::scholar_phone_photos_dir,
       study::study_add_book,
       study::study_list_books,
       study::study_delete_book,
@@ -284,6 +462,8 @@ pub fn run() {
       quick_settings::quick_settings_open_system_utility,
     ])
     .setup(|app| {
+      eprintln!("[udaan] setup() entered");
+      focus_video::start();
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -291,7 +471,9 @@ pub fn run() {
             .build(),
         )?;
       }
+      eprintln!("[udaan] about to init claude_code");
       let state = claude_code::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      eprintln!("[udaan] claude_code init done");
       app.manage(state);
       app.manage(taskbar::ThumbnailRegistry::default());
       app.manage(omniroute::OmniRouteProcess::default());
@@ -308,13 +490,16 @@ pub fn run() {
       app.manage(taskbar_prefs_state);
       let document_reader_state = document_reader::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(document_reader_state);
+      let scholar_state = scholar::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(scholar_state);
       let study_state = study::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(study_state);
       let notes_state = notes::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(notes_state);
+      let notifications_state = notifications::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
+      app.manage(notifications_state);
+      notifications::windows_mirror::start(app.handle().clone());
 
-      let agritrack_state = agritrack::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(agritrack_state);
       let audio_library_state = audio_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(audio_library_state);
       let audio_recorder_state = audio_recorder::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
@@ -325,13 +510,16 @@ pub fn run() {
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);
-        // Udaan is a full desktop-replacement shell, not a windowed app —
-        // it should always fill the screen on launch rather than opening
-        // at tauri.conf.json's fixed 1440x900 default size.
-        if let Err(e) = main_window.maximize() {
-          log::error!("Failed to maximize main window on startup: {e}");
+        if let Err(e) = shell::install_desktop(&main_window) {
+          log::error!("Failed to install the desktop layer: {e}");
         }
       }
+
+      shell::shell_set_keyboard_hook(true);
+      shell::session::refresh_autostart_target();
+      shell::start(app.handle().clone());
+      shell::gesture::start(app.handle().clone());
+      utilities::start_clipboard_watch(app.handle().clone());
 
       {
         use tauri_plugin_global_shortcut::GlobalShortcutExt;
@@ -352,8 +540,15 @@ pub fn run() {
       // background process. Only ever kills a process we spawned ourselves
       // — see OmniRouteProcess's own doc comment.
       if let tauri::WindowEvent::CloseRequested { .. } = event {
-        if let Some(state) = window.try_state::<omniroute::OmniRouteProcess>() {
-          state.kill_blocking();
+        // The desktop is the shell itself: closing it (Alt+F4, or a
+        // graceful `taskkill`) quits Udaan, which restores Explorer's
+        // taskbar and releases the keyboard hook in RunEvent::Exit.
+        // Closing any app window only closes that app.
+        if window.label() == "main" {
+          if let Some(state) = window.try_state::<omniroute::OmniRouteProcess>() {
+            state.kill_blocking();
+          }
+          window.app_handle().exit(0);
         }
 
         // Mirror the same "never leave the OS in a weird state" principle
@@ -363,7 +558,7 @@ pub fn run() {
         // area permanently shrunk. This always runs on close regardless
         // of how the window closes (crash aside), independent of whatever
         // cleanup the frontend itself attempts.
-        if window.label() == "taskbar" {
+        if window.label() == "taskbar" || window.label() == "menubar" {
           if let Ok(hwnd) = window.hwnd() {
             taskbar::unregister_appbar_by_hwnd(hwnd.0 as isize);
           }
@@ -382,6 +577,22 @@ pub fn run() {
         }
       }
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      if let tauri::RunEvent::Exit = event {
+        shell::live_audio::restore_all();
+        shell::edge_light::shutdown();
+        // Give reserved screen edges back even if a window was torn down
+        // without a close event, so maximized windows fill the screen again.
+        for label in ["taskbar", "menubar"] {
+          if let Some(w) = app.get_webview_window(label) {
+            if let Ok(hwnd) = w.hwnd() {
+              taskbar::unregister_appbar_by_hwnd(hwnd.0 as isize);
+            }
+          }
+        }
+        shell::restore_on_exit();
+      }
+    });
 }

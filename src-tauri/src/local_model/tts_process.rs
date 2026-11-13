@@ -90,7 +90,12 @@ pub async fn synthesize(text: &str, voice_id: &str, speed: f32) -> Result<Vec<u8
   // synthesis or produce garbled output.
   let length_scale = (1.0 / speed.clamp(0.5, 3.0)).clamp(0.33, 2.0);
 
-  let mut child = Command::new(&piper)
+  // Audio goes to a temp file, not stdout: piper's stdout on Windows is in
+  // text mode and turns every 0x0A byte into 0x0D 0x0A, which corrupts the
+  // WAV samples into crackle and static.
+  let wav_path = std::env::temp_dir().join(format!("udaan-tts-{}-{}.wav", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
+  let mut child = Command::new(&piper);
+  child
     .arg("--model")
     .arg(&model)
     .arg("--config")
@@ -100,14 +105,15 @@ pub async fn synthesize(text: &str, voice_id: &str, speed: f32) -> Result<Vec<u8
     .arg("--length_scale")
     .arg(length_scale.to_string())
     .arg("--output_file")
-    .arg("-")
+    .arg(&wav_path)
     .arg("--quiet")
     .stdin(Stdio::piped())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
-    .kill_on_drop(true)
-    .spawn()
-    .map_err(|e| format!("Failed to spawn piper: {e}"))?;
+    .kill_on_drop(true);
+  #[cfg(windows)]
+  child.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: no console flash per sentence
+  let mut child = child.spawn().map_err(|e| format!("Failed to spawn piper: {e}"))?;
 
   let mut stdin = child.stdin.take().expect("stdin piped");
   stdin
@@ -135,13 +141,14 @@ pub async fn synthesize(text: &str, voice_id: &str, speed: f32) -> Result<Vec<u8
     }
   };
 
+  let audio = std::fs::read(&wav_path);
+  let _ = std::fs::remove_file(&wav_path);
   if !output.status.success() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     return Err(format!("Piper synthesis failed: {stderr}"));
   }
-  if output.stdout.is_empty() {
-    return Err("Piper produced no audio output".into());
+  match audio {
+    Ok(bytes) if bytes.len() > 44 => Ok(bytes),
+    _ => Err("Piper produced no audio output".into()),
   }
-
-  Ok(output.stdout)
 }

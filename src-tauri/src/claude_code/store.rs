@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::db::configure_connection;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
@@ -55,6 +57,7 @@ pub struct Store {
 impl Store {
   pub fn open(db_path: PathBuf) -> rusqlite::Result<Self> {
     let conn = Connection::open(db_path)?;
+    configure_connection(&conn)?;
     conn.execute_batch(
       "CREATE TABLE IF NOT EXISTS tasks (
         id TEXT PRIMARY KEY,

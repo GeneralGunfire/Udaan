@@ -13,6 +13,53 @@ fn page_count_of(doc: &Document) -> u32 {
   doc.get_pages().len() as u32
 }
 
+/// Rotates the given 1-based pages (all when empty) by a multiple of 90°.
+#[tauri::command]
+pub fn pdf_tool_rotate(input_path: String, output_path: String, pages: Vec<u32>, degrees: i64) -> Result<PdfInfo, String> {
+  let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
+  let all = doc.get_pages();
+  for (num, id) in all.iter() {
+    if !pages.is_empty() && !pages.contains(num) {
+      continue;
+    }
+    let page = doc.get_object_mut(*id).and_then(|o| o.as_dict_mut()).map_err(|e| e.to_string())?;
+    let current = page.get(b"Rotate").and_then(|r| r.as_i64()).unwrap_or(0);
+    page.set("Rotate", Object::Integer((current + degrees).rem_euclid(360)));
+  }
+  doc.save(&output_path).map_err(|e| format!("Failed to save PDF: {e}"))?;
+  Ok(PdfInfo { path: output_path, page_count: page_count_of(&doc) })
+}
+
+/// Removes the given 1-based pages.
+#[tauri::command]
+pub fn pdf_tool_delete_pages(input_path: String, output_path: String, pages: Vec<u32>) -> Result<PdfInfo, String> {
+  let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
+  if pages.is_empty() {
+    return Err("Choose at least one page to remove".into());
+  }
+  if pages.len() as u32 >= page_count_of(&doc) {
+    return Err("That would remove every page".into());
+  }
+  doc.delete_pages(&pages);
+  doc.prune_objects();
+  doc.save(&output_path).map_err(|e| format!("Failed to save PDF: {e}"))?;
+  Ok(PdfInfo { path: output_path, page_count: page_count_of(&doc) })
+}
+
+/// Rewrites the file with compressed streams and unused objects removed.
+/// Returns (before, after) sizes in bytes.
+#[tauri::command]
+pub fn pdf_tool_compress(input_path: String, output_path: String) -> Result<(u64, u64), String> {
+  let before = std::fs::metadata(&input_path).map(|m| m.len()).unwrap_or(0);
+  let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
+  doc.prune_objects();
+  doc.delete_zero_length_streams();
+  doc.compress();
+  doc.save(&output_path).map_err(|e| format!("Failed to save PDF: {e}"))?;
+  let after = std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);
+  Ok((before, after))
+}
+
 #[tauri::command]
 pub fn pdf_tool_inspect(file_path: String) -> Result<PdfInfo, String> {
   let doc = Document::load(&file_path).map_err(|e| format!("Failed to load PDF: {e}"))?;

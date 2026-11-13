@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import './fonts.css';
+@import './logo-font.css';
 @import './tokens.css';
+@import './os.css';
 
 /* Map design tokens into Tailwind v4's theme so utilities like
    bg-glass, text-accent-work, rounded-panel, font-display are generated. */
@@ -23,6 +25,7 @@
   --color-surface-base: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-surface-overlay: var(--surface-overlay);
+  --color-surface-hover: var(--surface-hover);
 
   /* Borders — border-hairline / border-strong. */
   --color-hairline: var(--border-hairline);
@@ -33,10 +36,26 @@
   --color-brand-cyan: var(--color-brand-cyan);
   --color-brand-teal: var(--color-brand-teal);
 
+  /* Palette primitives — bg-palette-navy, text-palette-bone, etc. Reach
+     for a semantic token first; these exist for the rare case where a
+     specific ramp step is the point (the logo, a reference swatch). */
+  --color-palette-canvas: var(--p-bg-canvas);
+  --color-palette-editor: var(--p-bg-editor);
+  --color-palette-panel: var(--p-bg-panel);
+  --color-palette-raised: var(--p-bg-raised);
+  --color-palette-input: var(--p-bg-input);
+  --color-palette-accent: var(--p-accent);
+  --color-palette-accent-bright: var(--p-accent-bright);
+  --color-palette-text: var(--p-text);
+  --color-palette-text-dim: var(--p-text-dim);
+
   /* Functional accent — text-accent, bg-accent, ring-accent, border-accent. */
   --color-accent: var(--color-accent);
   --color-accent-muted: var(--color-accent-muted);
   --color-accent-alt: var(--color-accent-alt);
+  /* Text/icon colour that sits ON an accent fill — flips with the theme,
+     so `bg-accent text-accent-contrast` is always legible. */
+  --color-accent-contrast: var(--color-accent-contrast);
 
   --color-accent-school: var(--color-accent-school);
   --color-accent-work: var(--color-accent-work);
@@ -46,6 +65,65 @@
   --color-danger: var(--color-danger);
   --color-warning: var(--color-warning);
   --color-success: var(--color-success);
+  --color-danger-surface: var(--color-danger-surface);
+  --color-danger-border: var(--color-danger-border);
+  --color-success-surface: var(--color-success-surface);
+  --color-success-contrast: var(--color-success-contrast);
+  --color-warning-surface: var(--color-warning-surface);
+
+  /* Tailwind's own `white` and `black` are redefined onto the palette.
+     There are a few hundred `bg-white/[0.06]`-style alpha tints across the
+     app — legitimate as a technique (a translucent lift over whatever
+     surface is beneath). `white` is a real white here — VS Code's own
+     scheme uses white alphas for exactly this — while `black` is pinned
+     to the scheme's darkest neutral rather than pure #000, so a dark
+     overlay never punches below the canvas. */
+  --color-white: var(--p-white);
+  --color-black: #101010;
+
+  /* Tailwind's default named colour ramps are removed. The palette is
+     closed, so `text-red-400` / `bg-emerald-500` and friends must not
+     resolve to anything — a build-time missing utility is the intended
+     failure mode, far better than a stray hue reaching a shipped screen.
+     Use the `danger` / `warning` / `success` tokens instead — those are
+     the three sanctioned hues (see tokens.css), tuned to sit inside the
+     gray/navy system, and they are the only hues the app ships. */
+  --color-red-*: initial;
+  --color-orange-*: initial;
+  --color-amber-*: initial;
+  --color-yellow-*: initial;
+  --color-lime-*: initial;
+  --color-green-*: initial;
+  --color-emerald-*: initial;
+  --color-teal-*: initial;
+  --color-cyan-*: initial;
+  --color-sky-*: initial;
+  --color-blue-*: initial;
+  --color-indigo-*: initial;
+  --color-violet-*: initial;
+  --color-purple-*: initial;
+  --color-fuchsia-*: initial;
+  --color-pink-*: initial;
+  --color-rose-*: initial;
+
+  /* The neutral ramps go too, and for a subtler reason than the hues. A
+     stray `bg-red-500` is obvious in review; a stray `bg-zinc-800` looks
+     completely correct sitting next to the surface ladder while being a
+     value the system does not own and that does not move with the theme —
+     it stays dark when the app goes light. Removing them forces every
+     neutral through the ladder (`bg-surface-raised` and friends), which is
+     the only way a surface stays correct in both themes.
+
+     Note these ramps do currently appear in the built stylesheet: Tailwind
+     v4 scans the whole project directory, so it finds class names quoted
+     inside .agents/skills/*.md and "Udaan Technical Reference.mhtml" and
+     generates utilities for them. Nothing in src/ uses them — but that is
+     exactly the accident this guards against. */
+  --color-gray-*: initial;
+  --color-zinc-*: initial;
+  --color-neutral-*: initial;
+  --color-slate-*: initial;
+  --color-stone-*: initial;
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -58,6 +136,8 @@
   --font-mono: var(--font-mono);
 
   /* Type scale — text-2xs … text-2xl. */
+  --text-3xs: var(--text-3xs);
+  --text-2xs-alt: var(--text-2xs-alt);
   --text-2xs: var(--text-2xs);
   --text-xs: var(--text-xs);
   --text-sm: var(--text-sm);
@@ -76,6 +156,47 @@
   --shadow-panel: var(--shadow-panel);
   --shadow-sidebar: var(--shadow-sidebar);
   --shadow-composer: var(--shadow-composer);
+}
+
+@layer base {
+  /* ---- Optical tracking, applied by size class ----
+     Every size utility carries the letter-spacing correct for its size,
+     so components get set type by default instead of each author
+     remembering. A component can still override with an explicit
+     `tracking-*` utility, which wins on specificity.
+
+     Without this, the app used one tracking from 9px badges to 36px
+     hero text; large type looked loose and small type looked cramped,
+     which reads as "default" rather than "designed" even when nothing is
+     obviously wrong. */
+  .text-3xs,
+  .text-2xs-alt {
+    letter-spacing: var(--track-micro);
+  }
+  .text-2xs,
+  .text-xs {
+    letter-spacing: var(--track-small);
+  }
+  .text-sm,
+  .text-base {
+    letter-spacing: var(--track-body);
+  }
+  .text-md {
+    letter-spacing: var(--track-heading);
+  }
+  .text-lg {
+    letter-spacing: var(--track-title);
+  }
+  .text-xl,
+  .text-2xl {
+    letter-spacing: var(--track-hero);
+  }
+
+  /* Uppercase runs always need extra tracking regardless of size —
+     capitals have no ascender/descender variety to separate them. */
+  .uppercase {
+    letter-spacing: var(--track-caps);
+  }
 }
 
 @layer base {
@@ -202,6 +323,46 @@
 }
 
 @layer components {
+  /* Kept as a no-op so the dozen components that reference it keep
+     working. The primary fill is a solid colour now, not a gradient with
+     a light end, so white text on it needs no shadow — and the shadow
+     that used to live here made small labels look smudged. */
+  .text-on-gradient-brand {
+    text-shadow: none;
+  }
+
+  /* A live-status halo. Tailwind's `animate-ping` scales to 2x and snaps
+     back on a linear cubic-bezier, which on a 6px status dot reads as a
+     twitch rather than a pulse. This is the same idea tuned for a small
+     indicator: a gentler expansion, a longer settle, and a fade that
+     finishes before the next cycle starts so the dot never strobes. */
+  @keyframes status-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    70% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+
+  .animate-status-pulse {
+    animation: status-pulse 2s cubic-bezier(0.2, 0, 0.4, 1) infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-status-pulse {
+      animation: none;
+    }
+  }
+}
+
+@layer components {
   /* Base raised surface — sidebar tiles, composer, chips, cards.
      Elevation comes from the ladder step plus a hairline border and the
      inset top highlight, not from a drop shadow. The backdrop blur that
@@ -209,15 +370,69 @@
      so the filter cost real GPU work every frame while being visually
      inert. Genuinely translucent layers (modal scrims, the Launchpad
      backdrop) opt into blur explicitly via .glass-translucent below. */
+  /* ---- Inset surface ----
+     For a well *inside* a panel: a search field's ground, a code block, a
+     list row's container. The lighting is inverted relative to
+     .glass-surface — a dark line along the TOP edge and a light one along
+     the bottom — which is what reads as "carved into" rather than "sitting
+     on". About 150 places in the app used a flat `bg-white/5` for this,
+     which has no edges at all and is most of why the interior of every
+     panel looked like a painted rectangle. */
+  .surface-inset {
+    background: rgb(0 0 0 / 16%);
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 26%),
+      inset 0 -1px 0 var(--highlight-inset);
+  }
+
+  /* ---- Sunken well ----
+     Deeper version for genuinely recessed areas — a scroll region, a
+     track, an empty drop target. */
+  .surface-well {
+    background: rgb(0 0 0 / 24%);
+    box-shadow:
+      inset 0 2px 5px rgb(0 0 0 / 32%),
+      inset 0 -1px 0 var(--highlight-inset);
+  }
+
+  /* ---- Hairline divider ----
+     A 1px rule that reads as a seam between two planes rather than a
+     drawn line: a dark pixel with a light pixel under it, which is how a
+     real edge catches light. Replaces `border-white/10` dividers, which
+     look painted on. */
+  .divider-seam {
+    border: 0;
+    height: 1px;
+    background: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 34%) 0%,
+      rgb(0 0 0 / 34%) 50%,
+      var(--highlight-inset) 50%,
+      var(--highlight-inset) 100%
+    );
+  }
+
   .glass-surface {
-    background:
-      linear-gradient(155deg, var(--highlight-inset) 0%, transparent 40%),
-      var(--surface-raised);
+    /* Flat fill, no sheen gradient.
+
+       This carried a large `155deg` highlight sweep across its top-left
+       to give small cards a lit face. That works at card scale, but the
+       app's MAIN WINDOW PANEL uses this same class — and stretched across
+       a full-screen rectangle the same sweep becomes a broad bright wash
+       in the upper corner that reads as the panel glowing. Depth here
+       comes from the edges instead, which behaves identically at every
+       size. */
+    background: var(--surface-raised);
     border: 1px solid var(--border-hairline);
+    /* A lit top edge and a shaded bottom edge — one pixel each, so a
+       surface reads as a physical object without any part of it
+       emitting light. */
     box-shadow:
       inset 0 1px 0 var(--highlight-inset),
+      inset 0 -1px 0 rgb(0 0 0 / 22%),
       var(--shadow-raised);
   }
+
 
   /* Loading placeholder sweep. One compositor-driven gradient animation
      regardless of how many skeletons are on screen — a JS-driven pulse
@@ -250,6 +465,34 @@
     }
   }
 
+  /* The main app shell panel. Opaque — not `.glass-surface`'s translucent
+     sibling and not blurred — because the wallpaper showing through a
+     full-screen frosted panel made the surface ladder unpredictable: the
+     panel's own greys shifted with whatever was behind the window (see the
+     removed App.tsx comment this replaces). The wallpaper still reads as
+     "always partly visible" via AmbientBackground in the inset margin
+     around this panel, not through it. --panel-edge-glow gives the opaque
+     edge a soft rim so it doesn't look like a flat cutout pasted over the
+     photo behind it.
+
+     Uses --surface-base, same as always — an earlier pass here bypassed
+     the token and hardcoded --p-bg-canvas directly on just this one rule
+     to match Private Player's darker panel, which broke the ladder: every
+     step above it (raised/overlay/hover) was still spaced relative to the
+     OLD --surface-base value, so the jump from panel to the first card
+     inside it became visibly larger than the rest of the app's even
+     spacing. The correct fix was re-measuring the whole palette (see
+     tokens.css's --p-bg-* block) off the new darker canvas, so
+     --surface-base itself is now the right value and this rule needs no
+     override at all. */
+  .app-panel {
+    background: var(--surface-base);
+    box-shadow:
+      inset 0 1px 0 var(--panel-edge-glow),
+      inset 0 -1px 0 rgb(0 0 0 / 22%),
+      var(--shadow-panel);
+  }
+
   /* For layers that actually sit over the wallpaper and are meant to be
      see-through. Blur is expensive; it belongs only here. */
   .glass-translucent {
@@ -258,8 +501,11 @@
     box-shadow:
       inset 0 1px 0 var(--highlight-inset),
       var(--shadow-overlay);
-    backdrop-filter: blur(var(--blur-panel)) saturate(110%);
-    -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(110%);
+    /* Blur only, no saturation boost — see App.tsx's main panel for the
+       reasoning: amplifying the colour behind a frosted pane reads as the
+       pane emitting a coloured haze rather than as glass. */
+    backdrop-filter: blur(var(--blur-panel));
+    -webkit-backdrop-filter: blur(var(--blur-panel));
   }
 
   /* General Chat's composer — the single most-used control on that
@@ -269,14 +515,21 @@
      outline ring, so "you're typing here" reads as the whole surface
      physically coming forward. */
   .composer-surface {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+    box-shadow:
+      inset 0 1px 0 var(--highlight-inset),
+      inset 0 -1px 0 rgb(0 0 0 / 20%),
+      var(--shadow-raised);
   }
   .composer-surface:focus-within {
-    border-color: color-mix(in srgb, var(--color-brand-blue) 55%, transparent);
+    /* Focus is carried by the border alone plus real elevation. The
+       accent-coloured spread ring that used to sit here read as the
+       composer emitting light, which nothing else in the app does. */
+    border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-brand-blue) 30%, transparent),
-      0 8px 24px -6px color-mix(in srgb, var(--color-brand-blue) 35%, transparent),
-      0 2px 8px rgb(0 0 0 / 25%);
+      inset 0 1px 0 var(--highlight-inset),
+      inset 0 -1px 0 rgb(0 0 0 / 20%),
+      0 8px 24px -6px rgb(0 0 0 / 44%),
+      0 2px 8px rgb(0 0 0 / 28%);
     transform: translateY(-1px);
   }
   @media (prefers-reduced-motion: reduce) {
@@ -344,16 +597,32 @@
 }
 
 @layer base {
-  /* Custom scrollbar — thin, glass-toned track/thumb instead of the OS
-     default, applied globally so every scrollable panel matches. */
+  /* Custom scrollbar, applied globally so every scrollable panel matches.
+
+     Quiet by default and firmer on hover, matching how every other
+     control in the app behaves after the screensaver pass: present when
+     you need it, invisible when you do not. The thumb was previously
+     filled with a SURFACE token (--color-glass-bg-hover), which is opaque
+     enough to read as a solid grey bar parked against the content — a
+     piece of permanent chrome on every list in the app. A low-alpha white
+     tints whatever is behind it instead, so it reads as part of the glass
+     rather than a rail bolted onto it.
+
+     Hovering the scrollbar itself is not enough to reveal it: a thumb you
+     can only see once you have already found it is not an affordance. It
+     brightens when the pointer is anywhere over the scrolling element. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-glass-bg-hover) transparent;
+    scrollbar-color: rgb(246 243 237 / 12%) transparent;
+  }
+
+  *:hover {
+    scrollbar-color: rgb(246 243 237 / 22%) transparent;
   }
 
   *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   *::-webkit-scrollbar-track {
@@ -361,15 +630,31 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: var(--color-glass-bg-hover);
+    background-color: rgb(246 243 237 / 12%);
     border-radius: var(--radius-full);
-    border: 2px solid transparent;
+    /* Transparent border + padding-box clip insets the visible thumb
+       inside the gutter, so it sits as a floating pill rather than
+       filling the full track width edge to edge. */
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 150ms ease-out;
+  }
+
+  *:hover::-webkit-scrollbar-thumb {
+    background-color: rgb(246 243 237 / 22%);
     background-clip: padding-box;
   }
 
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-text-tertiary);
+  *::-webkit-scrollbar-thumb:hover,
+  *::-webkit-scrollbar-thumb:active {
+    background-color: rgb(246 243 237 / 34%);
     background-clip: padding-box;
+  }
+
+  /* Corner where a vertical and horizontal bar meet — left unpainted it
+     shows as a small opaque square in the panel's bottom-right. */
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   /* Opt-out for a handful of panels that need overflow as a pure safety

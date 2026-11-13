@@ -1,0 +1,470 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   UDAAN SHELL — MATERIALS, SURFACES, CONTROLS
+   ═══════════════════════════════════════════════════════════════════════
+
+   THE MATERIAL MODEL
+   ------------------
+   macOS chrome is never one flat tint. Each surface is four layers:
+
+     1. a backdrop     — the real desktop, blurred by the compositor
+     2. a tint         — a translucent wash of colour over that blur
+     3. a luminosity   — a top-to-bottom gradient, brighter where light enters
+     4. an edge pair   — a lit 1px inner top edge, a dark 1px inner bottom
+
+   Layer 1 cannot be done in CSS. A webview only blurs pixels inside its own
+   page, and every Udaan shell surface is a transparent OS window with the
+   real desktop behind it — so `backdrop-filter` there samples nothing and
+   burns GPU every frame for the privilege. It comes from DWM instead, via
+   os/kernel/material.ts.
+
+   Layers 2–4 are here. They are what separate "a grey box over a blur" from
+   a surface that looks like it has thickness.
+
+   THE TINT CONTRACT
+   -----------------
+   When DWM really blurs, it applies its own tint too. The webview must then
+   paint only a whisper on top or the two stack and the surface turns to mud.
+   `data-material` on <html> says what landed:
+
+     modern | legacy  → a real blur is behind us; paint the light GLASS tint
+     none             → no blur; the SOLID tint has to carry the surface alone
+
+   Every surface below defines both and switches on that attribute. This is
+   why Udaan looks right on Windows 11 22H2 and still acceptable on 10.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme='dark'] {
+  --chrome-active: #000000;
+  --chrome-inactive: #000000;
+
+  /* ── Geometry ──────────────────────────────────────────────────────
+     Concentric radii: a shape inset N px inside a rounded parent needs
+     radius (outer − N) or the two curves visibly diverge at the corner.
+     See os/design/scale.ts innerRadius(). */
+  --os-radius-window: 12px;
+  --os-radius-overlay: 16px;
+  --os-radius-control: 8px;
+  --os-radius-dock: 22px;
+  --os-radius-widget: 20px;
+  --os-radius-pill: 999px;
+
+  /* ── Surface tints: solid (no blur) and glass (blur behind) ────────
+     The glass variants are ~3× weaker. That ratio is the whole trick. */
+  --os-menubar-solid: linear-gradient(to bottom, rgb(28 28 30 / 82%), rgb(18 18 20 / 78%));
+  --os-menubar-glass: linear-gradient(to bottom, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%));
+
+  --os-dock-solid: linear-gradient(to bottom, rgb(58 58 62 / 58%), rgb(30 30 34 / 66%));
+  --os-dock-glass: linear-gradient(to bottom, rgb(255 255 255 / 9%), rgb(255 255 255 / 3%));
+
+  --os-panel-solid: linear-gradient(to bottom, rgb(42 42 46 / 86%), rgb(26 26 29 / 90%));
+  --os-panel-glass: linear-gradient(to bottom, rgb(255 255 255 / 7%), rgb(255 255 255 / 2.5%));
+
+  --os-widget-solid: linear-gradient(to bottom, rgb(56 56 61 / 62%), rgb(32 32 36 / 70%));
+  --os-widget-glass: linear-gradient(to bottom, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%));
+
+  /* ── Borders & edges ──────────────────────────────────────────────
+     A glass surface has TWO edges: a lit one where light enters at the
+     top, and a dark one where it leaves at the bottom. Drawing only the
+     lit one is the single most common reason faked glass looks flat. */
+  --os-border: rgb(255 255 255 / 12%);
+  --os-border-strong: rgb(255 255 255 / 18%);
+  --os-edge: inset 0 1px 0 rgb(255 255 255 / 14%), inset 0 -1px 0 rgb(0 0 0 / 22%);
+  --os-edge-strong: inset 0 1px 0 rgb(255 255 255 / 20%), inset 0 -1px 0 rgb(0 0 0 / 28%);
+
+  /* ── Text ─────────────────────────────────────────────────────────
+     Four levels, not two. Dim-only hierarchies force every secondary
+     label to the same weight and the surface reads as noise. */
+  --os-text: #f5f5f7;
+  --os-text-secondary: #c7c7cc;
+  --os-text-dim: #98989d;
+  --os-text-faint: #68686d;
+  /* Legacy aliases — existing components still reference these. */
+  --os-menu-text: var(--os-text);
+  --os-menu-text-dim: var(--os-text-dim);
+
+  /* ── Interaction states ───────────────────────────────────────────
+     A real OS has four, and skipping `active` is why web-built shells
+     feel unresponsive: the press has no acknowledgement of its own. */
+  --os-hover: rgb(255 255 255 / 8%);
+  --os-active: rgb(255 255 255 / 14%);
+  --os-selected: rgb(255 255 255 / 11%);
+  --os-separator: rgb(255 255 255 / 9%);
+  /* Legacy aliases. */
+  --os-menu-item-hover: var(--os-hover);
+  --os-menu-item-active: var(--color-accent);
+  --os-menu-separator: var(--os-separator);
+
+  /* ── Shadows ──────────────────────────────────────────────────────
+     Two parts, as real shadows are: a tight contact shadow that anchors
+     the object to what is under it, and a wide soft cast that gives it
+     height. One blurred shadow alone always reads as a sticker. */
+  --os-shadow-sm: 0 1px 2px rgb(0 0 0 / 24%), 0 2px 6px rgb(0 0 0 / 18%);
+  --os-shadow-md: 0 1px 2px rgb(0 0 0 / 26%), 0 8px 24px rgb(0 0 0 / 32%);
+  --os-shadow-lg: 0 1px 3px rgb(0 0 0 / 30%), 0 18px 52px rgb(0 0 0 / 46%);
+  --os-shadow-xl: 0 2px 4px rgb(0 0 0 / 34%), 0 28px 72px rgb(0 0 0 / 54%);
+  /* Legacy aliases. */
+  --os-shadow-overlay: var(--os-shadow-lg);
+  --os-shadow-dock: var(--os-shadow-lg);
+  --os-shadow-widget: var(--os-shadow-md);
+
+  --os-acrylic: rgb(10 10 10 / 95%);
+  --os-acrylic-strong: rgb(10 10 10 / 92%);
+  --os-acrylic-border: var(--os-border);
+  --os-acrylic-edge: var(--os-edge);
+  --os-backdrop: none;
+
+  --md-link: var(--color-accent-alt);
+  --os-selection-fill: rgb(142 142 147 / 22%);
+  --os-selection-border: rgb(163 163 168 / 70%);
+  --os-icon-label-shadow: 0 1px 2px rgb(0 0 0 / 85%), 0 0 6px rgb(0 0 0 / 45%);
+
+  /* Focus ring: one definition, used by every control. */
+  --os-focus-ring: 0 0 0 2px var(--chrome-active), 0 0 0 4px var(--color-accent);
+}
+
+[data-theme='light'] {
+  --chrome-active: #f5f5f7;
+  --chrome-inactive: #fafafa;
+
+  /* Light chrome is never pure white: a faint cool-grey keeps it from
+     glaring against a bright wallpaper, and the gradient still runs
+     light-to-slightly-darker so the surface has a direction. */
+  --os-menubar-solid: linear-gradient(to bottom, rgb(252 252 253 / 86%), rgb(242 242 245 / 82%));
+  --os-menubar-glass: linear-gradient(to bottom, rgb(255 255 255 / 40%), rgb(255 255 255 / 22%));
+
+  --os-dock-solid: linear-gradient(to bottom, rgb(255 255 255 / 76%), rgb(240 240 244 / 70%));
+  --os-dock-glass: linear-gradient(to bottom, rgb(255 255 255 / 48%), rgb(255 255 255 / 26%));
+
+  --os-panel-solid: linear-gradient(to bottom, rgb(253 253 254 / 92%), rgb(244 244 247 / 90%));
+  --os-panel-glass: linear-gradient(to bottom, rgb(255 255 255 / 46%), rgb(255 255 255 / 28%));
+
+  --os-widget-solid: linear-gradient(to bottom, rgb(255 255 255 / 84%), rgb(246 246 249 / 78%));
+  --os-widget-glass: linear-gradient(to bottom, rgb(255 255 255 / 44%), rgb(255 255 255 / 24%));
+
+  --os-border: rgb(0 0 0 / 9%);
+  --os-border-strong: rgb(0 0 0 / 14%);
+  --os-edge: inset 0 1px 0 rgb(255 255 255 / 85%), inset 0 -1px 0 rgb(0 0 0 / 6%);
+  --os-edge-strong: inset 0 1px 0 rgb(255 255 255 / 95%), inset 0 -1px 0 rgb(0 0 0 / 9%);
+
+  --os-text: #1d1d1f;
+  --os-text-secondary: #3c3c43;
+  --os-text-dim: #6e6e73;
+  --os-text-faint: #9a9aa0;
+
+  --os-hover: rgb(0 0 0 / 5%);
+  --os-active: rgb(0 0 0 / 10%);
+  --os-selected: rgb(0 0 0 / 7%);
+  --os-separator: rgb(0 0 0 / 9%);
+
+  /* A bright environment casts less shadow, and heavy black under white
+     chrome reads as dirt rather than depth. */
+  --os-shadow-sm: 0 1px 2px rgb(0 0 0 / 7%), 0 2px 5px rgb(0 0 0 / 5%);
+  --os-shadow-md: 0 1px 2px rgb(0 0 0 / 8%), 0 7px 20px rgb(0 0 0 / 11%);
+  --os-shadow-lg: 0 1px 3px rgb(0 0 0 / 10%), 0 16px 44px rgb(0 0 0 / 16%);
+  --os-shadow-xl: 0 2px 4px rgb(0 0 0 / 12%), 0 26px 64px rgb(0 0 0 / 20%);
+
+  --os-acrylic: rgb(245 245 247 / 96%);
+  --os-acrylic-strong: rgb(249 249 249 / 88%);
+
+  --md-link: var(--color-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MATERIAL CLASSES
+   One class per surface type. A component writes `className="os-dock"`
+   rather than restating four properties and drifting from its siblings.
+   Each defaults to the SOLID tint and switches to GLASS only when DWM
+   confirmed a real blur — so the fallback is the safe case, not the lucky one.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.os-menubar-material { background: var(--os-menubar-solid); box-shadow: inset 0 -0.5px 0 var(--os-separator); }
+.os-dock-material    { background: var(--os-dock-solid);    border: 1px solid var(--os-border); box-shadow: var(--os-edge-strong), var(--os-shadow-lg); }
+.os-panel-material   { background: var(--os-panel-solid);   border: 1px solid var(--os-border); box-shadow: var(--os-edge), var(--os-shadow-lg); }
+.os-widget-material  { background: var(--os-widget-solid);  border: 1px solid var(--os-border); box-shadow: var(--os-edge), var(--os-shadow-md); }
+
+[data-material='modern'] .os-menubar-material,
+[data-material='legacy'] .os-menubar-material { background: var(--os-menubar-glass); }
+[data-material='modern'] .os-dock-material,
+[data-material='legacy'] .os-dock-material    { background: var(--os-dock-glass); }
+[data-material='modern'] .os-panel-material,
+[data-material='legacy'] .os-panel-material   { background: var(--os-panel-glass); }
+[data-material='modern'] .os-widget-material,
+[data-material='legacy'] .os-widget-material  { background: var(--os-widget-glass); }
+
+/* A specular sheen across the top of a glass surface. Applied as a
+   pseudo-element so it clips to the parent's radius and never tints the
+   parent's own border. Decorative, so it ignores the pointer. */
+.os-sheen { position: relative; }
+.os-sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 55%);
+}
+[data-theme='light'] .os-sheen::before {
+  background: linear-gradient(to bottom, rgb(255 255 255 / 55%), rgb(255 255 255 / 0%) 60%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONTROLS
+   Every interactive element in the shell, defined once.
+
+   The press state is not decoration. A control that only reacts on hover
+   feels like a web page; one that visibly compresses under the pointer and
+   releases feels like hardware. Each control below has all four states:
+   rest, hover, active (pressed), and focus-visible.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Shared behaviour. Transitions name their properties — `transition: all`
+   animates layout too and is a frequent cause of jank. */
+.os-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--os-radius-control);
+  color: var(--os-text);
+  font: inherit;
+  cursor: default;
+  user-select: none;
+  transition:
+    background-color 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 140ms linear;
+}
+.os-control:focus-visible { outline: none; box-shadow: var(--os-focus-ring); }
+.os-control:disabled { opacity: 0.38; pointer-events: none; }
+
+/* Ghost: the default shell button (menu-bar items, icon buttons). */
+.os-btn-ghost { background: transparent; }
+.os-btn-ghost:hover { background: var(--os-hover); }
+.os-btn-ghost:active { background: var(--os-active); transform: scale(0.96); transition-duration: 60ms; }
+
+/* Filled: the affirmative action in a dialog or panel. */
+.os-btn-filled {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: var(--os-edge), var(--os-shadow-sm);
+}
+.os-btn-filled:hover { filter: brightness(1.08); }
+.os-btn-filled:active { filter: brightness(0.94); transform: scale(0.97); transition-duration: 60ms; }
+
+/* Tinted: a secondary action, still clearly a button. */
+.os-btn-tinted { background: var(--os-hover); box-shadow: var(--os-edge); }
+.os-btn-tinted:hover { background: var(--os-active); }
+.os-btn-tinted:active { transform: scale(0.97); transition-duration: 60ms; }
+
+/* Toggle: carries state, so its ON look must differ in FILL, not just tint
+   — a toggle that only brightens is unreadable to ~8% of men. */
+.os-toggle[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: var(--os-edge), var(--os-shadow-sm);
+}
+
+/* Segmented control: one selected cell slides between positions. */
+.os-segment {
+  position: relative;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--os-radius-control);
+  background: var(--os-hover);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 12%);
+}
+.os-segment > button {
+  position: relative;
+  z-index: 1;
+  border-radius: calc(var(--os-radius-control) - 2px);
+  padding: 4px 12px;
+  color: var(--os-text-dim);
+  transition: color 140ms ease;
+}
+.os-segment > button[aria-selected='true'] { color: var(--os-text); }
+
+/* A row in a list or menu. Hover is a full-width wash, not a scale: scaling
+   a row of text makes it visibly resample and look blurry mid-animation. */
+.os-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--os-radius-control);
+  color: var(--os-text);
+  text-align: left;
+  cursor: default;
+  transition: background-color 110ms ease;
+}
+.os-row:hover { background: var(--os-hover); }
+.os-row:active { background: var(--os-active); }
+.os-row[aria-selected='true'] { background: var(--os-selected); }
+
+/* Switch — the iOS/macOS sliding toggle. */
+.os-switch {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--os-radius-pill);
+  background: var(--os-active);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 16%);
+  transition: background-color 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: default;
+}
+.os-switch[aria-checked='true'] { background: var(--color-accent); }
+.os-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 28%), 0 0 0 0.5px rgb(0 0 0 / 6%);
+  /* A slight overshoot on the knob is what makes a switch feel physical. */
+  transition: transform 260ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.os-switch[aria-checked='true']::after { transform: translateX(16px); }
+.os-switch:active::after { width: 23px; }
+
+/* Input field. */
+.os-field {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--os-radius-control);
+  background: var(--os-hover);
+  border: 1px solid var(--os-border);
+  color: var(--os-text);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 8%);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+.os-field::placeholder { color: var(--os-text-faint); }
+.os-field:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 8%), 0 0 0 3px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+/* Slider — filled track up to --fill. */
+.os-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;
+  border-radius: var(--os-radius-pill);
+  background: linear-gradient(to right, rgb(255 255 255 / 92%) var(--fill, 0%), rgb(255 255 255 / 14%) var(--fill, 0%));
+  cursor: pointer;
+  outline: none;
+}
+.os-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+  transition: transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.os-slider:active::-webkit-slider-thumb { transform: scale(1.12); }
+[data-theme='light'] .os-slider {
+  background: linear-gradient(to right, rgb(0 0 0 / 70%) var(--fill, 0%), rgb(0 0 0 / 10%) var(--fill, 0%));
+}
+
+/* Separator between groups. */
+.os-divider { flex: none; background: var(--os-separator); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LEGACY / SHARED
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dock-suppress-labels .os-dock-label { opacity: 0 !important; }
+.dock-no-hover button { pointer-events: none; }
+
+.os-acrylic {
+  background: var(--os-acrylic);
+  backdrop-filter: var(--os-backdrop);
+  -webkit-backdrop-filter: var(--os-backdrop);
+  border: 1px solid var(--os-acrylic-border);
+  box-shadow: var(--os-acrylic-edge), var(--os-shadow-lg);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .os-acrylic { background: var(--os-acrylic-strong); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  /* With transparency reduced, every material falls back to its solid tint
+     regardless of what DWM reported. */
+  [data-material] .os-menubar-material { background: var(--os-menubar-solid); }
+  [data-material] .os-dock-material    { background: var(--os-dock-solid); }
+  [data-material] .os-panel-material   { background: var(--os-panel-solid); }
+  [data-material] .os-widget-material  { background: var(--os-widget-solid); }
+}
+
+@keyframes os-menu-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes os-menu-in { from { opacity: 0; } to { opacity: 1; } }
+}
+
+/* Menu bar "now playing" equalizer. */
+@keyframes eq {
+  0%, 100% { height: 3px; }
+  50% { height: 12px; }
+}
+
+/* Shell surfaces behave like an OS, not a web page: nothing highlights or
+   drags except text you are actually editing. */
+[data-shell],
+[data-shell] *,
+.os-titlebar,
+.os-titlebar * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+[data-shell] input,
+[data-shell] textarea,
+[data-shell] [contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+img, svg { -webkit-user-drag: none; user-select: none; }
+
+/* Chat message markdown — uses theme tokens so it works in light and dark. */
+.md-body { font-size: 15px; line-height: 1.7; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.md-body > :first-child { margin-top: 0; }
+.md-body > :last-child { margin-bottom: 0; }
+.md-body p { margin: 0 0 0.75em; }
+.md-body h1, .md-body h2, .md-body h3 { font-weight: 650; line-height: 1.3; margin: 1.1em 0 0.45em; color: var(--color-text-primary); }
+.md-body h1 { font-size: 1.35em; } .md-body h2 { font-size: 1.2em; } .md-body h3 { font-size: 1.05em; }
+.md-body ul, .md-body ol { margin: 0 0 0.8em; padding-left: 1.4em; }
+.md-body ul { list-style: disc; } .md-body ol { list-style: decimal; }
+.md-body li { margin: 0.2em 0; }
+.md-body a { color: var(--md-link, var(--color-accent)); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.md-body strong { color: var(--color-text-primary); font-weight: 650; }
+.md-body blockquote { border-left: 3px solid var(--border-hairline); margin: 0 0 0.8em; padding: 0.1em 0 0.1em 1em; color: var(--color-text-secondary); }
+.md-body :not(pre) > code { background: var(--surface-hover); border-radius: 5px; padding: 0.1em 0.35em; font-size: 0.88em; font-family: var(--font-mono, ui-monospace, monospace); }
+.md-body table { border-collapse: collapse; margin: 0 0 0.9em; font-size: 0.92em; display: block; overflow-x: auto; }
+.md-body th, .md-body td { border: 1px solid var(--border-hairline); padding: 6px 10px; text-align: left; }
+.md-body th { background: var(--surface-raised); font-weight: 600; }
+.md-body hr { border: 0; border-top: 1px solid var(--border-hairline); margin: 1em 0; }
+.md-body img { max-width: min(100%, 520px); border-radius: 12px; margin: 0.4em 0; cursor: zoom-in; box-shadow: var(--shadow-raised); }
+.md-code { margin: 0 0 0.9em; border: 1px solid var(--border-hairline); border-radius: 10px; overflow: hidden; background: var(--surface-canvas); }
+.md-code-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--surface-raised); font-size: 11.5px; color: var(--color-text-tertiary); }
+.md-code-bar button { color: var(--color-text-secondary); border-radius: 6px; padding: 2px 8px; }
+.md-code-bar button:hover { background: var(--surface-hover); color: var(--color-text-primary); }
+.md-code pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.55; font-family: var(--font-mono, ui-monospace, monospace); }
+
+/* Settings → "Turn off animations": no transitions or keyframes anywhere. */
+html.no-motion *,
+html.no-motion *::before,
+html.no-motion *::after {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+}

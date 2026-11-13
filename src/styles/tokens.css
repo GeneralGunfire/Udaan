@@ -1,106 +1,246 @@
 /**
- * Design tokens — glassmorphic, Udaan brand. Dark is the default/primary
- * mode; light is a real theme, not an afterthought — both are first-class.
- * Single source of truth for color, spacing, radius, blur, and typography.
- * The ambient smoke background is a full-bleed DOM layer (see
- * shared/components/AmbientBackground.tsx) and swaps per theme; these
- * tokens define the glass surfaces that float on top of it.
+ * Design tokens — Udaan's colour system, built on VS Code Dark+.
+ *
+ * The reference is deliberate and specific: VS Code's dark theme is the
+ * surface people in this app's audience stare at all day, it is tuned for
+ * long sessions, and its neutrals are genuinely neutral — no clay, no
+ * cast, no tint. Earlier passes here tried an olive ramp, a cyan-cast
+ * ramp, and a blue-tinted "cool grey" ramp; all three read as a screen
+ * that needed calibrating rather than as a colour choice.
+ *
+ *   Surfaces — true neutral, R=G=B:
+ *     #1a1a1a  canvas      behind everything
+ *     #1e1e1e  editor bg   VS Code's own editor ground
+ *     #252526  sidebar     panels, cards
+ *     #2d2d30  raised      hovered rows, tab strip
+ *     #3c3c3c  input       inputs, controls, the top ladder step
+ *
+ *   Accent — VS Code's button/focus blue. SOLID, never a gradient:
+ *     #0E639C  button      the primary fill
+ *     #1177BB  button:hover
+ *     #007ACC  focus/status the brighter cue blue
+ *
+ *   Text:
+ *     #D4D4D4  primary     VS Code's editor foreground
+ *     #A0A0A0  secondary
+ *     #858585  tertiary    VS Code's own dimmed text
+ *
+ * Status hues (danger/warning/success) are the one exception to the
+ * scheme and are defined further down — state is the one thing a user
+ * scans for without reading, and grey cannot carry it.
  */
+
+:root {
+  /* ==== THE PALETTE — raw values, referenced by everything below ====
+     True neutral: red, green and blue are equal (or within one point) on
+     every surface step, so the ladder has no cast in any direction.
+
+     Ground-up rebuild: darkened from the previous VS Code Dark+-derived
+     values (canvas was #1a1a1a) to genuinely match the reference material
+     — the finance/transaction app, the notification panel, and the
+     folder-manager screenshots all sit at a true near-black (#0a0a0a-
+     #141414 range), noticeably darker than VS Code's own editor
+     background. Every surface step below is re-measured off this new
+     canvas so the ladder's even luminance spacing is preserved, not just
+     the top value darkened in isolation. */
+  /* Re-measured off a darker canvas (#0a0a0a → #060606) to match Private
+     Player's own panel background — the app panel was switched to this
+     value directly first as a one-off `.app-panel` override, which broke
+     the ladder: every step above it (raised/overlay/hover) was still
+     spaced relative to the OLD #121212 base, so the jump from panel to
+     the first card inside it became much larger than the rest of the
+     ladder's even spacing. Re-deriving every step from the new canvas
+     here — same even ~15% relative-luminance-ish spacing the original
+     ladder used — fixes that everywhere at once instead of leaving every
+     other surface token silently mismatched against the new panel. */
+  /* macOS dark-mode palette: true black chrome, not a dark gray family.
+     macOS genuinely composites its menu bar, dock and sidebars as near-
+     pure black with a vibrancy/translucency blur showing the wallpaper
+     through, rather than a lighter "elevated" gray the way Windows/VS
+     Code themes do. The ladder keeps its elevation-step structure (each
+     level a measured step up) but is now anchored to true black instead
+     of the previous #060606-family near-blacks. */
+  --p-bg-canvas: #000000;
+  --p-bg-editor: #000000;
+  --p-bg-panel: #0a0a0a;
+  --p-bg-raised: #161616;
+  --p-bg-input: #1e1e1e;
+  --p-border: #262626;
+  --p-border-light: #333333;
+
+  /* Accent: macOS's own "Graphite" system accent — Apple's literal
+     answer to "no color." Darkened one step from Apple's lightest
+     Graphite swatch (#8e8e93) to #6e6e73 so white text/icons on a solid
+     accent fill clear 4.5:1 AA contrast (5.3:1 measured) — still reads
+     unmistakably as graphite, not black, but doesn't sacrifice
+     accessibility for the exact swatch value. Hover/bright step toward
+     the lighter Apple swatch; "deep"/pressed steps darker still.
+     Traffic-light window controls (close/minimize/maximize) are a
+     separate component and untouched by this token. */
+  --p-accent: #6e6e73;
+  --p-accent-hover: #8e8e93;
+  --p-accent-bright: #a3a3a8;
+  --p-accent-deep: #525256; /* pressed state */
+
+  /* Text ramp. */
+  --p-text: #f5f5f7;
+  --p-text-mid: #a0a0a5;
+  --p-text-dim: #78787d;
+  --p-white: #ffffff;
+}
 
 :root,
 [data-theme='dark'] {
   /* ==== SURFACE LADDER ====================================================
      Four steps, each a real measured luminance increase. Elevation in a
-     dark UI reads as *more light*, not more shadow — a panel floating
-     above another is lighter, the way it would be if lit from above.
-     Every surface in the app previously resolved to one identical value
-     (#141416 for base, elevated, glass AND chrome), which is precisely
-     why nothing read as having depth: with zero luminance delta there is
-     nothing for the eye to interpret as a layer.
+     dark UI reads as *more light* — a panel floating above another is
+     lighter, the way it would be if lit from above. A surface never sits
+     on a sibling of the same step; nesting always steps up, and hover
+     advances one step rather than painting a white tint over the fill.
 
-     Rules:
-       - A surface never sits on a sibling of the same step; nesting
-         always steps up.
-       - Hover advances one step rather than painting a white tint over
-         the existing fill.
-       - `base` is deliberately unchanged (#141416) so the background
-         tone already signed off on stays exactly as it is.
+     The ladder is TRUE NEUTRAL — R, G and B equal on every step. Three
+     earlier attempts gave it a cast (olive, then cyan, then a 10% blue
+     "cool grey"); every one of them read as clay or as a miscalibrated
+     display rather than as a decision. Neutral grey is what VS Code,
+     Linear and every other tool people stare at for eight hours use, and
+     it is what lets a single accent colour do all the work of feeling
+     alive without competing with the walls.
+
+     The steps are VS Code's own: editor ground, sidebar/panel, hovered
+     row, then input/control. Evenly spaced so each nesting level is a
+     visible, equal increment.
+
+     The accent is never a surface: it is reserved for what you act on.
      ---------------------------------------------------------------- */
-  --surface-canvas: #0d0d0f; /* behind everything: ambient layer, screensaver */
-  --surface-base: #141416; /* app window panel, feature view roots */
-  --surface-raised: #1a1a1d; /* cards, composer, bubbles, sidebar tiles */
-  --surface-overlay: #212125; /* dropdowns, dialogs, popovers, taskbar popups */
+  --surface-canvas: var(--p-bg-canvas); /* behind everything: ambient layer, screensaver */
+  --surface-base: var(--p-bg-editor); /* app window panel, feature view roots */
+  --surface-raised: var(--p-bg-panel); /* cards, composer, bubbles, sidebar tiles */
+  --surface-overlay: var(--p-bg-raised); /* dropdowns, dialogs, popovers, taskbar popups */
+  --surface-hover: var(--p-bg-input); /* the step above overlay, for hover on an overlay */
 
   /* ---- Borders & highlight ----
-     Hairline borders carry surface edges (a 1px line reads cleaner at
-     small sizes than a soft shadow); the inset highlight is the "lit top
-     edge" that makes a surface feel like a physical object rather than a
-     coloured rectangle. Every raised/overlay surface gets both. */
-  --border-hairline: rgb(255 255 255 / 8%);
-  --border-strong: rgb(255 255 255 / 14%);
-  --highlight-inset: rgb(255 255 255 / 6%);
+     Hairline borders carry surface edges; the inset highlight is the "lit
+     top edge" that makes a surface feel like a physical object rather
+     than a coloured rectangle. Both are alphas of bone, not pure white,
+     so they stay inside the palette. */
+  /* VS Code draws real, solid border colours rather than white alphas —
+     an alpha border shifts with whatever is under it, so the same card
+     looked different on two surfaces. These are fixed values. */
+  --border-hairline: var(--p-border);
+  --border-strong: var(--p-border-light);
+  --highlight-inset: rgb(255 255 255 / 5%);
 
   /* ---- Legacy aliases ----
-     Every existing consumer keeps resolving correctly without a rename
-     pass; new work should reference the ladder tokens above directly. */
+     Existing consumers keep resolving correctly without a rename pass;
+     new work should reference the ladder tokens above directly. */
   --color-bg-base: var(--surface-base);
   --color-bg-elevated: var(--surface-raised);
   --color-glass-bg: var(--surface-raised);
   --color-glass-bg-hover: var(--surface-overlay);
   --color-glass-border: var(--border-hairline);
   --color-glass-highlight: var(--highlight-inset);
-  --color-glass-inner-shadow: rgb(0 0 0 / 20%);
+  --color-glass-inner-shadow: rgb(0 0 0 / 24%);
   --color-chrome-bg: var(--surface-base);
 
   /* ---- Color: text ----
-     Measured on --surface-base: 17.0:1 / 9.8:1 / 5.6:1 — AAA, AAA, AA. */
-  --color-text-primary: rgb(255 255 255 / 96%);
-  --color-text-secondary: rgb(255 255 255 / 74%);
-  --color-text-tertiary: rgb(255 255 255 / 58%);
+     Bone / pale slate / concrete, measured against --surface-base
+     (#2b2b2b): 13.9:1, 10.6:1, 10.2:1 — all AAA. Tertiary uses concrete
+     rather than stone: stone sits close enough to the surface to read as
+     poor anti-aliasing rather than as deliberately quiet text. */
+  --color-text-primary: var(--p-text);
+  --color-text-secondary: var(--p-text-mid);
+  --color-text-tertiary: var(--p-text-dim);
 
   /* ---- Color: accent per category (School / Work / Creativity / General)
-     Four positions along the logo's own ramp. The previous values (a
-     violet and two greens) were the only colours in the app that existed
-     nowhere in the mark; these are distinguishable by hue position and
-     luminance while staying logo-native. */
-  --color-accent-school: #2d6fef;
-  --color-accent-work: #2593d7;
-  --color-accent-creativity: #21c1c1;
-  --color-accent-general: #5f95ff;
+     The palette owns no four distinguishable hues, deliberately — so
+     categories separate by *value*, walking down from bone, rather than
+     inventing colours the system does not have. General matches the
+     functional accent (slate navy) since General Chat is the app's
+     primary surface — navy itself is excluded here too. */
+  /* Calendar tag hues — VS Code's syntax foreground colours, which that
+     theme picked to be legible as TEXT on this exact ground. Categories
+     separate by hue, not by luminance; see calendar/lib/tags.ts. */
+  --tag-school: #8fb8ff;
+  --tag-work: #8fb8ff;
+  --tag-personal: #8fb8ff;
+
+  --color-accent-school: var(--p-accent-bright);
+  --color-accent-work: var(--p-accent);
+  --color-accent-creativity: var(--p-text-mid);
+  --color-accent-general: var(--p-accent-hover);
 
   /* ---- Elevation ----
-     Tuned per ladder step. Drop shadows are reserved for layers that
-     genuinely float; flat surfaces rely on the hairline + inset instead. */
-  --shadow-raised: 0 1px 2px rgb(0 0 0 / 20%);
+     Pure black falloff, no colour cast anywhere. Flat surfaces rely on
+     the hairline plus the inset highlight instead of a drop shadow. */
+  /* Neutral black, no tint. These were previously rgb(6 10 20) — a
+     blue-black — on the theory that a tinted shadow belongs to the
+     palette. At small sizes that is invisible, but --shadow-modal blurs
+     over 72px, and across the main window panel's whole perimeter the
+     tint resolved as a visible blue halo around the app. A shadow is an
+     absence of light; it takes no hue. */
+  --shadow-raised:
+    0 1px 2px rgb(0 0 0 / 34%), 0 2px 6px -2px rgb(0 0 0 / 26%);
   --shadow-overlay:
-    0 8px 24px -6px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 25%);
+    0 10px 30px -8px rgb(0 0 0 / 58%), 0 3px 8px rgb(0 0 0 / 34%);
   --shadow-modal:
-    0 24px 64px -12px rgb(0 0 0 / 60%), 0 4px 12px rgb(0 0 0 / 35%);
-  --shadow-brand: 0 4px 16px -2px rgb(45 111 239 / 35%);
+    0 28px 72px -14px rgb(0 0 0 / 68%), 0 6px 16px rgb(0 0 0 / 42%);
+  --shadow-brand: 0 5px 16px -3px rgb(0 0 0 / 52%);
 
   /* Legacy shadow aliases. */
   --shadow-panel: var(--shadow-modal);
-  --shadow-sidebar: 4px 0 32px rgb(0 0 0 / 35%);
+  --shadow-sidebar: 4px 0 32px rgb(0 0 0 / 38%);
   --shadow-composer: var(--shadow-overlay);
   --shadow-bubble: var(--shadow-raised);
   --shadow-bubble-brand: var(--shadow-brand);
 
   --ambient-base: var(--surface-canvas);
+
+  /* The main app panel is opaque (see App.tsx) — the wallpaper stays
+     visible only in the inset margin around it, never through it, so the
+     surface ladder reads at its defined values regardless of which
+     wallpaper is active. These two tokens style that margin:
+     --scrim-ambient darkens the wallpaper slightly so it never competes
+     with panel content in peripheral vision, and --panel-edge-glow is a
+     soft light rim on the panel's own edge so it doesn't look like a flat
+     cutout pasted over the photo. */
+  --scrim-ambient: rgb(0 0 0 / 22%);
+  --panel-edge-glow: rgb(255 255 255 / 6%);
+
+  /* ---- Functional accent: macOS Graphite, SOLID ----
+     The surfaces are true black; Graphite is the only colour in the
+     chrome (no blue, no saturated hue — Apple's own neutral system
+     accent), so it marks what the user is meant to act on and nothing
+     else. Spreading it onto hovers, borders or panel tints is what would
+     dissolve its meaning. White text on --p-accent (#6e6e73) holds
+     5.3:1, clearing AA. */
+  --color-accent: var(--p-accent);
+  --color-accent-muted: var(--p-accent-deep);
+  --color-accent-alt: var(--p-accent-bright);
+  --color-accent-contrast: #ffffff;
 }
 
 [data-theme='light'] {
   /* ---- Surface ladder, inverted ----
-     Light mode runs the same four-step model, but elevation reads as
-     *less* tint rather than more light: the canvas is the greyest and
-     each step up moves toward pure white. */
-  --surface-canvas: #e4e9ef;
-  --surface-base: #eef2f6;
-  --surface-raised: #f7f9fb;
+     Same four-step model, the same true-gray discipline, and the same
+     even lightness spacing (~5 points a step): the canvas is the greyest
+     and each step up moves toward bone. Pure white never appears — bone
+     is the top of the ladder, and it is the one step here that keeps a
+     tint, because a warm off-white as the *lightest* surface reads as
+     paper rather than as a cast. */
+  /* macOS light-mode palette: true near-white chrome (macOS's own
+     #F5F5F7-family "system background"), not VS Code Light+'s grays. */
+  --surface-canvas: #e5e5e5;
+  --surface-base: #f5f5f7;
+  --surface-raised: #fafafa;
   --surface-overlay: #ffffff;
+  /* The top step is already white, so its hover goes very slightly grey
+     — the light theme's one downward step, since there is nothing
+     brighter to reach for. */
+  --surface-hover: #ececec;
 
-  --border-hairline: rgb(15 23 35 / 10%);
-  --border-strong: rgb(15 23 35 / 18%);
-  --highlight-inset: rgb(255 255 255 / 75%);
+  --border-hairline: #d2d2d7; /* macOS's own light hairline grey */
+  --border-strong: #b8b8bd;
+  --highlight-inset: rgb(255 255 255 / 70%);
 
   /* Legacy aliases. */
   --color-bg-base: var(--surface-base);
@@ -109,113 +249,136 @@
   --color-glass-bg-hover: var(--surface-overlay);
   --color-glass-border: var(--border-hairline);
   --color-glass-highlight: var(--highlight-inset);
-  --color-glass-inner-shadow: rgb(30 30 32 / 8%);
+  --color-glass-inner-shadow: rgb(0 0 0 / 10%);
   --color-chrome-bg: var(--surface-raised);
 
-  /* ---- Color: text ---- */
-  --color-text-primary: rgb(15 23 35 / 94%);
-  --color-text-secondary: rgb(15 23 35 / 72%);
-  --color-text-tertiary: rgb(15 23 35 / 54%);
+  /* ---- Color: text ----
+     Navy / slate navy / deep gray on --surface-base (#d2d2d2): 11.5:1,
+     8.5:1, 5.9:1. */
+  --color-text-primary: #1f1f1f;
+  --color-text-secondary: #4a4a4a;
+  --color-text-tertiary: #6c6c6c;
 
   /* ---- Color: accent per category ----
-     Same logo ramp, deepened so each still clears contrast on a light
-     ground (the raw mark values are tuned for dark surfaces). */
-  --color-accent-school: #1d4fc4;
-  --color-accent-work: #1a72aa;
-  --color-accent-creativity: #14898a;
-  --color-accent-general: #2860cf;
+     Same value-separation, walking the dark end of the ramp so each still
+     clears contrast on a light ground; navy is excluded here too. */
+  /* Same three hues, darkened for a light ground (5.8 / 5.2 / 6.4:1). */
+  --tag-school: #1565a8;
+  --tag-work: #00786a;
+  --tag-personal: #2e8b45;
+
+  --color-accent-school: var(--p-accent-bright);
+  --color-accent-work: var(--p-accent);
+  --color-accent-creativity: #6c6c6c;
+  --color-accent-general: var(--p-accent-deep);
 
   /* ---- Elevation ---- */
-  --shadow-raised: 0 1px 2px rgb(30 30 32 / 10%);
+  /* Neutral, for the same reason as the dark theme above. */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 12%);
   --shadow-overlay:
-    0 8px 24px -6px rgb(30 30 32 / 16%), 0 2px 6px rgb(30 30 32 / 10%);
+    0 8px 24px -6px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 12%);
   --shadow-modal:
-    0 24px 64px -12px rgb(30 30 32 / 20%), 0 4px 12px rgb(30 30 32 / 12%);
-  --shadow-brand: 0 4px 16px -2px rgb(45 111 239 / 25%);
+    0 24px 64px -12px rgb(0 0 0 / 24%), 0 4px 12px rgb(0 0 0 / 14%);
+  --shadow-brand: 0 4px 14px -3px rgb(0 0 0 / 20%);
 
   --shadow-panel: var(--shadow-modal);
-  --shadow-sidebar: 4px 0 32px rgb(30 30 32 / 12%);
+  --shadow-sidebar: 4px 0 32px rgb(0 0 0 / 14%);
   --shadow-composer: var(--shadow-overlay);
   --shadow-bubble: var(--shadow-raised);
   --shadow-bubble-brand: var(--shadow-brand);
 
   --ambient-base: var(--surface-canvas);
+
+  --scrim-ambient: rgb(0 0 0 / 10%);
+  --panel-edge-glow: rgb(255 255 255 / 45%);
+
+  /* ---- Functional accent: macOS Graphite, light ground ----
+     Same Graphite accent as dark mode, darkened slightly further so it
+     still reads clearly against a near-white surface (a mid-gray that
+     works on black chrome can look washed out on white). White text on
+     this value holds >4.5:1. */
+  --color-accent: #5c5c61;
+  --color-accent-muted: #3f3f43;
+  --color-accent-alt: #46464a;
+  --color-accent-contrast: #ffffff;
 }
 
 :root {
-  /* ---- Color: Udaan brand. Surfaces, panels, shadows, and glass tokens
-     are strict monochrome (see /DESIGN_SYSTEM.md and the grayscale surface
-     tokens above/below) — zero hue anywhere in the app's background/panel
-     system. The ONE exception is this brand-blue family: the logo mark's
-     own blue/teal, deliberately desaturated ~28% from the raw sampled
-     pixel values (#3072f0/#2fc4c9) so it reads as a restrained accent
-     against the gray surfaces rather than dominating them — a fully
-     saturated accent competed with the monochrome system instead of
-     punctuating it. Used only for buttons/primary actions/focus rings,
-     never for backgrounds or panels; treat it as reserved for genuinely
-     primary interactive state, not every hover/focus touch a component
-     happens to have.
-     A wallpaper may still restore the full original blue theme via
-     WallpaperDefinition.theme (see wallpapers.ts) — WallpaperProvider
-     applies it as an inline override on <html>, which wins over these
-     :root defaults. The three original blue wallpapers (windows-blue,
-     cobalt-bloom, navy-petals) carry that override explicitly, restoring
-     the exact pre-monochrome blue theme; every other wallpaper uses this
-     muted logo-derived accent against monochrome surfaces. */
-  /* ---- Raw logo petals — pixel-sampled from src/assets/udaan-mark.png.
-     GRADIENT FILL ONLY. These are the true mark colours, but the darker
-     end of the ramp cannot carry functional weight: measured against
-     --surface-base, indigo lands at 2.70:1 and blue at 4.06:1, so
-     neither clears the 4.5:1 needed for standalone text/iconography.
-     Use them inside --gradient-brand and nowhere else. ---- */
-  --brand-indigo: #2150cc;
-  --brand-blue: #2d6fef;
-  --brand-cyan: #2593d7;
-  --brand-teal: #21c1c1;
+  /* ---- Brand ramp ----
+     The accent family, used for the logo mark and any brand fill. These
+     are the VS Code blues, not the logo's original blue-cyan petals: the
+     mark is now recoloured to match the UI rather than the UI chasing
+     the mark, so the whole product reads as one system.
 
-  /* ---- Functional accent ----
-     The lifted end of the same ramp (sampled from the mark's lightest
-     saturated pixel), which is what everything standalone actually uses:
-     focus rings, active states, accent text, iconography, borders.
-     Measured on --surface-base: 6.33 / 5.30 / 8.64 — all AA for body
-     text, comfortably AAA for UI. ---- */
-  --color-accent: #5f95ff;
-  --color-accent-muted: #4d86f5;
-  --color-accent-alt: #2fc4c9;
+     The petal names are kept because UdaanMark.tsx's four gradients
+     reference them positionally (deep -> bright), not because anything
+     here is still cyan. */
+  --brand-blue-deep: var(--p-accent-deep);
+  --brand-blue: var(--p-accent);
+  --brand-azure: var(--p-accent-hover);
+  --brand-cyan: var(--p-accent-bright);
 
   /* ---- Legacy brand aliases ----
-     Existing consumers keep working. Note these now resolve to the
-     *lifted* accent rather than the raw petals, which is the correct
-     behaviour: every one of these is used for a functional element. */
-  --color-brand-navy: var(--brand-indigo);
-  --color-brand-blue: var(--color-accent);
-  --color-brand-cyan: var(--color-accent);
-  --color-brand-teal: var(--color-accent-alt);
+     Existing consumers keep resolving. Everything lands in the accent
+     family now; nothing here is a separate hue. */
+  --brand-navy: var(--brand-blue-deep);
+  --brand-slate: var(--brand-blue);
+  --brand-pale: var(--brand-azure);
+  --brand-bone: var(--brand-cyan);
 
-  /* Runs indigo → cyan and deliberately stops short of teal: white text
-     holds 3.37:1 at the cyan end (fine for ≥13px/600 labels) but falls
-     to 2.22:1 over teal, which would fail on every gradient button. */
-  --gradient-brand: linear-gradient(
-    135deg,
-    var(--brand-indigo) 0%,
-    #2372d2 50%,
-    var(--brand-cyan) 100%
-  );
+  --color-brand-navy: var(--brand-blue-deep);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-teal: var(--brand-cyan);
 
-  /* The full four-stop mark gradient, for decorative fills only (never
-     behind text) — the logo itself, splash art, large empty-state marks. */
-  --gradient-brand-full: linear-gradient(
-    135deg,
-    var(--brand-indigo) 0%,
-    var(--brand-blue) 35%,
-    var(--brand-cyan) 70%,
-    var(--brand-teal) 100%
-  );
+  /* ---- Primary fill: SOLID, not a gradient ----
+     Every primary button, taskbar tile and launcher icon used to carry a
+     bright blue-to-cyan gradient. At that saturation it dominated the
+     chrome instead of marking it, and a gradient repeated across a whole
+     toolbar reads as decoration rather than as a control. This is now
+     one solid colour — VS Code's own button blue — and depth comes from
+     the lit/shaded edges and the drop shadow, exactly as it does for
+     every other raised surface in the app.
 
-  /* ---- Color: semantic ---- */
-  --color-danger: #ff6b6b;
-  --color-warning: #ffb454;
-  --color-success: #6bdc9c;
+     `--gradient-brand` is kept as a token name because a dozen
+     components reference it, but it now resolves to a flat fill. White
+     text on it holds 5.6:1, so no text shadow is needed. */
+  --gradient-brand: var(--p-accent);
+  --gradient-brand-full: var(--p-accent);
+
+  /* ---- Color: semantic — THE ONE SANCTIONED EXCEPTION TO THE PALETTE ----
+     These three are hues, and that is deliberate. An earlier pass folded
+     them into the neutral ramp (danger = bone, success = pale slate) on
+     the theory that a closed palette should signal state by value plus a
+     glyph. In practice that killed the app: a "running" indicator that is
+     the same grey as its own label reads as decoration, not as a live
+     status, and a close button that only brightens reads as any other
+     hover. Status colour is not decoration — it is the fastest signal the
+     UI has, and the one thing a user scans for without reading.
+
+     They are not raw web red/green/amber. Each is desaturated and pulled
+     toward the app's own temperature so it sits in the gray/navy system
+     rather than shouting over it — enough hue to be unmistakable at a
+     6px dot, not enough to look like a different product. Reserved
+     strictly for state: live/stopped, destructive, caution. Never for
+     emphasis, never for branding, never as a surface. */
+  --color-danger: #e06b62; /* muted brick — destructive, error */
+  --color-warning: #d9a05b; /* muted amber — caution, degraded */
+  --color-success: #5cbf87; /* muted jade — running, healthy, done */
+
+  /* Soft fills/borders for status chips, banners, and destructive hover.
+     Alphas of the hue itself, so a danger surface reads as tinted rather
+     than as a solid block of colour. */
+  /* Text/icon colour that sits ON a solid success fill. The success hue
+     is light enough that white on it fails contrast (2.1:1), so a solid
+     success button takes a very dark green-black label instead — the same
+     inversion trick the accent uses, in the success family. */
+  --color-success-contrast: #0d2a1a;
+
+  --color-danger-surface: rgb(224 107 98 / 14%);
+  --color-danger-border: rgb(224 107 98 / 34%);
+  --color-success-surface: rgb(92 191 135 / 16%);
+  --color-warning-surface: rgb(217 160 91 / 16%);
 
   /* ---- Blur (glassmorphism) ---- */
   --blur-panel: 28px;
@@ -242,15 +405,46 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* ---- Typography ---- */
-  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* ---- Typography ----
+     One family, not two: Montserrat Variable carries body, UI, AND display
+     text across its full 100-900 weight axis. Poppins (a separate static
+     family) was dropped — the ground-up rebuild's reference material pairs
+     hierarchy through weight and size within a single family rather than
+     switching typefaces, and a variable font's continuous weight axis is
+     exactly what makes that work well at both a 36px hero and 12px UI
+     label. --font-display and --font-sans are kept as separate tokens
+     (rather than collapsing to one) so a future deliberate divergence has
+     somewhere to go, but they currently resolve to the same stack.
+
+     The wordmark logo (Wordmark.tsx) is the one deliberate exception: it
+     uses its own dedicated display typeface, loaded separately and scoped
+     only to that component — branding, not a UI token, so it doesn't
+     reopen the "how many fonts" question for the rest of the app.
+
+     The mono stack previously named 'JetBrains Mono', which is NOT among
+     the bundled fonts, so all seven mono usages silently fell through to
+     whatever generic monospace the OS picked — usually Courier New on
+     Windows, which is exactly the "unrefined" default this app should
+     never show. Cascadia Mono ships with Windows 10/11 and matches the
+     app's own aesthetic; the rest of the stack covers other platforms
+     before reaching a generic. */
+  --font-display: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono:
+    'Cascadia Mono', 'Cascadia Code', 'SF Mono', 'Segoe UI Mono', Consolas,
+    ui-monospace, monospace;
+  /* The wordmark's own typeface — see the note above. Used nowhere but
+     Wordmark.tsx and the splash screen's lockup. */
+  --font-wordmark: 'Space Grotesk', var(--font-sans);
 
   /* ---- Type scale ----
-     Replaces the ad-hoc arbitrary sizes scattered through components
-     (text-[13.5px], text-[11.5px], text-[12.5px] and friends). Sizes are
-     assigned by role, not by eye. */
+     Sizes are assigned by role, not by eye. */
+  /* Two steps below 2xs for genuinely incidental type — a badge count, a
+     keycap hint, an axis label. These existed as text-[9px]/text-[10px]
+     scattered through components; naming them stops the scale being
+     re-invented per file. */
+  --text-3xs: 9px; /* keycaps, dense axis labels */
+  --text-2xs-alt: 10px; /* badge counts, tight metadata */
   --text-2xs: 11px; /* metadata, timestamps, counts */
   --text-xs: 12px; /* labels, badges, secondary controls */
   --text-sm: 13px; /* UI default: buttons, menu items */
@@ -260,14 +454,28 @@
   --text-xl: 28px; /* empty-state / hero */
   --text-2xl: 36px;
 
+  /* ---- Optical tracking ----
+     Letter-spacing has to move opposite to size: type set large needs it
+     tightened or the words fall apart into letters, and type set small
+     needs it opened or the letters mash together. A single tracking value
+     across a 9px-to-36px range — which is what the app had — is wrong at
+     both ends simultaneously, and is a large part of why the type read as
+     flat and generic rather than set. */
+  --track-hero: -0.022em; /* 28px+ */
+  --track-title: -0.014em; /* 20px */
+  --track-heading: -0.008em; /* 16px */
+  --track-body: -0.002em; /* 13-14px */
+  --track-small: 0.01em; /* 11-12px */
+  --track-micro: 0.022em; /* 9-10px */
+  --track-caps: 0.07em; /* uppercase labels at any size */
+
   /* Line heights, paired to role rather than to size. */
   --leading-display: 1.2;
   --leading-ui: 1.4;
   --leading-body: 1.5;
 
   /* Body weight sits at 500, not 400: on dark surfaces a regular weight
-     loses too much perceived stroke, which reads as washed-out and flat.
-     Medium restores density without tipping into bold. */
+     loses too much perceived stroke, which reads as washed out and flat. */
   --weight-body: 500;
   --weight-medium: 500;
   --weight-semibold: 600;

@@ -1,0 +1,17 @@
+/* Space Grotesk (SIL OFL 1.1 — see src/assets/fonts/logo/OFL.txt), self-
+   hosted like every other font in this app. Scoped ONLY to the wordmark
+   lockup (Wordmark.tsx / SplashScreen) via --font-wordmark — never used as
+   a body/UI font, so it doesn't reopen the "how many fonts" question for
+   the rest of the app (that's still Montserrat + Cascadia Mono, see
+   tokens.css). A geometric, wide-set display face is exactly what the
+   reference material's branding direction called for; Space Grotesk was
+   chosen over Azonix specifically because Azonix is personal-use-only and
+   not redistributable, whereas Space Grotesk is genuinely open-licensed. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../assets/fonts/logo/SpaceGrotesk-Variable.ttf')
+    format('truetype-variations');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}

@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
+use crate::db::configure_connection;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleEvent {
   pub id: String,
@@ -14,13 +16,18 @@ pub struct ScheduleEvent {
   pub start_time: Option<String>,
   pub end_time: Option<String>,
   pub description: Option<String>,
-  /// One of: school | work | creativity | general.
+  /// One of: school | work | creativity | general | personal.
   pub category: String,
   /// One of: unplanned | planned | done. A todo-style item with no fixed
   /// date/time is "unplanned"; anything with a date/time is "planned";
   /// completion flips it to "done" regardless of scheduling.
   pub status: String,
   pub created_at: String,
+  /// True for a Calendar all-day event. Absent/false for Schedule items.
+  #[serde(default)]
+  pub all_day: bool,
+  /// Calendar event duration in minutes, when known.
+  pub duration_minutes: Option<i64>,
 }
 
 pub struct Store {
@@ -30,6 +37,7 @@ pub struct Store {
 impl Store {
   pub fn open(db_path: PathBuf) -> rusqlite::Result<Self> {
     let conn = Connection::open(db_path)?;
+    configure_connection(&conn)?;
     conn.execute_batch(
       "CREATE TABLE IF NOT EXISTS schedule_events (
         id TEXT PRIMARY KEY,
@@ -44,13 +52,42 @@ impl Store {
       );
       CREATE INDEX IF NOT EXISTS idx_schedule_events_date ON schedule_events(date);",
     )?;
+
+    // Additive migration: Calendar's all-day/duration fields, added when the
+    // Calendar feature moved onto this store. Existing schedule-assistant
+    // rows are untouched (columns default to NULL/0).
+    Self::add_column_if_missing(&conn, "schedule_events", "all_day", "INTEGER NOT NULL DEFAULT 0")?;
+    Self::add_column_if_missing(&conn, "schedule_events", "duration_minutes", "INTEGER")?;
+
     Ok(Self { conn: Mutex::new(conn) })
+  }
+
+  /// Adds `column` to `table` if it isn't already there. SQLite has no
+  /// `ADD COLUMN IF NOT EXISTS`, so this checks `pragma_table_info` first —
+  /// safe to call every time the store opens.
+  fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    ddl_type: &str,
+  ) -> rusqlite::Result<()> {
+    let exists: bool = conn.query_row(
+      &format!(
+        "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = ?1"
+      ),
+      params![column],
+      |row| row.get::<_, i64>(0),
+    )? > 0;
+    if !exists {
+      conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {ddl_type};"))?;
+    }
+    Ok(())
   }
 
   pub fn list_events(&self) -> rusqlite::Result<Vec<ScheduleEvent>> {
     let conn = self.conn.lock().unwrap();
     let mut stmt = conn.prepare(
-      "SELECT id, title, date, start_time, end_time, description, category, status, created_at
+      "SELECT id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes
        FROM schedule_events ORDER BY date ASC, start_time ASC",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -64,6 +101,8 @@ impl Store {
         category: row.get(6)?,
         status: row.get(7)?,
         created_at: row.get(8)?,
+        all_day: row.get(9)?,
+        duration_minutes: row.get(10)?,
       })
     })?;
     rows.collect()
@@ -73,8 +112,8 @@ impl Store {
     let conn = self.conn.lock().unwrap();
     conn.execute(
       "INSERT INTO schedule_events
-        (id, title, date, start_time, end_time, description, category, status, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        (id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
       params![
         event.id,
         event.title,
@@ -85,6 +124,8 @@ impl Store {
         event.category,
         event.status,
         event.created_at,
+        event.all_day,
+        event.duration_minutes,
       ],
     )?;
     Ok(())
@@ -95,7 +136,7 @@ impl Store {
     conn.execute(
       "UPDATE schedule_events SET
         title = ?2, date = ?3, start_time = ?4, end_time = ?5,
-        description = ?6, category = ?7, status = ?8
+        description = ?6, category = ?7, status = ?8, all_day = ?9, duration_minutes = ?10
        WHERE id = ?1",
       params![
         event.id,
@@ -106,6 +147,8 @@ impl Store {
         event.description,
         event.category,
         event.status,
+        event.all_day,
+        event.duration_minutes,
       ],
     )?;
     Ok(())
@@ -154,6 +197,8 @@ mod tests {
       category: "general".into(),
       status: "planned".into(),
       created_at: "2026-08-21T00:00:00Z".into(),
+      all_day: false,
+      duration_minutes: Some(30),
     };
     let event2 = ScheduleEvent {
       id: "test-evt-2".into(),
@@ -165,6 +210,8 @@ mod tests {
       category: "work".into(),
       status: "planned".into(),
       created_at: "2026-08-21T00:00:01Z".into(),
+      all_day: false,
+      duration_minutes: None,
     };
     let todo = ScheduleEvent {
       id: "test-todo-1".into(),
@@ -176,6 +223,8 @@ mod tests {
       category: "general".into(),
       status: "unplanned".into(),
       created_at: "2026-08-21T00:00:02Z".into(),
+      all_day: false,
+      duration_minutes: None,
     };
 
     store.create_event(&event1).expect("create event1");
@@ -218,6 +267,77 @@ mod tests {
     assert_eq!(after_reopen.len(), 2, "data must survive reopening the db file");
 
     // Clean up the temp file.
+    drop(reopened);
+    let _ = std::fs::remove_file(&db_path);
+  }
+
+  /// Simulates a pre-existing schedule.sqlite3 created before the
+  /// all_day/duration_minutes columns existed (the shape every real user's
+  /// db is in today, since the schedule assistant predates the Calendar
+  /// migration). Opening it through `Store::open` must add the new columns
+  /// in place, without touching or losing the row that was already there.
+  #[test]
+  fn opening_pre_migration_database_preserves_existing_row_and_adds_columns() {
+    let mut db_path = std::env::temp_dir();
+    db_path.push(format!("udaan_schedule_premigration_{}.sqlite3", uuid::Uuid::new_v4()));
+
+    {
+      let conn = Connection::open(&db_path).expect("create raw pre-migration db");
+      conn
+        .execute_batch(
+          "CREATE TABLE schedule_events (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            description TEXT,
+            category TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'planned',
+            created_at TEXT NOT NULL
+          );
+          INSERT INTO schedule_events (id, title, date, start_time, end_time, description, category, status, created_at)
+          VALUES ('pre-1', 'Existing schedule item', '2026-08-20', '10:00', NULL, NULL, 'work', 'planned', '2026-08-20T00:00:00Z');",
+        )
+        .expect("seed pre-migration schema and row");
+    }
+
+    let store = Store::open(db_path.clone()).expect("open pre-migration store");
+    let events = store.list_events().expect("list after opening pre-migration db");
+    assert_eq!(events.len(), 1, "the pre-existing row must survive the migration");
+    let existing = &events[0];
+    assert_eq!(existing.id, "pre-1");
+    assert_eq!(existing.title, "Existing schedule item");
+    assert_eq!(existing.all_day, false, "new column should default safely for old rows");
+    assert_eq!(existing.duration_minutes, None, "new column should default safely for old rows");
+
+    // New writes with the new fields must work post-migration.
+    let new_event = ScheduleEvent {
+      id: "post-1".into(),
+      title: "Calendar all-day event".into(),
+      date: "2026-08-21".into(),
+      start_time: None,
+      end_time: None,
+      description: Some("notes".into()),
+      category: "personal".into(),
+      status: "planned".into(),
+      created_at: "2026-08-21T00:00:00Z".into(),
+      all_day: true,
+      duration_minutes: Some(1440),
+    };
+    store.create_event(&new_event).expect("create post-migration event");
+    let after_create = store.list_events().expect("list after create");
+    assert_eq!(after_create.len(), 2);
+    let created = after_create.iter().find(|e| e.id == "post-1").expect("new event present");
+    assert_eq!(created.all_day, true);
+    assert_eq!(created.duration_minutes, Some(1440));
+
+    // Idempotency: reopening an already-migrated db must not error or duplicate columns.
+    drop(store);
+    let reopened = Store::open(db_path.clone()).expect("reopen already-migrated store");
+    let after_reopen = reopened.list_events().expect("list after reopen");
+    assert_eq!(after_reopen.len(), 2, "reopening must not lose or duplicate rows");
+
     drop(reopened);
     let _ = std::fs::remove_file(&db_path);
   }
