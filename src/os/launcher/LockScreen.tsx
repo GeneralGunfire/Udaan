@@ -316,7 +316,9 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
                     whileTap={{ scale: 0.9 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     onClick={() => (k === '⌫' ? setPin((p) => p.slice(0, -1)) : press(k))}
-                    className="flex h-[66px] w-[66px] items-center justify-center rounded-full border border-white/10 bg-white/[0.12] text-[24px] font-medium backdrop-blur-xl transition-[background-color] duration-100 hover:bg-white/[0.22] active:bg-white/30"
+                    // A lit top edge and a dark bottom: the key reads as a
+                    // physical button on glass rather than a flat circle.
+                    className="flex h-[66px] w-[66px] items-center justify-center rounded-full border border-white/10 bg-white/[0.12] text-[24px] font-medium shadow-[inset_0_1px_0_rgb(255_255_255/0.22),inset_0_-1px_0_rgb(0_0_0/0.18),0_2px_8px_rgb(0_0_0/0.2)] backdrop-blur-xl transition-[background-color] duration-100 hover:bg-white/[0.22] active:bg-white/30"
                   >
                     {k}
                   </motion.button>

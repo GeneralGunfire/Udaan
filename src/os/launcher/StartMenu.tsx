@@ -230,12 +230,43 @@ async function showPowerMenu() {
 
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
+/**
+ * An app tile.
+ *
+ * The highlight follows the pointer rather than filling the whole tile.
+ * On a grid this size a uniform hover wash says "something is selected";
+ * a light that tracks the cursor says "this is a surface you are touching",
+ * and it makes the grid feel responsive between tiles as well as on them.
+ */
 function Tile({ label, path, onClick, children }: { label: string; path?: string; onClick: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLButtonElement>(null)
   const tile = (
-    <motion.button type="button" onClick={onClick}
-      whileHover={tileHover} whileTap={tileTap} transition={tileTrans}
-      className="flex flex-col items-center gap-[7px] rounded-[12px] px-1 py-3 hover:bg-(--os-hover)"
+    <motion.button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      onPointerMove={(e) => {
+        const el = ref.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        // Written straight to CSS custom properties: no React state, so
+        // this costs nothing per frame even across sixty tiles.
+        el.style.setProperty('--tile-x', `${e.clientX - r.left}px`)
+        el.style.setProperty('--tile-y', `${e.clientY - r.top}px`)
+      }}
+      whileHover={tileHover}
+      whileTap={tileTap}
+      transition={tileTrans}
+      className="group relative isolate flex flex-col items-center gap-[7px] rounded-[12px] px-1 py-3"
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        style={{
+          background:
+            'radial-gradient(120px circle at var(--tile-x, 50%) var(--tile-y, 50%), var(--os-active), var(--os-hover) 70%)',
+        }}
+      />
       {children}
       <span className="w-full truncate text-center text-[12px] font-medium leading-tight">{label}</span>
     </motion.button>
@@ -283,7 +314,7 @@ function FolderModal({ folder, onClose, onLaunch }: { folder: FolderDef; onClose
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
     >
       <button type="button" className="absolute inset-0" onClick={onClose} aria-label="Close folder" />
-      <motion.div className="relative z-10 w-[540px] overflow-hidden rounded-[20px] border border-[var(--os-acrylic-border)] bg-[var(--surface-raised)] shadow-[var(--os-shadow-overlay)]"
+      <motion.div className="relative z-10 w-[540px] overflow-hidden rounded-[20px] border border-[var(--os-acrylic-border)] bg-(--os-hover) shadow-[var(--os-shadow-overlay)]"
         initial={{ scale: 0.88, y: 12, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1, transition: { ...springs.flyout } }}
         exit={{ scale: 0.92, y: 8, opacity: 0, transition: { duration: 0.1, ease: curve.accelerate } }}
@@ -374,7 +405,7 @@ function DragGrid({
           data-drag-cell
           className={cn(
             'group relative flex flex-col items-center gap-1 rounded-[10px] p-2 select-none transition-[transform,background-color,box-shadow] duration-100',
-            dragOver === idx ? 'scale-105 bg-(--os-hover) ring-1 ring-[var(--color-accent)]/40' : 'hover:bg-(--os-hover)',
+            dragOver === idx ? 'scale-105 bg-(--os-hover) ring-1 ring-accent/40' : 'hover:bg-(--os-hover)',
           )}
           style={{ cursor: dragIdx.current !== null ? 'grabbing' : 'grab', touchAction: 'none' }}
           onPointerDown={(e) => onPointerDown(idx, e)}
@@ -465,13 +496,13 @@ function EditModal({
           {(['pinned', 'quick', 'folder'] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}
               className={cn('rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium transition-colors',
-                tab === t ? 'bg-[var(--color-accent)] text-white' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]')}
+                tab === t ? 'bg-[var(--color-accent)] text-white' : 'bg-(--os-hover) hover:bg-(--os-active)')}
             >{TAB_LABEL[t]}</button>
           ))}
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => onSave(draft, utilDraft)} className="rounded-[8px] bg-[var(--color-accent)] px-4 py-1.5 text-[12.5px] font-semibold text-white hover:bg-[var(--color-accent-muted)]">Done</button>
-          <button type="button" onClick={onClose} className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12.5px] font-medium hover:bg-[var(--surface-hover)]">Cancel</button>
+          <button type="button" onClick={onClose} className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12.5px] font-medium hover:bg-(--os-active)">Cancel</button>
         </div>
       </div>
 
@@ -518,7 +549,7 @@ function EditModal({
                 <p className="text-[10.5px] font-semibold uppercase tracking-wide text-(--os-text-dim)">Add app</p>
                 <input value={appSearch} onChange={(e) => setAppSearch(e.target.value)}
                   placeholder="Search…"
-                  className="ml-auto w-[160px] rounded-[8px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 py-1 text-[12px] outline-none focus:border-[var(--color-accent)]"
+                  className="ml-auto w-[160px] rounded-[8px] border border-[var(--border-hairline)] bg-(--os-hover) px-3 py-1 text-[12px] outline-none focus:border-[var(--color-accent)]"
                 />
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
@@ -587,7 +618,7 @@ function EditModal({
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <input value={folderName} onChange={(e) => setFolderName(e.target.value)}
               placeholder="Folder name" autoFocus
-              className="w-full rounded-[8px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] outline-none focus:border-[var(--color-accent)]"
+              className="w-full rounded-[8px] border border-[var(--border-hairline)] bg-(--os-hover) px-3 py-2 text-[13px] outline-none focus:border-[var(--color-accent)]"
             />
             <p className="text-[10.5px] font-semibold uppercase tracking-wide text-(--os-text-dim)">Udaan apps</p>
             <div className="grid grid-cols-7 gap-1">
@@ -595,7 +626,7 @@ function EditModal({
                 const sel = folderItems.some((i) => i.kind === 'udaan' && i.appId === id)
                 return (
                   <button key={id} type="button" onClick={() => toggleFolderUdaan(id)}
-                    className={cn('flex flex-col items-center gap-1 rounded-[8px] p-2 text-[10px]', sel ? 'bg-[var(--color-accent)]/15 ring-1 ring-[var(--color-accent)]' : 'hover:bg-(--os-hover)')}>
+                    className={cn('flex flex-col items-center gap-1 rounded-[8px] p-2 text-[10px]', sel ? 'bg-[var(--color-accent)]/15 ring-1 ring-accent' : 'hover:bg-(--os-hover)')}>
                     <AppIcon appId={id} size={26} />
                     <span className="w-full truncate text-center">{APP_DEFS[id].name}</span>
                   </button>
@@ -610,7 +641,7 @@ function EditModal({
                     const sel = folderItems.some((i) => i.kind === 'installed' && i.app.id === a.id)
                     return (
                       <button key={a.id} type="button" onClick={() => toggleFolderInstalled(a)}
-                        className={cn('flex flex-col items-center gap-1 rounded-[8px] p-2 text-[10px]', sel ? 'bg-[var(--color-accent)]/15 ring-1 ring-[var(--color-accent)]' : 'hover:bg-(--os-hover)')}>
+                        className={cn('flex flex-col items-center gap-1 rounded-[8px] p-2 text-[10px]', sel ? 'bg-[var(--color-accent)]/15 ring-1 ring-accent' : 'hover:bg-(--os-hover)')}>
                         <InstalledIcon id={a.id} size={26} />
                         <span className="w-full truncate text-center">{a.name}</span>
                       </button>
@@ -625,7 +656,7 @@ function EditModal({
                 {editingFolderIdx !== null ? 'Update' : 'Create'}
               </button>
               <button type="button" onClick={() => { setTab('pinned'); setEditingFolderIdx(null) }}
-                className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12.5px] hover:bg-[var(--surface-hover)]">
+                className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12.5px] hover:bg-(--os-active)">
                 Cancel
               </button>
             </div>
@@ -666,7 +697,7 @@ function StatusBar({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex items-center border-t border-(--os-separator) bg-[var(--surface-raised)]/30 px-5 py-2.5">
+    <div className="flex items-center border-t border-(--os-separator) bg-(--os-hover)/30 px-5 py-2.5">
       {/* Time + date */}
       <button type="button" onClick={() => { onClose(); void launchApp('ms-settings:dateandtime') }}
         className="mr-4 flex flex-col items-start rounded-[8px] px-2.5 py-1.5 hover:bg-(--os-hover) transition-colors duration-75">
@@ -743,7 +774,7 @@ function SectionHeader({ title, action, onAction, extra }: { title: string; acti
       {extra}
       {action && (
         <button type="button" onClick={onAction}
-          className="flex items-center gap-1 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
+          className="flex items-center gap-1 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-(--os-active)">
           {action} <ChevronRightIcon width={11} height={11} />
         </button>
       )}
@@ -802,7 +833,7 @@ function NewsCard({ story, src, onOpen }: { story: { headline: string; section: 
       transition={{ duration: 0.28, ease: curve.decelerate }}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.985 }}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-[12px] bg-[var(--surface-raised)] text-left transition-colors hover:bg-(--os-hover)"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-[12px] bg-(--os-hover) text-left transition-colors hover:bg-(--os-hover)"
     >
       {src ? (
         <span className="relative block aspect-[16/9] w-full overflow-hidden bg-(--os-hover)">
@@ -880,7 +911,7 @@ function NewsFeedSection({ onClose }: { onClose: () => void }) {
       ) : cards.length === 0 ? (
         <div className="grid grid-cols-3 gap-2.5 pb-5" aria-hidden>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="overflow-hidden rounded-[12px] bg-[var(--surface-raised)]">
+            <div key={i} className="overflow-hidden rounded-[12px] bg-(--os-hover)">
               <div className="aspect-[16/9] animate-pulse bg-(--os-hover)" />
               <div className="space-y-2 p-2.5">
                 <div className="h-2 w-1/3 animate-pulse rounded bg-(--os-hover)" />
@@ -1080,7 +1111,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
             <div className="px-5">
               <SectionHeader title="Pinned" action="All apps" onAction={() => setView('all')} extra={
                 <button type="button" onClick={() => setEditing(true)}
-                  className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
+                  className="rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-(--os-active)">
                   Edit
                 </button>
               } />
@@ -1110,13 +1141,13 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
                   <span className="text-[12px] text-(--os-text-dim)">{APP_IDS.length + apps.length}</span>
                   <span className="flex-1" />
                   <button type="button" onClick={() => setView('home')}
-                    className="flex items-center gap-1 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
+                    className="flex items-center gap-1 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-(--os-active)">
                     <ChevronRightIcon width={11} height={11} className="rotate-180" /> Back
                   </button>
                 </div>
 
                 <section data-section="udaan">
-                  <p className="sticky top-0 z-10 flex items-center gap-3 rounded-[8px] bg-[var(--surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--color-accent)]">
+                  <p className="sticky top-0 z-10 flex items-center gap-3 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-semibold text-[var(--color-accent)]">
                     Udaan <span className="h-px flex-1 bg-(--os-separator)" />
                   </p>
                   <div className="grid grid-cols-3 gap-x-1 pb-2">
@@ -1138,7 +1169,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
 
                 {letters.map(([letter, list]) => (
                   <section key={letter} data-letter={letter}>
-                    <p className="sticky top-0 z-10 flex items-center gap-3 rounded-[8px] bg-[var(--surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--color-accent)]">
+                    <p className="sticky top-0 z-10 flex items-center gap-3 rounded-[8px] bg-(--os-hover) px-3 py-1.5 text-[12px] font-semibold text-[var(--color-accent)]">
                       {letter} <span className="h-px flex-1 bg-(--os-separator)" />
                     </p>
                     <div className="grid grid-cols-3 gap-x-1 pb-2">
@@ -1193,7 +1224,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
         <StatusBar onClose={onClose} />
 
         {/* Footer — user + My Day + power */}
-        <footer className="flex h-[56px] shrink-0 items-center justify-between border-t border-(--os-separator) bg-[var(--surface-raised)]/40 px-6">
+        <footer className="flex h-[56px] shrink-0 items-center justify-between border-t border-(--os-separator) bg-(--os-hover)/40 px-6">
           <button type="button" onClick={() => { onClose(); void openApp('settings') }}
             className="-ml-1.5 flex items-center gap-3 rounded-[10px] px-2 py-1.5 text-[13px] transition-colors duration-75 hover:bg-(--os-hover)">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent)] text-[13px] font-semibold text-[var(--color-accent-contrast)]">
@@ -1204,7 +1235,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => setView((v) => (v === 'day' ? 'home' : 'day'))}
               className={cn('flex h-8 items-center gap-2 rounded-[10px] px-3 text-[12.5px] font-medium transition-colors duration-75',
-                view === 'day' ? 'bg-[var(--color-accent)] text-white' : 'bg-(--os-hover) hover:bg-[var(--surface-hover)]')}>
+                view === 'day' ? 'bg-[var(--color-accent)] text-white' : 'bg-(--os-hover) hover:bg-(--os-active)')}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <circle cx="12" cy="12" r="4" />
                 <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />

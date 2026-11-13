@@ -72,11 +72,17 @@ export function TitleBar({ title, appId, active, maximized, onClose, onMinimize,
     <header
       data-tauri-drag-region
       className={cn(
-        'os-titlebar relative flex h-10 shrink-0 select-none items-center border-b px-3.5 transition-colors duration-150',
+        'os-titlebar relative flex h-10 shrink-0 select-none items-center border-b px-3.5 transition-[background-color,border-color,box-shadow] duration-200',
+        // An inactive window recedes rather than changing colour: the same
+        // surface, dimmer and flatter. Giving it a different tint makes a
+        // stack of windows read as a stack of different apps.
         active
-          ? 'border-[var(--border-hairline)] bg-[var(--chrome-active)] bg-gradient-to-b from-white/[0.06] to-transparent shadow-[inset_0_0.5px_0_rgb(255_255_255/0.14)]'
-          : 'border-[var(--border-hairline)]/50 bg-[var(--chrome-inactive)]',
+          ? 'border-(--os-border) shadow-[inset_0_1px_0_rgb(255_255_255/0.12),inset_0_-1px_0_rgb(0_0_0/0.18)]'
+          : 'border-(--os-border) opacity-[0.86] shadow-[inset_0_1px_0_rgb(255_255_255/0.05)]',
       )}
+      style={{
+        background: active ? 'var(--os-menubar-solid)' : 'var(--chrome-inactive)',
+      }}
     >
       <div className="group/lights z-10 flex items-center gap-2" onDoubleClick={(e) => e.stopPropagation()}>
         {LIGHTS.map((light) => (
@@ -98,10 +104,10 @@ export function TitleBar({ title, appId, active, maximized, onClose, onMinimize,
                   }
                 : undefined
             }
-            className="relative flex h-3 w-3 items-center justify-center rounded-full outline-none ring-offset-0 transition-[background-color,filter] duration-100 focus-visible:ring-2 focus-visible:ring-[var(--color-text-secondary)] active:brightness-75"
+            className="relative flex h-3 w-3 items-center justify-center rounded-full outline-none ring-offset-0 transition-[background-color,filter,transform] duration-100 focus-visible:ring-2 focus-visible:ring-(--color-text-secondary) hover:brightness-110 active:scale-90 active:brightness-75"
             style={{
               // Glass bead: the colour, a top highlight that fades out, and a hairline edge with a soft drop.
-              background: active ? `linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 55%), ${light.color}` : 'var(--os-menu-item-hover)',
+              background: active ? `linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 55%), ${light.color}` : 'var(--os-hover)',
               boxShadow: active ? 'inset 0 0 0 0.5px rgb(0 0 0 / 0.28), inset 0 0.5px 0 rgb(255 255 255 / 0.6), 0 0.5px 1.5px rgb(0 0 0 / 0.3)' : 'none',
             }}
           >
