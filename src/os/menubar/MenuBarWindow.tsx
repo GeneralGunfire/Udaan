@@ -1,7 +1,7 @@
 import { FocusPill } from './FocusPill'
 import { usePref } from '@/os/kernel/prefs'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, type HTMLMotionProps } from 'framer-motion'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
 import { useImmersive } from '@/os/kernel/useImmersive'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -141,13 +141,10 @@ function SoundIcon({ level, muted }: { level: number; muted: boolean }) {
  * behave identically: the same hover wash, the same press compression, the
  * same lit state when their panel is open. Inline classNames drifted before.
  */
-const StatusButton = motion.create(
-  function StatusButtonBase(
-    { active, className, children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean },
-    ref: React.Ref<HTMLButtonElement>,
-  ) {
+const StatusButton = forwardRef<HTMLButtonElement, HTMLMotionProps<'button'> & { active?: boolean }>(
+  function StatusButton({ active, className, children, ...rest }, ref) {
     return (
-      <button
+      <motion.button
         ref={ref}
         type="button"
         className={cn(
@@ -159,10 +156,9 @@ const StatusButton = motion.create(
         {...rest}
       >
         {children}
-      </button>
+      </motion.button>
     )
   },
-  { forwardMotionProps: true },
 )
 
 export function MenuBarWindow() {
