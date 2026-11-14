@@ -21,6 +21,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell"
+version = "0.0.0"
+dependencies = [
+ "windows",
+ "windows-numerics",
+]
+
+[[package]]
 name = "spike"
 version = "0.0.0"
 dependencies = [
