@@ -442,6 +442,7 @@ pub fn run() {
       taskbar_prefs::taskbar_prefs_set_pinned,
       taskbar_prefs::taskbar_prefs_get,
       taskbar_prefs::taskbar_prefs_set,
+      taskbar_prefs::taskbar_prefs_all,
       window_watcher::window_watcher_set_enabled,
       window_watcher::window_watcher_status,
       quick_settings::quick_settings_battery_status,

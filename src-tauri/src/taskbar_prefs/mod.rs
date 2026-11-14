@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 pub use store::PinnedApp;
 use store::Store;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct TaskbarPrefsState {
   store: Arc<Store>,
@@ -42,7 +42,20 @@ pub fn taskbar_prefs_get(state: State<TaskbarPrefsState>, key: String) -> Result
   state.store.get_pref(&key).map_err(|e| e.to_string())
 }
 
+/// Saves a preference and announces the change to every window. The store itself makes the
+/// announcement, so every window hears about every change no matter which one (or which
+/// part of the engine) made it, instead of depending on the writer remembering to emit.
 #[tauri::command]
-pub fn taskbar_prefs_set(state: State<TaskbarPrefsState>, key: String, value: String) -> Result<(), String> {
-  state.store.set_pref(&key, &value).map_err(|e| e.to_string())
+pub fn taskbar_prefs_set(app: AppHandle, state: State<TaskbarPrefsState>, key: String, value: String) -> Result<(), String> {
+  state.store.set_pref(&key, &value).map_err(|e| e.to_string())?;
+  let parsed = serde_json::from_str::<serde_json::Value>(&value).unwrap_or_else(|_| serde_json::Value::String(value.clone()));
+  let _ = app.emit("shell://pref-changed", serde_json::json!({ "key": key, "value": parsed }));
+  Ok(())
+}
+
+/// Every preference at once (key -> raw JSON string), for loading a window's settings in
+/// a single call.
+#[tauri::command]
+pub fn taskbar_prefs_all(state: State<TaskbarPrefsState>) -> Result<std::collections::HashMap<String, String>, String> {
+  state.store.all_prefs().map_err(|e| e.to_string())
 }

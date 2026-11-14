@@ -93,6 +93,15 @@ impl Store {
       .optional()
   }
 
+  /// Every stored preference, so a window can load all of them in one call at startup
+  /// instead of one round-trip per key.
+  pub fn all_prefs(&self) -> rusqlite::Result<std::collections::HashMap<String, String>> {
+    let conn = self.conn.lock().unwrap();
+    let mut st = conn.prepare("SELECT key, value FROM taskbar_prefs")?;
+    let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    rows.collect()
+  }
+
   pub fn set_pref(&self, key: &str, value: &str) -> rusqlite::Result<()> {
     let conn = self.conn.lock().unwrap();
     conn.execute(

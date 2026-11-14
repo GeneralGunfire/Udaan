@@ -1,13 +1,21 @@
+import { spring as makeSpring } from '@/os/motion/physics'
+
 /**
  * In-app motion vocabulary — every spring/duration in app views comes from
  * here. Animate only transform+opacity, never layout properties.
+ *
+ * These springs are derived from the same physics as the OS motion system
+ * (`@/os/motion/physics`): a response time and a damping ratio, not hand-tuned
+ * stiffness and damping. The values are the exact equivalents of the numbers
+ * they replaced, so nothing changes feel, but there is now one definition of a
+ * spring in the whole app.
  */
 export const spring = {
-  micro: { type: 'spring', stiffness: 500, damping: 30, mass: 0.8 } as const,
-  standard: { type: 'spring', stiffness: 420, damping: 32 } as const,
+  micro: makeSpring(0.25, 0.75, 0.8),
+  standard: makeSpring(0.31, 0.78),
   panel: { type: 'tween', duration: 0.18, ease: [0.2, 0, 0, 1] } as const,
-  emphasis: { type: 'spring', stiffness: 380, damping: 24 } as const,
-  gentle: { type: 'spring', stiffness: 280, damping: 28 } as const,
+  emphasis: makeSpring(0.32, 0.62),
+  gentle: makeSpring(0.38, 0.84),
 }
 
 export const stagger = {

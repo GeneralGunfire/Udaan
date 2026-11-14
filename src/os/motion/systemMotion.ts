@@ -522,26 +522,3 @@ export const titleChar = {
 export function titleCharDelay(index: number, step = 0.035): number {
   return index * step
 }
-
-/**
- * BREATHE. A slow, barely-perceptible swell, for something at rest that
- * should not look frozen — a logo during a wait, an idle empty state.
- *
- * Six seconds and 3%: fast or large enough to notice is distracting, and
- * this is meant to be felt rather than watched.
- */
-export const breathe = {
-  animate: { scale: [1, 1.03, 1] },
-  transition: { duration: 6, repeat: Infinity, ease: 'easeInOut' as const },
-}
-
-/**
- * SHIMMER. A highlight travelling across a surface, for loading states.
- *
- * Better than a pulsing opacity for a skeleton: a sweep implies progress
- * along the content, where a pulse only says "something is happening".
- */
-export const shimmer = {
-  animate: { backgroundPosition: ['200% 0', '-200% 0'] },
-  transition: { duration: 1.6, repeat: Infinity, ease: 'linear' as const },
-}

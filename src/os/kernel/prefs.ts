@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { emit, listen } from '@tauri-apps/api/event'
-import { getTaskbarPref, setTaskbarPref } from '@/integrations/taskbar-prefs/client'
+import { listen } from '@tauri-apps/api/event'
+import { getAllTaskbarPrefs, setTaskbarPref } from '@/integrations/taskbar-prefs/client'
 import { inTauri } from './shell'
 
 /** Every shell preference, its type and default. Stored in SQLite, broadcast to all windows on change. */
@@ -92,24 +92,41 @@ export type BoolPrefKey = { [K in PrefKey]: Prefs[K] extends boolean ? K : never
 
 const cache = new Map<PrefKey, unknown>()
 
+// All stored preferences are loaded in ONE call the first time any is read, instead of one
+// round-trip per key from every window. Everything not stored falls back to its default.
+let loading: Promise<void> | null = null
+function loadAll(): Promise<void> {
+  loading ??= getAllTaskbarPrefs().then(
+    (all) => {
+      for (const [key, raw] of Object.entries(all)) {
+        if (cache.has(key as PrefKey)) continue // a newer change already arrived
+        try {
+          cache.set(key as PrefKey, JSON.parse(raw))
+        } catch {
+          // an unreadable stored value just falls back to its default
+        }
+      }
+    },
+    () => {
+      loading = null // try again on the next read
+    },
+  )
+  return loading
+}
+
 export async function getPref<K extends PrefKey>(key: K): Promise<PrefValue<K>> {
   if (cache.has(key)) return cache.get(key) as PrefValue<K>
   const fallback = PREF_DEFAULTS[key]
   if (!inTauri) return fallback
-  try {
-    const raw = await getTaskbarPref(key)
-    const value = raw === null ? fallback : (JSON.parse(raw) as PrefValue<K>)
-    cache.set(key, value)
-    return value
-  } catch {
-    return fallback
-  }
+  await loadAll()
+  return cache.has(key) ? (cache.get(key) as PrefValue<K>) : fallback
 }
 
+/** Saves a preference. The engine announces the change to every window (including this
+ *  one), so nothing is emitted here. */
 export async function setPref<K extends PrefKey>(key: K, value: PrefValue<K>): Promise<void> {
   cache.set(key, value)
   await setTaskbarPref(key, JSON.stringify(value))
-  await emit('shell://pref-changed', { key, value })
 }
 
 export function onPrefChanged(handler: (key: PrefKey, value: unknown) => void) {

@@ -44,3 +44,8 @@ export async function getTaskbarPref(key: string): Promise<string | null> {
 export async function setTaskbarPref(key: string, value: string): Promise<void> {
   await invoke('taskbar_prefs_set', { key, value })
 }
+
+/** Every stored preference as raw JSON strings, in one call. */
+export async function getAllTaskbarPrefs(): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>('taskbar_prefs_all')
+}
