@@ -26,7 +26,7 @@ export function Group({ title, footer, children, className }: { title?: string; 
 
 /** Vertical stack of groups. */
 export function Stack({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-6">{children}</div>
+  return <div className="u-stack flex flex-col gap-6">{children}</div>
 }
 
 export function Row({ title, description, children, stack }: { title: string; description?: string; children?: ReactNode; stack?: boolean }) {

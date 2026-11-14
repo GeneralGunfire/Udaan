@@ -537,9 +537,7 @@
      instead: near-opaque charcoal + grain + top light + edge. */
   .u-start {
     border-radius: 20px;
-    transform: translate(-50%, calc(-50% - 24px));
     background: var(--u-m-solid) !important;
-    animation: u-start-in 200ms var(--u-ease);
   }
   @keyframes u-start-in {
     from { opacity: 0; transform: translate(-50%, calc(-50% - 8px)) scale(0.985); }
@@ -663,3 +661,22 @@
   }
 }
 [data-motion='off'] .u-wp-settle, [data-motion='off'] .u-dock, [data-motion='off'] .u-menubar, [data-motion='off'] .u-dock__item { animation: none; }
+
+@layer components {
+  /* ── RISE: things arrive instead of appearing ─────────────────────── */
+  @keyframes u-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .u-stack > * { animation: u-rise 520ms var(--u-ease) both; }
+  .u-stack > *:nth-child(2) { animation-delay: 60ms; }
+  .u-stack > *:nth-child(3) { animation-delay: 120ms; }
+  .u-stack > *:nth-child(4) { animation-delay: 180ms; }
+  .u-stack > *:nth-child(5) { animation-delay: 240ms; }
+  .u-stack > *:nth-child(n + 6) { animation-delay: 300ms; }
+  /* Start's tiles and rows arrive in a quick cascade (the index is set on each tile). */
+  .u-cascade { animation: u-rise 460ms var(--u-ease) both; animation-delay: calc(140ms + var(--i, 0) * 22ms); }
+  /* A popup's rows settle in just after the card. */
+  .u-popup > * { animation: u-rise 300ms var(--u-ease) 40ms both; }
+  @media (prefers-reduced-motion: reduce) {
+    .u-stack > *, .u-cascade, .u-popup > * { animation: none; }
+  }
+}
+[data-motion='off'] .u-stack > *, [data-motion='off'] .u-cascade { animation: none; }

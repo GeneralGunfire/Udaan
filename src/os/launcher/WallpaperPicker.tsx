@@ -10,14 +10,17 @@ import { WallpaperBrowser } from '@/os/wallpaper/WallpaperBrowser'
  */
 export function WallpaperPicker({ onClose }: { onClose: () => void }) {
   return (
-    <motion.div className="fixed inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.16 } }} exit={{ opacity: 0, transition: { duration: 0.12 } }} style={{ background: 'rgb(0 0 0 / 18%)' }} onMouseDown={onClose}>
-      <div
+    <motion.div className="fixed inset-0 flex items-start justify-center pt-[6vh]" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.16 } }} exit={{ opacity: 0, transition: { duration: 0.12 } }} style={{ background: 'rgb(0 0 0 / 18%)' }} onMouseDown={onClose}>
+      <motion.div
         role="dialog"
         aria-label="Wallpaper"
+        initial={{ y: -160, opacity: 0, scale: 0.97 }}
+        animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 28 } }}
+        exit={{ y: -120, opacity: 0, transition: { duration: 0.2 } }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
         tabIndex={-1}
-        className="u-surface u-start absolute left-1/2 top-1/2 flex h-[min(720px,calc(100vh-100px))] w-[min(900px,calc(100vw-48px))] flex-col overflow-hidden outline-none"
+        className="u-surface u-start flex h-[min(720px,calc(100vh-130px))] w-[min(900px,calc(100vw-48px))] flex-col overflow-hidden outline-none"
       >
         <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-4">
           <h2 className="text-[15px] font-semibold">Wallpaper</h2>
@@ -34,7 +37,7 @@ export function WallpaperPicker({ onClose }: { onClose: () => void }) {
         <div className="u-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-5">
           <WallpaperBrowser compact />
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   )
 }

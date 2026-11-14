@@ -167,9 +167,10 @@ export function CinemaCanvas({ kind, className, scale = 0.5, fps = 30, paused = 
     let t = 0
     const renderStill = () => {
       t = 0
-      for (let i = 0; i < 30; i++) {
-        t += 0.1
-        scene.draw(ctx, t, 0.1, cv.width, cv.height)
+      // Played at the real frame rate for a few seconds, so the still looks like a frame of the real thing.
+      for (let i = 0; i < 90; i++) {
+        t += 1 / 30
+        scene.draw(ctx, t, 1 / 30, cv.width, cv.height)
       }
     }
     const ro = new ResizeObserver(() => {

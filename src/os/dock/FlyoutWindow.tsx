@@ -29,7 +29,7 @@ const sheetMotion = {
   exit: { opacity: 0, x: 40, transition: { duration: dur.fast, ease: curve.accelerate } },
 }
 
-const WIDTH = { 'notifications-panel': 320, calendar: 300, layouts: 380, network: 280, sound: 340, media: 320, 'context-menu': 220 } as const
+const WIDTH = { 'notifications-panel': 320, calendar: 300, layouts: 380, network: 280, sound: 340, media: 320, 'context-menu': 188 } as const
 const GAP_ABOVE_DOCK = 10
 const EDGE = 8
 const MAX_HEIGHT = 640
@@ -49,6 +49,8 @@ export function FlyoutWindow() {
   const cardRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const openRef = useRef(false)
+  // Bumped on every show request, so asking for a menu while another is open re-places it.
+  const [seq, setSeq] = useState(0)
   const reduced = prefersReducedMotion()
 
   const hide = useCallback(() => {
@@ -59,7 +61,7 @@ export function FlyoutWindow() {
     void emit('taskbar-popup:hidden')
     // Gone at once: the compositor's blur belongs to the window, so waiting for a fade-out would leave a
     // blurred rectangle on screen after the card has already left.
-    void getCurrentWindow().hide()
+    void invoke('engine_popup_dismiss').catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function FlyoutWindow() {
         setPlacement(p.placement ?? 'above')
         setMenuItems(p.items ?? [])
         setKind(p.kind)
+        setSeq((n) => n + 1)
       }),
       listen('taskbar-popup:hide', hide),
       listen('engine://popup-outside', hide),
@@ -84,7 +87,6 @@ export function FlyoutWindow() {
     if (!kind) return
     let cancelled = false
     void (async () => {
-      const win = getCurrentWindow()
       // Panels that load data (network, media, notifications...) start small and grow a
       // moment later. Wait for their height to stop changing so the window opens at its
       // real size instead of visibly moving and resizing after it appears.
@@ -135,20 +137,20 @@ export function FlyoutWindow() {
       }
       await invoke('shell_set_window_rect', { x, y, w: finalW, h })
       void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
-      await win.show()
-      await win.setFocus()
+      await invoke('engine_popup_present')
       // Any click outside the popup (the desktop included) closes it.
       void invoke('engine_popup_watch', { on: true }).catch(() => {})
     })()
     return () => {
       cancelled = true
     }
-  }, [kind, placement])
+  }, [kind, placement, seq])
 
   // Panels load their data after opening; grow (or shrink) the window with them.
   useEffect(() => {
     const el = contentRef.current
-    if (!kind || !el || placement === 'sheet-right') return
+    // A menu is complete the moment it opens: it never re-fits itself afterwards.
+    if (!kind || !el || placement === 'sheet-right' || kind === 'context-menu') return
     // Debounced, not per-frame: resizing an OS window is an async IPC chain
     // (size, monitor, position, set rect) with the compositor re-blurring
     // behind it, so following content that is mid-animation would resize the
@@ -173,7 +175,7 @@ export function FlyoutWindow() {
         const pos = await win.outerPosition()
         const y = anchor.current.placement === 'above' ? pos.y + size.height - h : pos.y
         await invoke('shell_set_window_rect', { x: pos.x, y, w, h })
-        void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
+        void invoke('engine_window_round', { radius: 16 }).catch(() => {})
       }, 70)
     })
     ro.observe(el)

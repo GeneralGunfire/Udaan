@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
-import { prefersReducedMotion } from '@/shared/lib/motion'
-import { staggerDelay } from '@/os/motion/systemMotion'
 import type { FlyoutMenuItem } from './taskbarPopupTypes'
 
 /**
@@ -24,7 +21,6 @@ import type { FlyoutMenuItem } from './taskbarPopupTypes'
  *     the menu unrolling. It is capped, so a long menu still lands quickly.
  */
 export function ContextMenuList({ items, onSelect }: { items: FlyoutMenuItem[]; onSelect: (id: string) => void }) {
-  const reduced = prefersReducedMotion()
   const [active, setActive] = useState<number>(-1)
   const typed = useRef({ text: '', at: 0 })
 
@@ -80,31 +76,27 @@ export function ContextMenuList({ items, onSelect }: { items: FlyoutMenuItem[]; 
   }, [active, items, onSelect, selectable])
 
   return (
-    <div className="flex flex-col gap-px text-[13px]" role="menu">
+    <div className="flex flex-col gap-px text-[12.5px]" role="menu">
       {items.map((it, i) =>
         it.label === undefined ? (
           <div key={i} className="mx-2 my-1 h-px bg-(--os-separator)" role="separator" />
         ) : (
-          <motion.button
+          <button
             key={i}
             type="button"
             role="menuitem"
             disabled={it.disabled}
-            initial={reduced ? false : { opacity: 0, x: -4 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: staggerDelay(i, 0.012, 8), duration: 0.14, ease: [0, 0, 0, 1] }}
-            whileTap={reduced || it.disabled ? undefined : { scale: 0.985 }}
             onPointerEnter={() => !it.disabled && setActive(i)}
             onClick={() => it.id && onSelect(it.id)}
             className={cn(
-              'relative flex h-8 w-full cursor-default select-none items-center rounded-(--os-radius-control) px-3 text-left outline-none transition-colors duration-100',
+              'relative flex h-[26px] w-full cursor-default select-none items-center rounded-[7px] px-2.5 text-left outline-none transition-colors duration-75',
               active === i && 'bg-(--os-hover)',
               it.danger && 'text-(--color-danger)',
               it.disabled && 'pointer-events-none opacity-40',
             )}
           >
             <span className="flex-1 truncate">{it.label}</span>
-          </motion.button>
+          </button>
         ),
       )}
     </div>

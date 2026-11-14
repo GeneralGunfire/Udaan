@@ -309,6 +309,31 @@ pub fn engine_window_round(window: tauri::WebviewWindow, radius: i32) -> Result<
   Ok(())
 }
 
+/// Shows the calling popup window and brings it to the front, with the system call (see the note in
+/// `engine_popup_open` about why not the window library's `show()`).
+#[tauri::command]
+pub fn engine_popup_present(window: tauri::WebviewWindow) -> Result<(), String> {
+  use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOW};
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  unsafe {
+    let _ = ShowWindow(hwnd, SW_SHOW);
+  }
+  let _ = window.set_focus();
+  Ok(())
+}
+
+/// Hides the calling popup window at once, natively, and forgets it was open.
+#[tauri::command]
+pub fn engine_popup_dismiss(window: tauri::WebviewWindow) -> Result<(), String> {
+  use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  with_open(|o| o.remove(&(hwnd.0 as isize)));
+  unsafe {
+    let _ = ShowWindow(hwnd, SW_HIDE);
+  }
+  Ok(())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
