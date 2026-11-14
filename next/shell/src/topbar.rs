@@ -124,7 +124,8 @@ impl TopBar {
         let name_w = v.e.gpu.measure(name, &style).ceil();
         // A new surface sized to the name: a surface brush would otherwise stretch.
         let old = v.app.visual().clone();
-        let Ok(mut l) = v.e.gpu.label(&v.e.compositor, (name_w + 4.0) as u32, v.h as u32, style) else { return };
+        let Ok(l) = v.e.gpu.label(&v.e.compositor, (name_w + 4.0) as u32, v.h as u32, style) else { return };
+        let mut l = l.with_shadow(0.9);
         if l.set_text(&v.e.gpu, name).is_err() {
             return;
         }
@@ -227,7 +228,7 @@ fn build(e: &Rc<Engine>, hwnd: HWND, t: &Theme, dark: bool, s: f32, app_name: &s
 
     let app_x = pad + mark + 10.0 * s;
     let name_w = e.gpu.measure(app_name, &strong).ceil();
-    let mut app = e.gpu.label(c, (name_w + 4.0) as u32, h as u32, strong)?;
+    let mut app = e.gpu.label(c, (name_w + 4.0) as u32, h as u32, strong)?.with_shadow(0.9);
     app.set_text(&e.gpu, app_name)?;
     app.visual().SetOffset(Vector3 { X: app_x, Y: 0.0, Z: 0.0 })?;
     content.Children()?.InsertAtTop(app.visual())?;
@@ -245,7 +246,7 @@ fn build(e: &Rc<Engine>, hwnd: HWND, t: &Theme, dark: bool, s: f32, app_name: &s
         hl.SetOpacity(0.0)?;
         content.Children()?.InsertAtTop(&hl)?;
 
-        let mut label = e.gpu.label(c, (mw + 2.0) as u32, h as u32, body.clone())?;
+        let mut label = e.gpu.label(c, (mw + 2.0) as u32, h as u32, body.clone())?.with_shadow(0.9);
         label.set_text(&e.gpu, m)?;
         label.visual().SetOffset(Vector3 { X: x, Y: 0.0, Z: 0.0 })?;
         content.Children()?.InsertAtTop(label.visual())?;
@@ -256,7 +257,7 @@ fn build(e: &Rc<Engine>, hwnd: HWND, t: &Theme, dark: bool, s: f32, app_name: &s
     // Right side: clock at the edge, status glyphs to its left.
     let clock_style = TextStyle { family: t.family.clone(), size: t.clock_bar * s, weight: 600, align: Align::Right, color: col(pal.text) };
     let cw = (190.0 * s) as u32;
-    let clock = e.gpu.label(c, cw, h as u32, clock_style)?;
+    let clock = e.gpu.label(c, cw, h as u32, clock_style)?.with_shadow(0.9);
     clock.visual().SetOffset(Vector3 { X: w - cw as f32 - pad, Y: 0.0, Z: 0.0 })?;
     content.Children()?.InsertAtTop(clock.visual())?;
 
@@ -268,7 +269,7 @@ fn build(e: &Rc<Engine>, hwnd: HWND, t: &Theme, dark: bool, s: f32, app_name: &s
     for g in glyphs.iter().rev() {
         let gw = (24.0 * s) as u32;
         gx -= gw as f32;
-        let mut l = e.gpu.label(c, gw, h as u32, glyph_style.clone())?;
+        let mut l = e.gpu.label(c, gw, h as u32, glyph_style.clone())?.with_shadow(0.9);
         l.set_text(&e.gpu, g)?;
         l.visual().SetOffset(Vector3 { X: gx, Y: 0.0, Z: 0.0 })?;
         content.Children()?.InsertAtTop(l.visual())?;

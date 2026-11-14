@@ -10,23 +10,24 @@
 # 1920x1080 screen: 55 px dock icons, 6 px gaps, 17 px off the bottom edge.
 
 # ---------------------------------------------------------------------------------
-# Type scale: Segoe UI (Windows 10 has no Segoe UI Variable). Sizes in logical px.
-# Weight: 300 light, 400 regular, 600 semibold, 700 bold.
+# Type: Montserrat Variable, loaded as a PRIVATE font from theme/fonts (never installed
+# system-wide). Poppins was dropped from the original Udaan, so Montserrat carries both
+# display and body. Weight 200-300 for oversized display type, 500-600 for UI.
 [type]
-family        = "Segoe UI"
+family        = "Montserrat"
 mono          = "Cascadia Mono"
 icons         = "Segoe MDL2 Assets"
 caption       = 11
-label         = 12
-body          = 13
+label         = 11
+body          = 12
 title         = 15
 headline      = 20
-display       = 34
+display       = 96
 display_weight = 300
 clock_bar     = 12
 
 # ---------------------------------------------------------------------------------
-# Spacing on a 4 px grid, radii, strokes. Logical px; scaled per monitor DPI.
+# Spacing on a 4 px grid, radii. Logical px; scaled per monitor DPI.
 [space]
 xs = 4
 sm = 8
@@ -39,9 +40,9 @@ xxl = 32
 sm     = 6
 md     = 10
 lg     = 16
-dock   = 20      # the reference dock plate is a soft, wide-radius pill
+dock   = 22
 widget = 16
-icon   = 11      # app icon plate corner
+icon   = 12
 
 # ---------------------------------------------------------------------------------
 # Elevation: compositor drop shadows. "blur radius, y offset, opacity".
@@ -53,53 +54,57 @@ lift  = 18, 6, 0.26
 
 # ---------------------------------------------------------------------------------
 # Glass. Measured on this PC (see the win10-glass-material note): accent blur-behind
-# on the window DOES respect a composition rounded clip, and the blur is strong, so
-# the tint over it must be a thin film. CreateHostBackdropBrush is never used: on
-# Windows 10 it paints black.
+# on a window DOES respect a composition rounded clip. The blur is strong, so the tint
+# over it is almost nothing; there is NO hairline border and NO dark slab. Light comes
+# from one direction (above): a soft highlight on the top edge, shadow below.
 [material]
 mode          = "blur"   # "blur" | "none" (opaque fallback)
 edge          = 1
-border        = 1
+border        = 0
+blur          = 30     # px radius of the wallpaper blur behind dock glass (computed once)
 
 # ---------------------------------------------------------------------------------
-# Colour. The active set follows the Windows app theme.
-# Dock/top-bar tints are deliberately LIGHT: over a real blur a heavy dark tint reads
-# as a 2010 widget, which is what the first attempt looked like.
+# Colour: the original Udaan monochrome. Charcoal with real depth (never pure black or
+# white), warm off-white text #faf8f4 at 96/72/52 percent, and ONE accent, the logo
+# blue #3072f0, used only for active/live/selected/focus (the running-app dot).
+# Danger is a desaturated brick red. No glows anywhere: shadows are neutral dark.
 [dark]
-glass_tint     = #FFFFFF1A   # a light film over the blur, not a dark slab
-glass_opaque   = #1D2029F2   # when transparency is off
-glass_edge     = #FFFFFF26
-glass_border   = #FFFFFF24
-glass_shade    = #00000014
-text           = #FFFFFFF2
-text_secondary = #FFFFFFB0
-text_tertiary  = #FFFFFF70
-accent         = #FF4D4D     # the reference calendar's red accent
-accent_text    = #FFFFFF
-indicator      = #FFFFFFD8
-icon_plate     = #FFFFFF00   # no plate: real icons sit directly on the glass
-separator      = #FFFFFF1C
-widget_tint    = #1C1F28E6
-widget_edge    = #FFFFFF2A
-shadow         = #000000
+glass_tint     = #FAF8F40E   # barely a film over a strong blur
+glass_opaque   = #1C1C20F2   # when transparency is off (charcoal surface)
+glass_edge     = #FAF8F42E   # top-edge highlight
+glass_border   = #00000000
+glass_shade    = #0A0A0C22
+text           = #FAF8F4F5   # 96%
+text_secondary = #FAF8F4B8   # 72%
+text_tertiary  = #FAF8F485   # 52%
+accent         = #3072F0
+accent_text    = #FAF8F4
+danger         = #D9736A
+indicator      = #3072F0
+icon_plate     = #00000000
+separator      = #FAF8F41A
+widget_tint    = #131316E6   # name tag fill
+widget_edge    = #FAF8F426
+shadow         = #0A0A0C
 
 [light]
-glass_tint     = #FFFFFF59
-glass_opaque   = #F4F6FAF2
-glass_edge     = #FFFFFFC0
-glass_border   = #00000018
-glass_shade    = #0000000A
-text           = #1B1F28F2
-text_secondary = #1B1F28A6
-text_tertiary  = #1B1F2866
-accent         = #FF3B30
-accent_text    = #FFFFFF
-indicator      = #1B1F28CC
+glass_tint     = #FAF8F440
+glass_opaque   = #EFEDE8F2
+glass_edge     = #FFFFFFB0
+glass_border   = #00000000
+glass_shade    = #0A0A0C10
+text           = #17171AF5
+text_secondary = #17171AB8
+text_tertiary  = #17171A85
+accent         = #3072F0
+accent_text    = #FAF8F4
+danger         = #C25A50
+indicator      = #3072F0
 icon_plate     = #00000000
-separator      = #00000018
-widget_tint    = #FFFFFFE8
-widget_edge    = #FFFFFFF0
-shadow         = #000000
+separator      = #17171A1A
+widget_tint    = #FAF8F4E6
+widget_edge    = #FFFFFFC0
+shadow         = #0A0A0C
 
 # ---------------------------------------------------------------------------------
 # Motion. Springs run on the compositor and stop by themselves; nothing loops.
@@ -122,13 +127,13 @@ press_scale = 0.90
 [dock]
 icon          = 55      # measured: 44 px in a 865 px-tall reference -> 55 at 1080
 gap           = 6       # icons nearly touch
-pad_x         = 7
-pad_y         = 5
+pad_x         = 9
+pad_y         = 7
 bottom        = 17      # measured gap from the screen's bottom edge
 magnify_max   = 1.45
 magnify_sigma = 1.30
 magnify_rise  = 16
-tilt          = 0       # the reference dock does not tilt; keep it flat and clean
+tilt          = 11      # degrees of 3D tilt toward the cursor (set on mouse move only, 0 at rest)
 indicator     = 4
 reserve       = true    # keep an AppBar strip so maximised windows stop above it
 
@@ -149,4 +154,4 @@ photo          = "wallpapers/machu-picchu.jpg"
 widget_width   = 220
 widget_margin  = 22
 widget_gap     = 14
-vignette       = 0.30
+vignette       = 0.34

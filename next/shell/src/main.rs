@@ -124,18 +124,13 @@ fn clock_string() -> String {
     const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let t = unsafe { GetLocalTime() };
-    let h12 = match t.wHour % 12 {
-        0 => 12,
-        h => h,
-    };
     format!(
-        "{} {} {}  {}:{:02} {}",
+        "{} {} {}   {:02}:{:02}",
         DAYS[(t.wDayOfWeek as usize) % 7],
-        MONTHS[((t.wMonth as usize).max(1) - 1) % 12],
         t.wDay,
-        h12,
-        t.wMinute,
-        if t.wHour < 12 { "AM" } else { "PM" }
+        MONTHS[((t.wMonth as usize).max(1) - 1) % 12],
+        t.wHour,
+        t.wMinute
     )
 }
 
@@ -248,6 +243,10 @@ impl App {
         for b in self.bars.iter_mut() {
             b.set_clock(&now);
         }
+        if let Some(d) = self.desktop.as_mut() {
+            let (time, date) = desktop::time_strings();
+            d.set_clock(&time, &date);
+        }
     }
 
     fn explorer_restarted(&mut self) {
@@ -346,6 +345,8 @@ extern "system" fn dock_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                         d.shrink_if_hidden(&theme);
                     } else if wp.0 == dock::TIMER_REGION {
                         d.shrink_region();
+                    } else if wp.0 == dock::TIMER_RAMP {
+                        d.tick_ramp(&theme);
                     }
                     true
                 }
@@ -495,7 +496,6 @@ fn main() -> Result<()> {
         win::register_class(dock::CLASS, Some(dock_proc));
         win::register_class(topbar::CLASS, Some(bar_proc));
         win::register_class(desktop::CLASS, Some(desktop_proc));
-        win::register_class(dock::PLATE_CLASS, Some(desktop_proc));
         win::register_class(w!("UdaanNextCore"), Some(core_proc));
 
         // Hidden top-level window (not message-only: those miss broadcasts such as

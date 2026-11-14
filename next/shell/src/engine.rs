@@ -38,6 +38,12 @@ impl Engine {
     pub fn new() -> Result<Rc<Self>> {
         let compositor = Compositor::new()?;
         let gpu = Gpu::new(&compositor)?;
+        // Bundled Montserrat, as a private font: never installed, never touches the
+        // user's system fonts. If it fails, text falls back to the system face.
+        let font = crate::theme::dir().join("fonts").join("Montserrat-Variable.ttf");
+        if let Err(e) = gpu.load_private_font(&font.to_string_lossy(), "Montserrat") {
+            println!("font: Montserrat not loaded ({e}); falling back to system fonts");
+        }
         Ok(Rc::new(Self { compositor, gpu, formats: RefCell::new(HashMap::new()) }))
     }
 

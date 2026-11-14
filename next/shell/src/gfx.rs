@@ -22,7 +22,8 @@ use windows::{
             Direct3D::D3D_DRIVER_TYPE_HARDWARE,
             Direct3D11::{D3D11CreateDevice, ID3D11Device, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION},
             DirectWrite::{
-                DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED,
+                DWriteCreateFactory, IDWriteFactory, IDWriteFactory5, IDWriteFactory6, IDWriteFontCollection, IDWriteTextFormat,
+                DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FAMILY_MODEL_TYPOGRAPHIC,
                 DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT, DWRITE_MEASURING_MODE_NATURAL,
                 DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_LEADING,
                 DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_WORD_WRAPPING_NO_WRAP,
@@ -75,6 +76,8 @@ pub struct Gpu {
     gfx: CompositionGraphicsDevice,
     pub dw: IDWriteFactory,
     wic: IWICImagingFactory,
+    /// A private font collection (our bundled Montserrat), if it loaded.
+    fonts: std::cell::RefCell<Option<(String, IDWriteFontCollection)>>,
 }
 
 impl Gpu {
@@ -99,7 +102,7 @@ impl Gpu {
             let gfx = interop.CreateGraphicsDevice(&d2d)?;
             let dw: IDWriteFactory = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)?;
             let wic: IWICImagingFactory = CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
-            Ok(Self { _d3d: d3d, _d2d: d2d, gfx, dw, wic })
+            Ok(Self { _d3d: d3d, _d2d: d2d, gfx, dw, wic, fonts: std::cell::RefCell::new(None) })
         }
     }
 
@@ -116,11 +119,32 @@ impl Gpu {
         Ok(Surface { visual, surface, w, h })
     }
 
+    /// Register a font file as a private collection (never installed system-wide) under
+    /// `family`. Variable fonts are expanded into their named instances, so weights
+    /// 300/400/600/700 all resolve from the one file. On failure the caller's family
+    /// name simply resolves against system fonts instead.
+    pub fn load_private_font(&self, path: &str, family: &str) -> Result<()> {
+        unsafe {
+            let f5: IDWriteFactory5 = self.dw.cast()?;
+            let f6: IDWriteFactory6 = self.dw.cast()?;
+            let builder = f5.CreateFontSetBuilder()?; // IDWriteFontSetBuilder1: file-based AddFontFile
+            let file = f5.CreateFontFileReference(&HSTRING::from(path), None)?;
+            builder.AddFontFile(&file)?;
+            let set = builder.CreateFontSet()?;
+            let coll = f6.CreateFontCollectionFromFontSet(&set, DWRITE_FONT_FAMILY_MODEL_TYPOGRAPHIC)?;
+            let n = coll.GetFontFamilyCount();
+            println!("font: private collection from {path}: {n} family/families");
+            *self.fonts.borrow_mut() = Some((family.to_string(), coll.cast()?));
+            Ok(())
+        }
+    }
+
     pub fn format(&self, style: &TextStyle) -> Result<IDWriteTextFormat> {
         unsafe {
+            let private = self.fonts.borrow().as_ref().filter(|(fam, _)| *fam == style.family).map(|(_, c)| c.clone());
             let fmt = self.dw.CreateTextFormat(
                 &HSTRING::from(&style.family),
-                None,
+                private.as_ref(),
                 DWRITE_FONT_WEIGHT(style.weight as i32),
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
@@ -155,7 +179,7 @@ impl Gpu {
 
     /// A text label of `w` x `h` device pixels.
     pub fn label(&self, compositor: &Compositor, w: u32, h: u32, style: TextStyle) -> Result<Label> {
-        Ok(Label { surface: self.surface(compositor, w, h)?, style, text: String::new() })
+        Ok(Label { surface: self.surface(compositor, w, h)?, style, text: String::new(), shadow: None })
     }
 
     /// Decode an image file to a premultiplied BGRA WIC source scaled so it covers
@@ -194,6 +218,48 @@ impl Gpu {
             Ok(())
         })?;
         Ok(s)
+    }
+
+    /// A blurred crop of the wallpaper, for glass. `region` is (x, y, w, h) in screen
+    /// pixels. The wallpaper is scaled to cover the screen exactly as `image` does, so
+    /// the crop lines up with what the desktop layer draws. Blurred once, at build time;
+    /// hard border mode so the screen edge does not fade to transparent.
+    pub fn glass_backdrop(&self, compositor: &Compositor, path: &str, screen: (u32, u32), region: (f32, f32, f32, f32), sigma: f32) -> Result<Surface> {
+        let (sw, sh) = screen;
+        let (src, tw, th) = self.decode(path, sw, sh)?;
+        let (rw, rh) = (region.2.ceil().max(1.0), region.3.ceil().max(1.0));
+        let surf = self.surface(compositor, rw as u32, rh as u32)?;
+        surf.draw(move |ctx, w, h| unsafe {
+            use windows::Win32::Graphics::Direct2D::{
+                Common::{D2D1_BORDER_MODE_HARD, D2D1_COMPOSITE_MODE_SOURCE_OVER}, CLSID_D2D1GaussianBlur, D2D1_ANTIALIAS_MODE_ALIASED,
+                D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, D2D1_PROPERTY_TYPE_ENUM,
+                D2D1_PROPERTY_TYPE_FLOAT,
+            };
+            let bmp = ctx.CreateBitmapFromWicBitmap(&src, None)?;
+            let scale = (sw as f32 / tw as f32).max(sh as f32 / th as f32);
+            let (dw, dh) = (tw as f32 * scale, th as f32 * scale);
+            let (x0, y0) = ((sw as f32 - dw) / 2.0, (sh as f32 - dh) / 2.0);
+            let mut base = Matrix3x2::default();
+            ctx.GetTransform(&mut base);
+            // Never draw outside this surface's own rectangle in the shared atlas.
+            ctx.SetTransform(&Matrix3x2::identity());
+            ctx.PushAxisAlignedClip(&D2D_RECT_F { left: base.M31, top: base.M32, right: base.M31 + w, bottom: base.M32 + h }, D2D1_ANTIALIAS_MODE_ALIASED);
+            let fx = ctx.CreateEffect(&CLSID_D2D1GaussianBlur)?;
+            fx.SetInput(0, &bmp, true);
+            let sd = (sigma / scale).max(0.5);
+            fx.SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION.0 as u32, D2D1_PROPERTY_TYPE_FLOAT, &sd.to_le_bytes())?;
+            fx.SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE.0 as u32, D2D1_PROPERTY_TYPE_ENUM, &(D2D1_BORDER_MODE_HARD.0 as u32).to_le_bytes())?;
+            let out = fx.GetOutput()?;
+            // image px -> surface px: scale to cover, then shift so the region's corner
+            // lands on the surface origin.
+            ctx.SetTransform(&Matrix3x2 { M11: scale, M12: 0.0, M21: 0.0, M22: scale, M31: x0 - region.0 + base.M31, M32: y0 - region.1 + base.M32 });
+            ctx.DrawImage(&out, None, None, windows::Win32::Graphics::Direct2D::D2D1_INTERPOLATION_MODE_LINEAR, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+            ctx.SetTransform(&Matrix3x2::identity());
+            ctx.PopAxisAlignedClip();
+            ctx.SetTransform(&base);
+            Ok(())
+        })?;
+        Ok(surf)
     }
 
     /// The icon of an executable (or any shell item) as premultiplied BGRA pixels,
@@ -283,9 +349,18 @@ pub struct Label {
     pub surface: Surface,
     pub style: TextStyle,
     pub text: String,
+    /// Soft neutral shadow under the glyphs, for legibility straight on a wallpaper
+    /// (the design uses a text shadow instead of a scrim behind the text).
+    pub shadow: Option<f32>,
 }
 
 impl Label {
+    /// Give the label a soft shadow of the given strength (0..1).
+    pub fn with_shadow(mut self, strength: f32) -> Self {
+        self.shadow = Some(strength);
+        self
+    }
+
     pub fn visual(&self) -> &SpriteVisual {
         &self.surface.visual
     }
@@ -298,10 +373,19 @@ impl Label {
         self.text = text.to_string();
         let fmt = gpu.format(&self.style)?;
         let color = self.style.color;
+        let (shadow, size) = (self.shadow, self.style.size);
         let (w, h) = (self.surface.w as f32, self.surface.h as f32);
         self.surface.draw(|ctx, _, _| unsafe {
-            let brush = ctx.CreateSolidColorBrush(&d2d_color(color), None)?;
             let wide: Vec<u16> = text.encode_utf16().collect();
+            if let Some(k) = shadow {
+                // Two offset passes read as a soft shadow without a blur effect.
+                let d = (size * 0.045).max(1.0);
+                for (dy, a) in [(d * 1.6, 0.16 * k), (d, 0.30 * k)] {
+                    let sb = ctx.CreateSolidColorBrush(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a }, None)?;
+                    ctx.DrawText(&wide, &fmt, &D2D_RECT_F { left: 0.0, top: dy, right: w, bottom: h + dy }, &sb, D2D1_DRAW_TEXT_OPTIONS_NONE, DWRITE_MEASURING_MODE_NATURAL);
+                }
+            }
+            let brush = ctx.CreateSolidColorBrush(&d2d_color(color), None)?;
             ctx.DrawText(
                 &wide,
                 &fmt,
