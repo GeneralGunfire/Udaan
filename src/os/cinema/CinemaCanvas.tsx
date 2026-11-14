@@ -72,7 +72,7 @@ function aurora(w: number, h: number): Scene {
 }
 
 function flow(w: number, h: number): Scene {
-  const N = 900
+  const N = Math.max(120, Math.min(900, Math.round((w * h) / 576)))
   const ps = Array.from({ length: N }, () => ({ x: Math.random() * w, y: Math.random() * h, life: Math.random() * 200 }))
   return {
     draw(ctx, t, dt) {

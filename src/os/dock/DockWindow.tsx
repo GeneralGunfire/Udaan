@@ -252,7 +252,18 @@ export function DockWindow() {
   // just opened. Suppress labels for the rest of this hover until the
   // pointer genuinely leaves the dock.
   const [suppressLabels, setSuppressLabels] = useState(false)
-  const openMenu = useShellMenu()
+  const openShellMenu = useShellMenu()
+  // Dock menus open upward from the icon's top edge, so they sit above the dock instead of covering it.
+  const openMenu = useCallback(
+    (e: { currentTarget: EventTarget; clientX: number }, items: ShellMenuItemDef[]) => {
+      const el = e.currentTarget as HTMLElement
+      const r = el.getBoundingClientRect?.()
+      const bar = barRef.current?.getBoundingClientRect()
+      const x = r && el !== barRef.current ? r.left : e.clientX - 8
+      openShellMenu({ x, y: (bar?.top ?? r?.top ?? 0) - 8 }, items, { up: true })
+    },
+    [openShellMenu],
+  )
 
   // The drag-up switcher gesture often starts on the dock. When it opens,
   // drop whatever the dock thought was happening (press, drag, hover) and

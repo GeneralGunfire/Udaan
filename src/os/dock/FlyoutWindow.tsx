@@ -104,7 +104,8 @@ export function FlyoutWindow() {
       const { placement } = anchor.current
       const naturalWidth = Math.max(WIDTH[kind], contentRef.current?.scrollWidth ?? 0, cardRef.current?.scrollWidth ?? 0)
       const w = Math.round(naturalWidth * scale)
-      let x = placement === 'point' ? Math.round(anchor.current.x * scale) : Math.round(anchor.current.x * scale - w / 2)
+      const isPoint = placement === 'point' || placement === 'point-up'
+      let x = isPoint ? Math.round(anchor.current.x * scale) : Math.round(anchor.current.x * scale - w / 2)
       let y: number
       let h: number
       if (placement === 'sheet-right' && monitor) {
@@ -113,12 +114,13 @@ export function FlyoutWindow() {
         h = monitor.position.y + monitor.size.height - top - Math.round(EDGE * 2 * scale)
         x = monitor.position.x + monitor.size.width - w - Math.round(EDGE * scale)
         y = top
-      } else if (placement === 'point') {
+      } else if (isPoint) {
         // Context menu: top-left anchored exactly at the click point, like
         // a native right-click menu — not centred like the other panels.
         const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? cardRef.current?.scrollHeight ?? 300) + 2
         h = Math.round(height * scale)
-        y = Math.round(anchor.current.y * scale)
+        // 'point-up' opens upward from the point (a menu on the dock sits above it, never over it).
+        y = placement === 'point-up' ? Math.round(anchor.current.y * scale) - h : Math.round(anchor.current.y * scale)
       } else {
         const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? cardRef.current?.scrollHeight ?? 400) + 2
         h = Math.round(height * scale)

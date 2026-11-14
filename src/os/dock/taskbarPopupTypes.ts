@@ -10,7 +10,7 @@
  * sheet on the right (Notification Center), or exactly at a point
  * (context menus).
  */
-export type FlyoutPlacement = 'above' | 'below' | 'sheet-right' | 'point'
+export type FlyoutPlacement = 'above' | 'below' | 'sheet-right' | 'point' | 'point-up'
 
 /** The menu bar's own button-triggered panels — excludes 'context-menu',
  * which is opened ad hoc (dock icons, widgets) rather than from a

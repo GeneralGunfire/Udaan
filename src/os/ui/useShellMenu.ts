@@ -37,7 +37,7 @@ export function useShellMenu() {
     return () => void un.then((fn) => fn())
   }, [])
 
-  const openMenu = useCallback((at: { clientX: number; clientY: number } | { x: number; y: number }, items: ShellMenuItemDef[]) => {
+  const openMenu = useCallback((at: { clientX: number; clientY: number } | { x: number; y: number }, items: ShellMenuItemDef[], opts?: { up?: boolean }) => {
     // The popup window places itself in screen coordinates; the caller's
     // click or rect is relative to its own (dock, menu bar...) window.
     const x = window.screenX + ('clientX' in at ? at.clientX : at.x)
@@ -50,7 +50,7 @@ export function useShellMenu() {
       return { label: it.label, danger: it.danger, disabled: it.disabled, id }
     })
     pending.current = map
-    void emit('taskbar-popup:show', { kind: 'context-menu', x, y, placement: 'point', items: payload })
+    void emit('taskbar-popup:show', { kind: 'context-menu', x, y, placement: opts?.up ? 'point-up' : 'point', items: payload })
   }, [])
 
   return openMenu
