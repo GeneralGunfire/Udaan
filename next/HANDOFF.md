@@ -31,7 +31,7 @@ Honest foundation audit: the OS mechanics (AppBar, auto-hide, watchdog, text) ar
 - Split `main.rs` into modules (bar, appbar, core window, scene).
 - Share ONE Compositor and ONE D3D/D2D device across all bars (each bar currently creates its own).
 - Cache DirectWrite text formats; add tokens + theme files with hot reload; add scene primitives (rounded rect, shadow, mask, icon image), hit-testing, and `tools/measure`.
-- **Spike rounded blurred glass on Windows 10 before building the dock.** `SetWindowCompositionAttribute` blur fills the whole window rectangle (no rounded corners), and the compositor backdrop brush does not see behind the window on Windows 10. Options to measure: `SetWindowRgn` rounded region (jagged edge), or blurring our own wallpaper slice (correct over our desktop, not over other apps). Pick from numbers and screenshots.
+- **(RESOLVED by measurement, see below) Spike rounded blurred glass on Windows 10 before building the dock.** `SetWindowCompositionAttribute` blur fills the whole window rectangle (no rounded corners), and the compositor backdrop brush does not see behind the window on Windows 10. Options to measure: `SetWindowRgn` rounded region (jagged edge), or blurring our own wallpaper slice (correct over our desktop, not over other apps). Pick from numbers and screenshots.
 - Test the written-but-untested paths (second monitor, DPI change, Explorer restart) carefully.
 
 ## Do next, in this order
@@ -44,3 +44,6 @@ Honest foundation audit: the OS mechanics (AppBar, auto-hide, watchdog, text) ar
 6. Add a perf harness (`tools/measure`) so every milestone ends with numbers.
 
 Show the user the result (screenshots) at the end of each of steps 2, 3 and 4, and check the idle cost after each. Keep Explorer running alongside; never modify the Winlogon `Shell` value; never use `SPI_SETWORKAREA`.
+
+## Measured result: rounded glass (supersedes the warning above)
+Spike on this PC: accent blur + composition rounded clip blurs the backdrop (stripe contrast 125 to 3) with clean antialiased rounded corners; accent blur + SetWindowRgn also works but with a harder edge; `CreateHostBackdropBrush` paints black on Windows 10 and must not be used; no blur leaves the backdrop untouched. Use accent blur + composition clip for the dock/top bar, and remove any host-backdrop-brush code (e.g. `glass.rs`). The blur is strong enough that the dock plate can be very light.
