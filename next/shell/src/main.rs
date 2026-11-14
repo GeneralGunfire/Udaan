@@ -76,6 +76,8 @@ struct App {
 }
 
 thread_local! {
+    static TASKBAR_CREATED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static REPLACE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
 }
 
@@ -277,6 +279,25 @@ fn shutdown(hwnd: HWND) {
 
 extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     unsafe {
+        // Explorer restarted: its taskbar is a new window (re-hide it) and appbar
+        // registrations were dropped (re-register, re-dock).
+        if msg != 0 && msg == TASKBAR_CREATED.with(|m| m.get()) {
+            let mut abd = appbar_data(hwnd);
+            abd.uCallbackMessage = WM_APPBAR;
+            SHAppBarMessage(ABM_NEW, &mut abd);
+            dock(hwnd, bar_height_px(hwnd));
+            if REPLACE.with(|r| r.get()) {
+                if let Ok(t) = FindWindowW(w!("Shell_TrayWnd"), None) {
+                    let _ = ShowWindow(t, SW_HIDE);
+                    APP.with(|a| {
+                        if let Some(app) = a.borrow_mut().as_mut() {
+                            app.explorer_tray = Some(t);
+                        }
+                    });
+                }
+            }
+            return LRESULT(0);
+        }
         match msg {
             WM_APPBAR => {
                 match wp.0 as u32 {
@@ -409,10 +430,17 @@ fn main() -> Result<()> {
             if let Some(t) = t {
                 let _ = ShowWindow(t, SW_HIDE);
             }
+            // Guard process: restores Explorer's taskbar even if we crash or are killed.
+            if let Ok(exe) = std::env::current_exe() {
+                let wd = exe.with_file_name("watchdog.exe");
+                let _ = std::process::Command::new(wd).arg(std::process::id().to_string()).spawn();
+            }
             t
         } else {
             None
         };
+        TASKBAR_CREATED.with(|m| m.set(RegisterWindowMessageW(w!("TaskbarCreated"))));
+        REPLACE.with(|r| r.set(args.replace));
 
         let app = build(hwnd, tray)?;
         APP.with(|a| *a.borrow_mut() = Some(app));
