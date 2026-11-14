@@ -114,6 +114,11 @@ pub fn run() {
       engine::apps::engine_app_closed,
       engine::doctor::engine_doctor,
       engine::engine_raise_topmost,
+      engine::search::search_register,
+      engine::search::search_query,
+      engine::search::search_record_launch,
+      engine::search::search_status,
+      engine::search::search_refresh_apps,
       engine::edges::engine_edge_bind,
       engine::edges::engine_edge_release,
       engine::popup::engine_popup_open,
@@ -175,6 +180,14 @@ pub fn run() {
       notifications::notifications_mark_all_read,
       notifications::notifications_dismiss,
       notifications::notifications_push,
+      engine::notify::notify_push,
+      engine::notify::notify_list,
+      engine::notify::notify_unread_count,
+      engine::notify::notify_mark_read,
+      engine::notify::notify_mark_all_read,
+      engine::notify::notify_dismiss,
+      engine::notify::notify_dismiss_banner,
+      engine::notify::notify_banners,
       claude_usage::claude_usage_get_report,
       general_chat::general_chat_create_session,
       general_chat::general_chat_list_sessions,
@@ -481,7 +494,7 @@ pub fn run() {
       engine::stores::manage(app.handle(), "scholar", scholar::init(app.handle()));
       engine::stores::manage(app.handle(), "study", study::init(app.handle()));
       engine::stores::manage(app.handle(), "notes", notes::init(app.handle()));
-      engine::stores::manage(app.handle(), "notifications", notifications::init(app.handle()));
+      engine::stores::manage(app.handle(), "notifications", engine::notify::start(app.handle()).map(|_| ()));
       notifications::windows_mirror::start(app.handle().clone());
 
       engine::stores::manage(app.handle(), "audio_library", audio_library::init(app.handle()));
@@ -492,6 +505,7 @@ pub fn run() {
       // All state is registered: only now may the shell's pages start loading.
       engine::create_windows(app.handle());
       engine::apps::start(app.handle().clone());
+      engine::search::start(app.handle().clone());
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);

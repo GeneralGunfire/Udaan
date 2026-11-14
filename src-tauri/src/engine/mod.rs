@@ -17,11 +17,13 @@
 //!   Explorer restart.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
+//! - [`notify`]: notifications from arrival to expiry: policy, history, banner queue and timers.
 //! - [`popup`]: where a popup goes (flip, clamp, fit) and when it dismisses itself.
 //! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
 //!   it back however the window ends.
 //! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
+//! - [`search`]: the Start search index: apps, settings, actions and files, ranked, with frecency.
 //! - [`stores`]: databases that open resiliently; a damaged one is set aside, never fatal.
 //! - [`trace`]: a small crash-safe breadcrumb log, because a release build has no console.
 
@@ -31,8 +33,10 @@ pub mod doctor;
 pub mod edges;
 pub mod governor;
 pub mod guard;
+pub mod notify;
 pub mod popup;
 pub mod resources;
+pub mod search;
 pub mod stores;
 pub mod supervisor;
 pub mod trace;

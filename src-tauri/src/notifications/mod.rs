@@ -1,45 +1,16 @@
-//! Real notification store backing the taskbar's notification panel —
-//! replaces what was previously a hardcoded empty state with no backend
-//! at all. Same store pattern as every other feature (see
-//! taskbar_prefs/store.rs for the reference shape): SQLite via
-//! `db::configure_connection`, one `Store` behind a `Mutex<Connection>`.
+//! Compatibility layer for the notification engine (`engine::notify`).
 //!
-//! Any Rust module can push a notification via `push_notification` (see
-//! below) — the first real producers are daily_brief (report ready) and
-//! the frontend's TTS error path (via the `notifications_push` command,
-//! since that failure surfaces in JS, not Rust).
+//! The notification store, policy and banner timing now live in the engine. This module keeps
+//! the old command names and the `push_notification` function working, unchanged, so the
+//! current toast and notification panel keep running until their own rebuild moves them onto
+//! the engine's commands. It owns no state and no storage.
 
-mod store;
 pub mod windows_mirror;
 
-use std::sync::Arc;
+use crate::engine::notify::{self, Incoming, Notification, Urgency};
+use tauri::AppHandle;
 
-pub use store::Notification;
-use store::Store;
-use tauri::{AppHandle, Emitter, Manager, State};
-
-pub struct NotificationsState {
-  store: Arc<Store>,
-}
-
-pub fn init(app: &AppHandle) -> Result<NotificationsState, String> {
-  let data_dir = app
-    .path()
-    .app_data_dir()
-    .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
-  std::fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create app data dir: {e}"))?;
-  let db_path = data_dir.join("notifications.sqlite3");
-
-  let store = Arc::new(Store::open(db_path).map_err(|e| format!("Failed to open notifications store: {e}"))?);
-  Ok(NotificationsState { store })
-}
-
-/// Callable from other Rust modules (daily_brief, ...) without
-/// going through the Tauri command/IPC layer — those run in Rust already
-/// and have direct access to `AppHandle`. Emits `notifications:changed` so
-/// every open window's taskbar panel updates without polling, the same
-/// broadcast-on-mutation pattern `taskbar:auto-hide-changed` already uses
-/// elsewhere in this app.
+/// Callable from Rust modules without going through the command layer.
 pub fn push_notification(
   app: &AppHandle,
   kind: &str,
@@ -49,58 +20,48 @@ pub fn push_notification(
   action_label: Option<&str>,
   action_payload: Option<&str>,
 ) -> Result<Notification, String> {
-  let state = app.state::<NotificationsState>();
-  let notification = state
-    .store
-    .push(kind, title, body, source_app, action_label, action_payload)
-    .map_err(|e| e.to_string())?;
-  let _ = app.emit("notifications:changed", ());
-  Ok(notification)
+  notify::submit(
+    app,
+    Incoming {
+      kind: kind.to_string(),
+      title: title.to_string(),
+      body: body.to_string(),
+      source_app: source_app.to_string(),
+      action_label: action_label.map(str::to_string),
+      action_payload: action_payload.map(str::to_string),
+      urgency: Urgency::Normal,
+    },
+  )
 }
 
-#[tauri::command]
-pub fn notifications_list(
-  state: State<NotificationsState>,
-  unread_only: bool,
-  limit: i64,
-) -> Result<Vec<Notification>, String> {
-  state.store.list(unread_only, limit).map_err(|e| e.to_string())
+#[tauri::command(async)]
+pub fn notifications_list(unread_only: bool, limit: i64) -> Result<Vec<Notification>, String> {
+  notify::notify_list(unread_only, limit)
 }
 
-#[tauri::command]
-pub fn notifications_unread_count(state: State<NotificationsState>) -> Result<i64, String> {
-  state.store.unread_count().map_err(|e| e.to_string())
+#[tauri::command(async)]
+pub fn notifications_unread_count() -> Result<i64, String> {
+  notify::notify_unread_count()
 }
 
-#[tauri::command]
-pub fn notifications_mark_read(app: AppHandle, state: State<NotificationsState>, id: String) -> Result<(), String> {
-  state.store.mark_read(&id).map_err(|e| e.to_string())?;
-  let _ = app.emit("notifications:changed", ());
-  Ok(())
+#[tauri::command(async)]
+pub fn notifications_mark_read(app: AppHandle, id: String) -> Result<(), String> {
+  notify::notify_mark_read(app, id)
 }
 
-#[tauri::command]
-pub fn notifications_mark_all_read(app: AppHandle, state: State<NotificationsState>) -> Result<(), String> {
-  state.store.mark_all_read().map_err(|e| e.to_string())?;
-  let _ = app.emit("notifications:changed", ());
-  Ok(())
+#[tauri::command(async)]
+pub fn notifications_mark_all_read(app: AppHandle) -> Result<(), String> {
+  notify::notify_mark_all_read(app)
 }
 
-#[tauri::command]
-pub fn notifications_dismiss(app: AppHandle, state: State<NotificationsState>, id: String) -> Result<(), String> {
-  state.store.dismiss(&id).map_err(|e| e.to_string())?;
-  let _ = app.emit("notifications:changed", ());
-  Ok(())
+#[tauri::command(async)]
+pub fn notifications_dismiss(app: AppHandle, id: String) -> Result<(), String> {
+  notify::notify_dismiss(app, id)
 }
 
-/// Frontend-facing push — used for producers that only exist in
-/// TypeScript (the TTS error path in Phase 8, since a Piper synthesis
-/// failure surfaces inside the document-reader/news-brief playback
-/// engine, not in Rust).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notifications_push(
   app: AppHandle,
-  state: State<NotificationsState>,
   kind: String,
   title: String,
   body: String,
@@ -108,17 +69,5 @@ pub fn notifications_push(
   action_label: Option<String>,
   action_payload: Option<String>,
 ) -> Result<Notification, String> {
-  let notification = state
-    .store
-    .push(
-      &kind,
-      &title,
-      &body,
-      &source_app,
-      action_label.as_deref(),
-      action_payload.as_deref(),
-    )
-    .map_err(|e| e.to_string())?;
-  let _ = app.emit("notifications:changed", ());
-  Ok(notification)
+  notify::submit(&app, Incoming { kind, title, body, source_app, action_label, action_payload, urgency: Urgency::Normal })
 }

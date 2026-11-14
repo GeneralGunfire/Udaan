@@ -27,6 +27,12 @@ pub fn init(app: &AppHandle) -> Result<TaskbarPrefsState, String> {
   Ok(TaskbarPrefsState { store })
 }
 
+/// Reads one stored preference (raw JSON string) from Rust, so the engine can obey the user's
+/// settings itself instead of leaving them to whichever window renders the result.
+pub fn read_pref(app: &AppHandle, key: &str) -> Option<String> {
+  app.try_state::<TaskbarPrefsState>()?.store.get_pref(key).ok().flatten()
+}
+
 #[tauri::command]
 pub fn taskbar_prefs_list_pinned(state: State<TaskbarPrefsState>) -> Result<Vec<PinnedApp>, String> {
   state.store.list_pinned().map_err(|e| e.to_string())
