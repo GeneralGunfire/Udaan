@@ -14,15 +14,18 @@
 //! - [`desktop`]: the wallpaper/icons layer: always the bottom of the stack, fitted to the
 //!   primary monitor, and recovered when monitors, DPI or Explorer change.
 //! - [`desktop_items`]: what is on the desktop, as Explorer would show it, kept current.
+//! - [`displays`]: every monitor (area, work area, scale, primary) and a notice when they change.
 //! - [`doctor`]: checks the engine's own invariants and repairs them after a display change or an
 //!   Explorer restart.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
+//! - [`keyboard`]: the Win key, Win+<key>, double-tap Ctrl and Alt+`, as a tested state machine.
 //! - [`notify`]: notifications from arrival to expiry: policy, history, banner queue and timers.
 //! - [`popup`]: where a popup goes (flip, clamp, fit) and when it dismisses itself.
 //! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
 //!   it back however the window ends.
 //! - [`wallpaper_packs`]: packs (cars, windows, abstract...) and automatic changing on a timer.
+//! - [`window_actions`]: focus, snap, minimise, show desktop and the other things done to windows.
 //! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
 //! - [`search`]: the Start search index: apps, settings, actions and files, ranked, with frecency.
@@ -32,19 +35,25 @@
 pub mod apps;
 pub mod desktop;
 pub mod desktop_items;
+pub mod displays;
 pub mod doctor;
 pub mod edges;
+pub mod explorer;
 pub mod governor;
+pub mod geometry;
 pub mod guard;
+pub mod keyboard;
 pub mod notify;
 pub mod popup;
 pub mod resources;
 pub mod search;
 pub mod stores;
 pub mod supervisor;
+pub mod tracker;
 pub mod trace;
 pub mod wallpaper_packs;
 pub mod wallpapers;
+pub mod window_actions;
 pub mod watchdog;
 
 use tauri::AppHandle;
@@ -54,6 +63,7 @@ use tauri::AppHandle;
 pub fn install(app: &AppHandle) {
   trace::init();
   install_panic_hook();
+  displays::init(app);
   governor::attach_all(app);
   trace::line("engine installed");
 }

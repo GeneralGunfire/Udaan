@@ -42,6 +42,13 @@ pub fn run(heal: bool) -> Vec<Check> {
   }
   out.push(check("external guard", alive || heal, if alive { "running" } else if heal { "was not running; restarted" } else { "not running" }));
 
+  // The keyboard hook, if it is meant to be on, must actually be installed.
+  let (want, have) = (super::keyboard::is_enabled(), super::keyboard::is_installed());
+  if want && !have && heal {
+    super::keyboard::set_enabled(true);
+  }
+  out.push(check("keyboard hook", !want || have || heal, if !want { "off (by setting)" } else if have { "installed" } else if heal { "was missing; reinstalling" } else { "wanted but not installed" }));
+
   let failed: Vec<String> = super::supervisor::health().into_iter().filter(|h| h.state == "failed").map(|h| h.name).collect();
   out.push(check("background services", failed.is_empty(), if failed.is_empty() { "all running".to_string() } else { format!("failed: {}", failed.join(", ")) }));
 

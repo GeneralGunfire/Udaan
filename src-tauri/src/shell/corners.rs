@@ -70,9 +70,9 @@ pub fn set_enabled(enabled: bool) {
         let hit = sample();
         match (hit, current) {
           (Some(c), Some((prev, since))) if c == prev => {
-            if !fired && since.elapsed() >= DWELL && !super::last_is_fullscreen() {
+            if !fired && since.elapsed() >= DWELL && !crate::engine::tracker::last_is_fullscreen() {
               fired = true;
-              super::send_hotkey(c);
+              crate::engine::keyboard::emit_hotkey(c);
             }
           }
           (Some(c), _) => {

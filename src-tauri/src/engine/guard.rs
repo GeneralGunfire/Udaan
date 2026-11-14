@@ -20,17 +20,6 @@ pub fn register(name: impl Into<String>, undo: impl FnOnce() + Send + 'static) {
   }
 }
 
-/// Runs and removes the undo registered under `name`, if any.
-pub fn release(name: &str) {
-  let undo = UNDOS.lock().ok().and_then(|mut all| {
-    let i = all.iter().position(|(n, _)| n == name)?;
-    Some(all.remove(i).1)
-  });
-  if let Some(u) = undo {
-    u();
-  }
-}
-
 /// Forgets the undo registered under `name` without running it (the change was already
 /// reverted by the normal path).
 pub fn cancel(name: &str) {
@@ -63,17 +52,17 @@ mod tests {
   static SERIAL: Mutex<()> = Mutex::new(());
 
   #[test]
-  fn undoes_newest_first_once_and_release_removes() {
+  fn undoes_newest_first_once_and_cancel_forgets() {
     let _s = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     let order = Arc::new(Mutex::new(Vec::new()));
     let (a, b, c) = (order.clone(), order.clone(), order.clone());
     register("g-a", move || a.lock().unwrap().push("a"));
     register("g-b", move || b.lock().unwrap().push("b"));
     register("g-c", move || c.lock().unwrap().push("c"));
-    release("g-b");
+    cancel("g-b");
     run_all();
     run_all();
-    assert_eq!(*order.lock().unwrap(), vec!["b", "c", "a"]);
+    assert_eq!(*order.lock().unwrap(), vec!["c", "a"], "newest first, each once, the cancelled one never");
   }
 
   #[test]

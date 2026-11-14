@@ -80,7 +80,7 @@ mod imp {
         }
         match wparam as u32 {
           WM_LBUTTONDOWN => {
-            if p.y >= monitor_bottom(p) - START_STRIP && !crate::shell::last_is_fullscreen() {
+            if p.y >= monitor_bottom(p) - START_STRIP && !crate::engine::tracker::last_is_fullscreen() {
               START_Y.store(p.y, Ordering::Relaxed);
               STATE.store(1, Ordering::Relaxed);
             } else {

@@ -112,6 +112,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       engine::engine_health,
       engine::apps::engine_app_closed,
+      engine::resources::engine_tier,
+      engine::displays::displays_list,
       engine::doctor::engine_doctor,
       engine::engine_raise_topmost,
       engine::search::search_register,
@@ -346,29 +348,29 @@ pub fn run() {
       schedule::schedule_update_event,
       schedule::schedule_delete_event,
       schedule::schedule_set_status,
-      shell::shell_snapshot,
-      shell::shell_focus_window,
-      shell::shell_minimize_window,
-      shell::shell_set_windows_hidden,
-      shell::shell_toggle_maximize_window,
-      shell::shell_close_window,
-      shell::shell_toggle_desktop,
-      shell::shell_set_explorer_chrome_hidden,
-      shell::shell_set_keyboard_hook,
+      engine::tracker::shell_snapshot,
+      engine::window_actions::shell_focus_window,
+      engine::window_actions::shell_minimize_window,
+      engine::window_actions::shell_set_windows_hidden,
+      engine::window_actions::shell_toggle_maximize_window,
+      engine::window_actions::shell_close_window,
+      engine::window_actions::shell_toggle_desktop,
+      engine::explorer::shell_set_explorer_chrome_hidden,
+      engine::keyboard::shell_set_keyboard_hook,
       shell::shell_set_material,
-      shell::shell_set_window_rect,
-      shell::shell_monitor_of,
-      shell::shell_open_app,
-      shell::shell_prewarm_apps,
-      shell::shell_take_app_args,
+      engine::window_actions::shell_set_window_rect,
+      engine::window_actions::shell_monitor_of,
+      engine::apps::shell_open_app,
+      engine::apps::shell_prewarm_apps,
+      engine::apps::shell_take_app_args,
       shell::shell_file_icons,
       shell::shell_invalidate_icon,
       shell::shell_app_names,
       shell::shell_resolve_launch,
-      shell::shell_window_sizes,
-      shell::shell_window_icons,
-      shell::shell_snap_window,
-      shell::shell_snap_self,
+      engine::window_actions::shell_window_sizes,
+      engine::window_actions::shell_window_icons,
+      engine::window_actions::shell_snap_window,
+      engine::window_actions::shell_snap_self,
       shell::apps::shell_installed_apps,
       shell::apps::shell_installed_app_icons,
       shell::fs::shell_recycle,
@@ -515,6 +517,7 @@ pub fn run() {
 
       // All state is registered: only now may the shell's pages start loading.
       engine::create_windows(app.handle());
+      engine::resources::start(app.handle().clone());
       engine::apps::start(app.handle().clone());
       engine::search::start(app.handle().clone());
       engine::stores::manage(app.handle(), "wallpaper_packs", engine::wallpaper_packs::start(app.handle()).map(|_| ()));
@@ -522,14 +525,15 @@ pub fn run() {
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);
-        if let Err(e) = shell::install_desktop(&main_window) {
+        if let Err(e) = engine::desktop::install_as_shell_desktop(&main_window) {
           log::error!("Failed to install the desktop layer: {e}");
         }
       }
 
-      shell::shell_set_keyboard_hook(true);
+      engine::keyboard::shell_set_keyboard_hook(true);
       shell::session::refresh_autostart_target();
-      shell::start(app.handle().clone());
+      engine::tracker::start(app.handle().clone());
+      engine::keyboard::start(app.handle().clone());
       shell::gesture::start(app.handle().clone());
       utilities::start_clipboard_watch(app.handle().clone());
 
@@ -566,11 +570,12 @@ pub fn run() {
     })
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
-    .run(|app, event| {
+    .run(|_app, event| {
       if let tauri::RunEvent::Exit = event {
         shell::live_audio::restore_all();
         shell::edge_light::shutdown();
-        shell::restore_on_exit();
+        engine::explorer::restore_on_exit();
+        engine::keyboard::restore_on_exit();
         // Anything still registered with the engine's guard: undo it.
         engine::guard::run_all();
       }

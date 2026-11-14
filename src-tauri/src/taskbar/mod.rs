@@ -50,16 +50,12 @@ pub(crate) mod win {
   use windows_sys::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
   };
-  use windows_sys::Win32::UI::Shell::{
-    SHAppBarMessage, ABE_BOTTOM, ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE,
-    ABM_SETPOS, APPBARDATA,
-  };
+  
   use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, FindWindowW, GetForegroundWindow, GetSystemMetrics, GetWindow, GetWindowLongW,
+    EnumWindows, GetWindow, GetWindowLongW,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
-    IsZoomed, PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, GWL_EXSTYLE,
-    GW_OWNER, HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOW, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
+    IsZoomed, PostMessageW, GWL_EXSTYLE,
+    GW_OWNER, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
     WS_EX_TOOLWINDOW,
   };
 
@@ -397,22 +393,6 @@ pub(crate) mod win {
     windows
   }
 
-  /// Requests the window close itself via `WM_CLOSE`, the same message a
-  /// real window's own close button/Alt-F4 sends — `PostMessageW` (not
-  /// `SendMessageW`) so this never blocks waiting on an unresponsive or
-  /// slow-to-repaint app; the app decides whether to actually exit (it may
-  /// still show its own "save changes?" prompt first, same as clicking its
-  /// titlebar X would).
-  pub fn close_window(handle: isize) -> Result<(), String> {
-    unsafe {
-      let hwnd = handle as HWND;
-      if PostMessageW(hwnd, WM_CLOSE, 0, 0) == 0 {
-        return Err("Could not close that window — it may have already closed.".to_string());
-      }
-    }
-    Ok(())
-  }
-
   /// Registers a live DWM thumbnail of `source_hwnd` (a real app's window)
   /// to be composited into `dest_hwnd` (the taskbar-popup window) — the
   /// exact mechanism the real Windows 11 taskbar uses for its own hover
@@ -517,14 +497,6 @@ pub(crate) mod win {
   pub fn unregister_thumbnail(_thumb: isize) {}
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct AppbarRect {
-  pub left: i32,
-  pub top: i32,
-  pub right: i32,
-  pub bottom: i32,
-}
-
 /// Every visible, titled, non-tool top-level window currently open on the
 /// desktop — the real OS-level window list a taskbar shows, not just
 /// Udaan's own windows.
@@ -614,17 +586,6 @@ pub fn taskbar_unregister_all_thumbnails(registry: tauri::State<ThumbnailRegistr
     win::unregister_thumbnail(thumb);
   }
   Ok(())
-}
-
-/// Same as `taskbar_unregister_all_thumbnails` but callable directly (not
-/// through the IPC command layer) — used by `lib.rs`'s `on_window_event`
-/// handler on the popup window's close, the same pattern
-/// `unregister_appbar_by_hwnd` already establishes for the appbar.
-pub fn unregister_all_thumbnails_by_state(registry: &ThumbnailRegistry) {
-  let mut map = registry.0.lock().unwrap();
-  for (_, thumb) in map.drain() {
-    win::unregister_thumbnail(thumb);
-  }
 }
 
 #[cfg(target_os = "windows")]

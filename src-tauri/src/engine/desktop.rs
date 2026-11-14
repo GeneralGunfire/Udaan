@@ -89,21 +89,24 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id
     WM_DISPLAYCHANGE | WM_DPICHANGED_ => {
       let r = DefSubclassProc(hwnd, msg, wp, lp);
       refit(hwnd);
-      crate::shell::notify_display_changed();
+      super::keyboard::emit_hotkey("display-changed");
+      super::displays::announce();
       super::doctor::heal_soon();
       return r;
     }
     WM_SETTINGCHANGE if wp.0 as u32 == SPI_SETWORKAREA.0 => {
       let r = DefSubclassProc(hwnd, msg, wp, lp);
       refit(hwnd);
-      crate::shell::notify_display_changed();
+      super::keyboard::emit_hotkey("display-changed");
+      // The usable area of a monitor changed (a bar was reserved or released).
+      super::displays::announce();
       return r;
     }
     m if m != 0 && m == TASKBAR_CREATED.load(Ordering::Relaxed) => {
       // Explorer restarted: it re-creates its desktop windows and its taskbar. Put the
       // desktop back above them and hide Explorer's taskbar again if we had hidden it.
       refit(hwnd);
-      crate::shell::on_explorer_restarted();
+      super::explorer::on_restarted();
       super::doctor::heal_soon();
     }
     _ => {}
@@ -156,3 +159,16 @@ pub fn check(heal: bool) -> (bool, String) {
     (false, format!("fitted: {fitted}, at bottom: {at_bottom}"))
   }
 }
+
+/// Pins the desktop window to the bottom of the z-order and spans it over
+/// its whole monitor. Called once from setup.
+pub fn install_as_shell_desktop(window: &tauri::WebviewWindow) -> Result<(), String> {
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
+  install(window)?;
+  if crate::shell::session::claim_shell(hwnd) {
+    log::info!("[shell] Udaan is the session shell; starting startup programs");
+    std::thread::spawn(crate::shell::session::run_startup_programs);
+  }
+  Ok(())
+}
+

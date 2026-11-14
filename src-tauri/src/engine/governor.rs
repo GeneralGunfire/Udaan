@@ -246,7 +246,7 @@ fn monitor_of(h: isize) -> isize {
 
 /// Called with every shell snapshot. Marks the desktop as covered while a maximised or
 /// full-screen window sits on its monitor, so its wallpaper, widgets and timers stop.
-pub fn reconcile(app: &AppHandle, snap: &crate::shell::ShellSnapshot) {
+pub fn reconcile(app: &AppHandle, snap: &super::tracker::ShellSnapshot) {
   let Some(desktop) = app.get_webview_window("main") else { return };
   let Ok(dh) = desktop.hwnd() else { return };
   let dh = dh.0 as isize;

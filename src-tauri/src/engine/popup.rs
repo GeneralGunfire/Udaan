@@ -23,22 +23,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
   SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, WA_INACTIVE, WM_ACTIVATE, WM_NCDESTROY,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Rect {
-  pub left: i32,
-  pub top: i32,
-  pub right: i32,
-  pub bottom: i32,
-}
-
-impl Rect {
-  pub fn width(&self) -> i32 {
-    self.right - self.left
-  }
-  pub fn height(&self) -> i32 {
-    self.bottom - self.top
-  }
-}
+pub use super::geometry::Rect;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
