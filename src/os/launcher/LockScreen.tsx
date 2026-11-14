@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion'
 import { AnalogClock } from '@/os/ui/AnalogClock'
 import { invoke } from '@tauri-apps/api/core'
@@ -6,7 +6,9 @@ import { keepAwake } from '@/integrations/power-state'
 import { Wallpaper } from '@/os/desktop/Wallpaper'
 import { playSound } from '@/os/sound/sounds'
 import { usePref } from '@/os/kernel/prefs'
-import { CinemaCanvas, CINEMA_KINDS, type CinemaKind } from '@/os/cinema/CinemaCanvas'
+import { CinemaCanvas, type CinemaKind } from '@/os/cinema/CinemaCanvas'
+import { SAVERS } from '@/os/cinema/scenes'
+import { fittedWallpaperSrc } from '@/app/wallpapers'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 
 import { DEFAULT_PIN_HASH, DEFAULT_PIN_LENGTH, loadPinConfig, sha256, type PinConfig } from '@/os/kernel/lockPin'
@@ -349,19 +351,31 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
 
 
 /**
- * The screensaver. Which one is a setting: the clock, one of the cinematic scenes (aurora, starflight,
- * currents, the Udaan mark), or shuffle, which picks a different scene each time it starts.
+ * The screensaver. Which one is a setting:
+ *   clock     your wallpaper with a clock face
+ *   veil      your wallpaper, softly frosted, with the time
+ *   reel      a slow tour through your wallpapers
+ *   aurora / flow / daylight   animated light on dark
+ *   minimal   black, with a small clock that drifts (kind to screens)
+ *   shuffle   a different one each time
  */
 export function Screensaver({ onDismiss }: { onDismiss: () => void }) {
-  const [kind] = usePref('screensaver.scene')
-  const [shuffled] = useState(() => CINEMA_KINDS[Math.floor(Math.random() * CINEMA_KINDS.length)].id)
-  if (kind === 'clock') return <ClockScreensaver onDismiss={onDismiss} />
-  const scene = (kind === 'shuffle' ? shuffled : CINEMA_KINDS.some((k) => k.id === kind) ? kind : 'aurora') as CinemaKind
-  return <CinemaSaver kind={scene} onDismiss={onDismiss} />
+  const [scene] = usePref('screensaver.scene')
+  const [shuffled] = useState(() => {
+    const pool = SAVERS.filter((x) => x.id !== 'shuffle')
+    return pool[Math.floor(Math.random() * pool.length)].id
+  })
+  const id = scene === 'shuffle' ? shuffled : SAVERS.some((x) => x.id === scene) ? scene : 'clock'
+  if (id === 'clock') return <ClockScreensaver onDismiss={onDismiss} />
+  return (
+    <SaverShell onDismiss={onDismiss}>
+      {id === 'veil' ? <Veil /> : id === 'reel' ? <Reel /> : id === 'minimal' ? <Minimal /> : <Canvas kind={id as CinemaKind} />}
+    </SaverShell>
+  )
 }
 
-function CinemaSaver({ kind, onDismiss }: { kind: CinemaKind; onDismiss: () => void }) {
-  const now = useNow(1000)
+/** What every non-clock saver shares: keep the PC awake, wake on a deliberate click or key, fade in and out. */
+function SaverShell({ onDismiss, children }: { onDismiss: () => void; children: React.ReactNode }) {
   useEffect(() => {
     void keepAwake(true)
     return () => void keepAwake(false)
@@ -377,23 +391,119 @@ function CinemaSaver({ kind, onDismiss }: { kind: CinemaKind; onDismiss: () => v
       window.removeEventListener('mousedown', end)
     }
   }, [onDismiss])
-  const hh = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
   return (
     <motion.div
       className="fixed inset-0 z-[100] cursor-none overflow-hidden bg-black"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: 1.8, ease: [0.4, 0, 0.2, 1] } }}
-      exit={{ opacity: 0, transition: { duration: 0.7 } }}
+      animate={{ opacity: 1, transition: { duration: 1.6, ease: [0.4, 0, 0.2, 1] } }}
+      exit={{ opacity: 0, transition: { duration: 0.6 } }}
     >
-      <motion.div className="absolute inset-0" initial={{ scale: 1.12 }} animate={{ scale: 1 }} transition={{ duration: 14, ease: [0.1, 0.5, 0.2, 1] }}>
+      {children}
+    </motion.div>
+  )
+}
+
+/** The time and date, bottom left, quiet. */
+function TimeLabel() {
+  const now = useNow(1000)
+  return (
+    <motion.div className="pointer-events-none absolute bottom-[9vh] left-[7vw] text-white" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.6, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}>
+      <p className="text-[clamp(44px,5.5vw,84px)] font-extralight leading-none tracking-[0.06em] tabular-nums">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
+      <p className="mt-3 text-[clamp(11px,0.95vw,14px)] font-light uppercase tracking-[0.34em] text-white/55">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+    </motion.div>
+  )
+}
+
+function Canvas({ kind }: { kind: CinemaKind }) {
+  return (
+    <>
+      <motion.div className="absolute inset-0" initial={{ scale: 1.1 }} animate={{ scale: 1 }} transition={{ duration: 14, ease: [0.1, 0.5, 0.2, 1] }}>
         <CinemaCanvas kind={kind} />
       </motion.div>
-      {/* Letterbox-style vignette: pulls the eye to the middle, like a film frame. */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 45%, rgb(0 0 0 / 0.62) 100%)' }} />
-      <motion.div className="pointer-events-none absolute bottom-[9vh] left-[7vw] text-white" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.2, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}>
-        <p className="text-[clamp(44px,5.5vw,84px)] font-extralight leading-none tracking-[0.06em] tabular-nums">{hh}</p>
-        <p className="mt-3 text-[clamp(11px,0.95vw,14px)] font-light uppercase tracking-[0.34em] text-white/50">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 50%, rgb(0 0 0 / 0.55) 100%)' }} />
+      <TimeLabel />
+    </>
+  )
+}
+
+/** Your wallpaper, frosted and dimmed, with a large thin time over it: the picture is still there. */
+function Veil() {
+  const now = useNow(1000)
+  return (
+    <>
+      <motion.div className="absolute inset-0" animate={{ scale: [1.06, 1.1, 1.06] }} transition={{ duration: 50, repeat: Infinity, ease: 'easeInOut' }} style={{ filter: 'blur(14px) saturate(1.1) brightness(0.72)' }}>
+        <Wallpaper />
       </motion.div>
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, rgb(0 0 0 / 0.1) 30%, rgb(0 0 0 / 0.5) 100%)' }} />
+      <motion.div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-white" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}>
+        <p className="text-[clamp(90px,15vw,240px)] font-thin leading-none tracking-[0.02em] tabular-nums" style={{ textShadow: '0 4px 40px rgb(0 0 0 / 0.35)' }}>
+          {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}
+        </p>
+        <p className="mt-4 text-[clamp(13px,1.3vw,20px)] font-light uppercase tracking-[0.4em] text-white/70">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      </motion.div>
+    </>
+  )
+}
+
+/** A slow tour through the wallpaper library: each picture drifts and eases toward you, then dissolves into the next. */
+function Reel() {
+  const [srcs, setSrcs] = useState<string[]>([])
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    let off = false
+    void (async () => {
+      const lib = await invoke<{ items: { id: string }[] }>('wallpaper_library').catch(() => null)
+      const ids = (lib?.items ?? []).map((x) => x.id)
+      // Shuffled once, so every run is a different tour.
+      ids.sort(() => Math.random() - 0.5)
+      const urls = await Promise.all(ids.slice(0, 12).map((id) => fittedWallpaperSrc(id)))
+      if (!off) setSrcs(urls.filter(Boolean))
+    })()
+    return () => {
+      off = true
+    }
+  }, [])
+  useEffect(() => {
+    if (srcs.length < 2) return
+    const t = setInterval(() => setI((n) => (n + 1) % srcs.length), 16000)
+    return () => clearInterval(t)
+  }, [srcs.length])
+  const dirs = [
+    { x: ['-1.5%', '1.5%'], y: ['1%', '-1%'] },
+    { x: ['1.5%', '-1.5%'], y: ['-1%', '1%'] },
+    { x: ['0%', '-2%'], y: ['1.5%', '-0.5%'] },
+  ]
+  const d = dirs[i % dirs.length]
+  return (
+    <>
+      <AnimatePresence>
+        {srcs.length > 0 && (
+          <motion.img
+            key={i}
+            src={srcs[i % srcs.length]}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 h-full w-full object-cover"
+            initial={{ opacity: 0, scale: 1.0, x: d.x[0], y: d.y[0] }}
+            animate={{ opacity: 1, scale: 1.12, x: d.x[1], y: d.y[1], transition: { opacity: { duration: 2.6 }, scale: { duration: 19, ease: 'linear' }, x: { duration: 19, ease: 'linear' }, y: { duration: 19, ease: 'linear' } } }}
+            exit={{ opacity: 0, transition: { duration: 2.6 } }}
+          />
+        )}
+      </AnimatePresence>
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(to top, rgb(0 0 0 / 0.55), transparent 38%), radial-gradient(ellipse at 50% 50%, transparent 60%, rgb(0 0 0 / 0.4) 100%)' }} />
+      <TimeLabel />
+    </>
+  )
+}
+
+/** Black, with a small clock that moves to a new spot every minute, so no pixel is lit for long. */
+function Minimal() {
+  const now = useNow(1000)
+  const spot = useMemo(() => ({ x: 10 + ((now.getMinutes() * 37) % 55), y: 15 + ((now.getMinutes() * 53) % 60) }), [now.getMinutes()]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <motion.div className="absolute text-white" animate={{ left: `${spot.x}%`, top: `${spot.y}%` }} transition={{ duration: 6, ease: [0.4, 0, 0.2, 1] }}>
+      <p className="text-[clamp(40px,4.5vw,72px)] font-thin leading-none tracking-[0.08em] tabular-nums text-white/85">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
+      <p className="mt-2 text-[clamp(10px,0.85vw,13px)] font-light uppercase tracking-[0.34em] text-white/40">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
     </motion.div>
   )
 }

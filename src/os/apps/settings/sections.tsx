@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { usePref } from '@/os/kernel/prefs'
@@ -6,7 +6,10 @@ import { usePoll } from '@/os/kernel/poll'
 import { changePin, loadPinConfig } from '@/os/kernel/lockPin'
 import { Button, Field } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
-import { CinemaCanvas, CINEMA_KINDS } from '@/os/cinema/CinemaCanvas'
+import { CinemaCanvas, type CinemaKind } from '@/os/cinema/CinemaCanvas'
+import { SAVERS } from '@/os/cinema/scenes'
+import { fittedWallpaperSrc } from '@/app/wallpapers'
+import { useWallpaper } from '@/shared/hooks/useWallpaper'
 import { ActionButton, Group, Row, Segmented, Stack, Switch } from './ui'
 
 /* ── Lock screen & screensaver ─────────────────────────────────── */
@@ -68,19 +71,53 @@ function PinChanger() {
 }
 
 
+/** A miniature of what the saver looks like. The pictures use your actual wallpaper. */
+function SaverPreview({ id, hover }: { id: string; hover: boolean }) {
+  const { wallpaperId } = useWallpaper()
+  const [src, setSrc] = useState('')
+  useEffect(() => {
+    let off = false
+    void fittedWallpaperSrc(wallpaperId).then((u) => !off && setSrc(u))
+    return () => {
+      off = true
+    }
+  }, [wallpaperId])
+  const pic = (style?: React.CSSProperties) => (src ? <img src={src} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={style} /> : <span className="absolute inset-0 bg-(--u-wash-on)" />)
+  if (id === 'aurora' || id === 'flow' || id === 'daylight') return <CinemaCanvas kind={id as CinemaKind} still={!hover} scale={0.25} fps={20} />
+  if (id === 'clock')
+    return (
+      <>
+        {pic()}
+        <span className="absolute bottom-1.5 left-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/60 bg-black/30">
+          <span className="h-3 w-px origin-bottom -translate-y-1.5 rotate-[20deg] bg-white" />
+        </span>
+        <span className="absolute bottom-2 left-10 text-[13px] font-extralight tabular-nums text-white">10:09</span>
+      </>
+    )
+  if (id === 'veil')
+    return (
+      <>
+        {pic({ filter: 'blur(5px) brightness(0.75)', transform: 'scale(1.1)' })}
+        <span className="absolute inset-0 flex items-center justify-center text-[26px] font-thin tabular-nums text-white">10:09</span>
+      </>
+    )
+  if (id === 'reel') return <>{pic({ transform: hover ? 'scale(1.12)' : 'scale(1)', transition: 'transform 8s linear' })}</>
+  if (id === 'minimal') return <span className="absolute left-[22%] top-[34%] text-[15px] font-thin tabular-nums text-white/85">10:09</span>
+  return (
+    <span className="absolute inset-0 grid grid-cols-3">
+      {['#1c54d6', '#0096cd', '#e26228', '#5c38c8', '#222', '#111'].map((c, i) => (
+        <span key={i} style={{ background: c, opacity: 0.8 }} />
+      ))}
+    </span>
+  )
+}
+
 function SaverTile({ id, name, blurb, on, onPick }: { id: string; name: string; blurb: string; on: boolean; onPick: () => void }) {
   const [hover, setHover] = useState(false)
-  const kind = CINEMA_KINDS.find((k) => k.id === id)
   return (
     <button type="button" aria-pressed={on} onClick={onPick} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} className={cn('u-tile items-stretch gap-1.5 p-1.5 text-left', on && 'bg-(--u-wash-on) shadow-[inset_0_0_0_2px_var(--u-accent)]')}>
       <span className="relative block aspect-video overflow-hidden rounded-[8px] bg-black shadow-[inset_0_0_0_1px_var(--u-edge)]">
-        {kind ? (
-          <CinemaCanvas kind={kind.id} still={!hover} scale={0.25} fps={20} />
-        ) : id === 'clock' ? (
-          <span className="flex h-full w-full items-center justify-center text-[22px] font-extralight tabular-nums text-white">10:09</span>
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-[11px] uppercase tracking-widest text-white/70">Surprise me</span>
-        )}
+        <SaverPreview id={id} hover={hover} />
       </span>
       <span className="px-0.5">
         <span className="block text-[12.5px] font-medium">{name}</span>
@@ -91,16 +128,11 @@ function SaverTile({ id, name, blurb, on, onPick }: { id: string; name: string; 
 }
 
 function SaverPicker() {
-  const [kind, setKind] = usePref('screensaver.scene')
-  const all = [
-    { id: 'clock', name: 'Clock', blurb: 'The classic clock face.' },
-    ...CINEMA_KINDS.map((k) => ({ id: k.id as string, name: k.name, blurb: k.blurb })),
-    { id: 'shuffle', name: 'Shuffle', blurb: 'A different scene each time.' },
-  ]
+  const [scene, setScene] = usePref('screensaver.scene')
   return (
-    <div className="grid grid-cols-3 gap-2 p-3">
-      {all.map((a) => (
-        <SaverTile key={a.id} {...a} on={kind === a.id} onPick={() => void setKind(a.id)} />
+    <div className="grid grid-cols-4 gap-2 p-3">
+      {SAVERS.map((a) => (
+        <SaverTile key={a.id} id={a.id} name={a.name} blurb={a.blurb} on={scene === a.id} onPick={() => void setScene(a.id)} />
       ))}
     </div>
   )

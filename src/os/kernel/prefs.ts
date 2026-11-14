@@ -97,7 +97,7 @@ export const PREF_DEFAULTS: Prefs = {
   'ui.opaque': false,
   'lock.pinHash': '',
   'lock.pinLength': 4,
-  'screensaver.scene': 'aurora',
+  'screensaver.scene': 'clock',
 }
 
 export type PrefKey = keyof Prefs

@@ -1,205 +1,154 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * CINEMA: the animated backdrops behind the boot screen and the screensavers.
+ * CINEMA: the animated canvas scenes behind the boot screen and the screensavers.
  *
- * Four scenes, each a slow, wide, film-like movement rather than a busy effect:
- *   aurora  luminous ribbons of colour drifting like northern lights
- *   warp    a slow flight through a star field, with light trails
- *   flow    thousands of particles carried along an invisible current
- *   drift   the Udaan mark adrift in light shafts and dust
+ *   aurora    luminous ribbons of colour drifting like northern lights
+ *   flow      "Currents": light carried along an invisible current
+ *   daylight  a soft colour mesh that follows the hour of the day
  *
- * Built for a slow PC: a 2D canvas drawn at a reduced internal size and scaled up by CSS (the scenes
- * are soft, so nothing is lost), capped at 30 frames a second, paused while hidden, and a single
- * still frame when "Reduce motion" is on. Nothing runs when it is not on screen.
+ * Built for a slow PC: a 2D canvas drawn at a reduced internal size and scaled up by CSS (the scenes are
+ * soft, so nothing is lost), capped at 30 frames a second, paused while hidden. Nothing runs when it is
+ * not on screen.
  */
-export type CinemaKind = 'aurora' | 'warp' | 'flow' | 'drift'
-
-export const CINEMA_KINDS: { id: CinemaKind; name: string; blurb: string }[] = [
-  { id: 'aurora', name: 'Aurora', blurb: 'Ribbons of light drifting like northern lights.' },
-  { id: 'warp', name: 'Starflight', blurb: 'A slow flight through the stars.' },
-  { id: 'flow', name: 'Silk', blurb: 'Fine lines of light flowing like fabric.' },
-  { id: 'drift', name: 'Udaan', blurb: 'The Udaan mark adrift in light and dust.' },
-]
+export type CinemaKind = 'aurora' | 'flow' | 'daylight'
 
 interface Scene {
   draw(ctx: CanvasRenderingContext2D, t: number, dt: number, w: number, h: number): void
 }
 
-const TAU = Math.PI * 2
+const PALETTE = [
+  [48, 114, 240], // blue
+  [0, 200, 255], // cyan
+  [255, 140, 40], // orange
+  [255, 70, 50], // red-orange
+  [150, 90, 255], // violet
+]
 
-/** Deep mesh of soft colour: a few huge, slow, low-contrast lights on near-black, like a studio backdrop. */
 function aurora(w: number, h: number): Scene {
-  const lights = [
-    { c: [28, 84, 214], r: 0.62, sx: 0.045, sy: 0.038, ph: 0.2, a: 0.34 },
-    { c: [0, 150, 205], r: 0.5, sx: 0.06, sy: 0.05, ph: 2.1, a: 0.22 },
-    { c: [226, 98, 40], r: 0.46, sx: 0.05, sy: 0.043, ph: 3.9, a: 0.2 },
-    { c: [92, 56, 200], r: 0.56, sx: 0.038, sy: 0.052, ph: 5.2, a: 0.22 },
-  ]
+  const blobs = PALETTE.concat(PALETTE.slice(0, 2)).map((c, i) => ({ c, sx: 0.07 + 0.045 * ((i * 7) % 5), sy: 0.05 + 0.04 * ((i * 3) % 4), ph: i * 1.7, r: 0.42 + 0.12 * (i % 3) }))
   return {
     draw(ctx, t) {
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = '#04050a'
+      const bg = ctx.createLinearGradient(0, 0, 0, h)
+      bg.addColorStop(0, '#04050a')
+      bg.addColorStop(1, '#0a0d18')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, w, h)
+      ctx.globalCompositeOperation = 'lighter'
+      for (const b of blobs) {
+        const x = w * (0.5 + 0.42 * Math.sin(t * b.sx + b.ph))
+        const y = h * (0.5 + 0.34 * Math.cos(t * b.sy + b.ph * 1.31))
+        const r = Math.max(w, h) * b.r
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+        g.addColorStop(0, `rgba(${b.c[0]},${b.c[1]},${b.c[2]},0.34)`)
+        g.addColorStop(0.55, `rgba(${b.c[0]},${b.c[1]},${b.c[2]},0.10)`)
+        g.addColorStop(1, `rgba(${b.c[0]},${b.c[1]},${b.c[2]},0)`)
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, w, h)
+      }
+      // A few translucent ribbons give the glow direction, like curtains of light.
+      ctx.globalCompositeOperation = 'screen'
+      for (let k = 0; k < 3; k++) {
+        const c = PALETTE[(k * 2) % PALETTE.length]
+        ctx.beginPath()
+        const base = h * (0.35 + 0.18 * k)
+        ctx.moveTo(0, h)
+        for (let x = 0; x <= w; x += 8) {
+          const y = base + Math.sin(x * 0.006 + t * (0.18 + k * 0.05) + k) * h * 0.09 + Math.sin(x * 0.015 - t * 0.12) * h * 0.025
+          ctx.lineTo(x, y)
+        }
+        ctx.lineTo(w, h)
+        ctx.closePath()
+        const g = ctx.createLinearGradient(0, base - h * 0.15, 0, h)
+        g.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},0.16)`)
+        g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`)
+        ctx.fillStyle = g
+        ctx.fill()
+      }
+      ctx.globalCompositeOperation = 'source-over'
+    },
+  }
+}
+
+function flow(w: number, h: number): Scene {
+  const N = 900
+  const ps = Array.from({ length: N }, () => ({ x: Math.random() * w, y: Math.random() * h, life: Math.random() * 200 }))
+  return {
+    draw(ctx, t, dt) {
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = 'rgba(4,5,10,0.07)'
+      ctx.fillRect(0, 0, w, h)
+      ctx.globalCompositeOperation = 'lighter'
+      const sp = 38 * dt
+      for (const p of ps) {
+        const a = (Math.sin(p.x * 0.0042 + t * 0.21) + Math.cos(p.y * 0.0051 - t * 0.17) + Math.sin((p.x + p.y) * 0.0031 + t * 0.09)) * 1.05
+        const nx = p.x + Math.cos(a) * sp
+        const ny = p.y + Math.sin(a) * sp
+        const k = (a / 3 + 1) / 2
+        const r = Math.round(40 + 215 * k)
+        const g = Math.round(130 + 10 * k)
+        const b = Math.round(255 - 190 * k)
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.55)`
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(p.x, p.y)
+        ctx.lineTo(nx, ny)
+        ctx.stroke()
+        p.x = nx
+        p.y = ny
+        p.life -= 1
+        if (p.life < 0 || p.x < -5 || p.x > w + 5 || p.y < -5 || p.y > h + 5) {
+          p.x = Math.random() * w
+          p.y = Math.random() * h
+          p.life = 120 + Math.random() * 200
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over'
+    },
+  }
+}
+
+/** Colours of the sky by hour: deep blues at night, rose at dawn, clear blue by day, amber at dusk. */
+function skyFor(hour: number): { bg: string; lights: number[][] } {
+  if (hour >= 5 && hour < 8) return { bg: '#0b0f1c', lights: [[255, 150, 120], [250, 200, 140], [90, 120, 220], [170, 110, 200]] }
+  if (hour >= 8 && hour < 17) return { bg: '#0a1426', lights: [[70, 150, 240], [120, 200, 250], [60, 110, 220], [150, 200, 255]] }
+  if (hour >= 17 && hour < 20) return { bg: '#0d0b18', lights: [[255, 130, 60], [230, 80, 110], [120, 70, 200], [255, 190, 110]] }
+  return { bg: '#04050a', lights: [[28, 70, 190], [60, 50, 170], [20, 110, 170], [90, 60, 190]] }
+}
+
+function daylight(w: number, h: number): Scene {
+  const motion = [
+    { r: 0.62, sx: 0.04, sy: 0.034, ph: 0.2, a: 0.34 },
+    { r: 0.5, sx: 0.052, sy: 0.045, ph: 2.1, a: 0.26 },
+    { r: 0.46, sx: 0.046, sy: 0.04, ph: 3.9, a: 0.24 },
+    { r: 0.56, sx: 0.036, sy: 0.05, ph: 5.2, a: 0.26 },
+  ]
+  return {
+    draw(ctx, t) {
+      const sky = skyFor(new Date().getHours())
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = sky.bg
       ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'screen'
-      for (const l of lights) {
+      motion.forEach((l, i) => {
+        const c = sky.lights[i % sky.lights.length]
         const x = w * (0.5 + 0.38 * Math.sin(t * l.sx + l.ph))
         const y = h * (0.5 + 0.3 * Math.cos(t * l.sy * 1.3 + l.ph))
         const r = Math.max(w, h) * l.r
         const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-        g.addColorStop(0, `rgba(${l.c[0]},${l.c[1]},${l.c[2]},${l.a})`)
-        g.addColorStop(0.5, `rgba(${l.c[0]},${l.c[1]},${l.c[2]},${(l.a * 0.35).toFixed(3)})`)
-        g.addColorStop(1, `rgba(${l.c[0]},${l.c[1]},${l.c[2]},0)`)
+        g.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${l.a})`)
+        g.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${(l.a * 0.35).toFixed(3)})`)
+        g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`)
         ctx.fillStyle = g
         ctx.fillRect(0, 0, w, h)
-      }
+      })
       ctx.globalCompositeOperation = 'source-over'
     },
   }
 }
 
-function warp(w: number, h: number): Scene {
-  const N = 380
-  const stars = Array.from({ length: N }, () => ({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: Math.random() * 0.95 + 0.05, tint: Math.random() }))
-  const f = Math.max(w, h) * 0.55
-  return {
-    draw(ctx, t, dt) {
-      // Trails: the previous frame fades instead of clearing.
-      ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = 'rgba(3,4,9,0.32)'
-      ctx.fillRect(0, 0, w, h)
-      const speed = 0.16 + 0.1 * (0.5 + 0.5 * Math.sin(t * 0.13))
-      const cx = w / 2 + Math.sin(t * 0.07) * w * 0.04
-      const cy = h / 2 + Math.cos(t * 0.05) * h * 0.03
-      ctx.globalCompositeOperation = 'lighter'
-      for (const s of stars) {
-        const pz = s.z
-        s.z -= speed * dt
-        if (s.z <= 0.02) {
-          s.x = (Math.random() - 0.5) * 2
-          s.y = (Math.random() - 0.5) * 2
-          s.z = 1
-          continue
-        }
-        const x0 = cx + (s.x / pz) * f * 0.5
-        const y0 = cy + (s.y / pz) * f * 0.5
-        const x1 = cx + (s.x / s.z) * f * 0.5
-        const y1 = cy + (s.y / s.z) * f * 0.5
-        if (x1 < -20 || x1 > w + 20 || y1 < -20 || y1 > h + 20) {
-          s.z = 1
-          continue
-        }
-        const a = Math.min(1, (1 - s.z) * 1.4)
-        const col = s.tint > 0.88 ? '255,170,90' : s.tint > 0.6 ? '150,200,255' : '235,240,255'
-        ctx.strokeStyle = `rgba(${col},${a.toFixed(2)})`
-        ctx.lineWidth = 0.6 + (1 - s.z) * 1.6
-        ctx.beginPath()
-        ctx.moveTo(x0, y0)
-        ctx.lineTo(x1, y1)
-        ctx.stroke()
-      }
-      ctx.globalCompositeOperation = 'source-over'
-    },
-  }
-}
-
-/** Silk: fine luminous lines flowing in layered waves, like light through a sheet of fabric. */
-function flow(w: number, h: number): Scene {
-  const LINES = 46
-  return {
-    draw(ctx, t) {
-      ctx.globalCompositeOperation = 'source-over'
-      const bg = ctx.createLinearGradient(0, 0, w, h)
-      bg.addColorStop(0, '#05060c')
-      bg.addColorStop(1, '#0a0a14')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
-      ctx.lineWidth = 1
-      for (let i = 0; i < LINES; i++) {
-        const f = i / (LINES - 1)
-        const base = h * (0.3 + 0.42 * f)
-        const amp = h * (0.12 + 0.07 * Math.sin(f * 3 + t * 0.07))
-        ctx.beginPath()
-        for (let x = 0; x <= w; x += 6) {
-          const u = x / w
-          const y =
-            base +
-            Math.sin(u * 4.2 + t * 0.16 + f * 2.4) * amp * (0.4 + 0.6 * Math.sin(u * Math.PI)) +
-            Math.sin(u * 9.5 - t * 0.1 + f * 5) * amp * 0.16
-          if (x === 0) ctx.moveTo(x, y)
-          else ctx.lineTo(x, y)
-        }
-        // Blue at one end of the sheet, warm at the other, the middle near white.
-        const r = Math.round(70 + 185 * Math.max(0, f - 0.45) * 1.8)
-        const g = Math.round(140 + 60 * (1 - Math.abs(f - 0.5) * 2))
-        const b = Math.round(255 - 170 * Math.max(0, f - 0.4) * 1.6)
-        ctx.strokeStyle = `rgba(${Math.min(255, r)},${g},${Math.max(60, b)},${(0.1 + 0.2 * Math.sin(f * Math.PI)).toFixed(3)})`
-        ctx.stroke()
-      }
-      ctx.globalCompositeOperation = 'source-over'
-    },
-  }
-}
-
-/** The Udaan mark, lit from within, with slow rings of light and bokeh drifting past. */
-function drift(w: number, h: number): Scene {
-  const img = new Image()
-  img.src = '/logo/udaan.png'
-  const bokeh = Array.from({ length: 22 }, () => ({ x: Math.random(), y: Math.random(), r: 0.012 + Math.random() * 0.05, z: 0.3 + Math.random() * 0.7, ph: Math.random() * TAU, hue: Math.random() }))
-  return {
-    draw(ctx, t, dt) {
-      ctx.globalCompositeOperation = 'source-over'
-      const bg = ctx.createRadialGradient(w / 2, h * 0.52, 0, w / 2, h * 0.52, Math.max(w, h) * 0.7)
-      bg.addColorStop(0, '#0c1224')
-      bg.addColorStop(1, '#030409')
-      ctx.fillStyle = bg
-      ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
-      for (const b of bokeh) {
-        b.y -= 0.006 * b.z * dt
-        b.x += Math.sin(t * 0.1 + b.ph) * 0.0002
-        if (b.y < -0.1) b.y = 1.1
-        const x = b.x * w
-        const y = b.y * h
-        const r = b.r * Math.max(w, h)
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-        const c = b.hue > 0.6 ? '255,160,90' : b.hue > 0.3 ? '90,170,255' : '170,200,255'
-        g.addColorStop(0, `rgba(${c},${(0.07 * b.z).toFixed(3)})`)
-        g.addColorStop(0.7, `rgba(${c},${(0.045 * b.z).toFixed(3)})`)
-        g.addColorStop(1, `rgba(${c},0)`)
-        ctx.fillStyle = g
-        ctx.beginPath()
-        ctx.arc(x, y, r, 0, TAU)
-        ctx.fill()
-      }
-      const cx = w / 2
-      const cy = h / 2
-      for (let i = 0; i < 4; i++) {
-        const k = (t * 0.07 + i / 4) % 1
-        ctx.strokeStyle = `rgba(140,190,255,${(0.16 * (1 - k)).toFixed(3)})`
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(cx, cy, Math.min(w, h) * (0.2 + 0.5 * k), 0, TAU)
-        ctx.stroke()
-      }
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.46)
-      const breathe = 0.2 + 0.05 * Math.sin(t * 0.6)
-      glow.addColorStop(0, `rgba(80,140,255,${breathe.toFixed(3)})`)
-      glow.addColorStop(0.5, 'rgba(255,140,60,0.05)')
-      glow.addColorStop(1, 'rgba(80,140,255,0)')
-      ctx.fillStyle = glow
-      ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'source-over'
-      if (img.complete && img.naturalWidth) {
-        const s = Math.min(w, h) * (0.36 + 0.008 * Math.sin(t * 0.6))
-        ctx.drawImage(img, cx - s / 2, cy - s / 2 + Math.sin(t * 0.4) * h * 0.008, s, s)
-      }
-    },
-  }
-}
-
-const SCENES: Record<CinemaKind, (w: number, h: number) => Scene> = { aurora, warp, flow, drift }
+const SCENES: Record<CinemaKind, (w: number, h: number) => Scene> = { aurora, flow, daylight }
 
 export function CinemaCanvas({ kind, className, scale = 0.5, fps = 30, paused = false, still = false }: { kind: CinemaKind; className?: string; scale?: number; fps?: number; paused?: boolean; still?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -215,6 +164,7 @@ export function CinemaCanvas({ kind, className, scale = 0.5, fps = 30, paused = 
     }
     fit()
     let scene = SCENES[kind](cv.width, cv.height)
+    let t = 0
     const renderStill = () => {
       t = 0
       for (let i = 0; i < 30; i++) {
@@ -231,7 +181,6 @@ export function CinemaCanvas({ kind, className, scale = 0.5, fps = 30, paused = 
 
     let raf = 0
     let last = performance.now()
-    let t = 0
     const step = 1000 / fps
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame)
@@ -246,23 +195,13 @@ export function CinemaCanvas({ kind, className, scale = 0.5, fps = 30, paused = 
       t += dt
       scene.draw(ctx, t, dt, cv.width, cv.height)
     }
-    if (still) {
-      // One frame, advanced a little so it is not an empty first frame.
-      renderStill()
-    } else {
-      raf = requestAnimationFrame(frame)
-    }
+    if (still) renderStill()
+    else raf = requestAnimationFrame(frame)
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
   }, [kind, scale, fps, paused, still])
 
-  return (
-    <div className={`relative h-full w-full ${className ?? ''}`}>
-      <canvas ref={ref} style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden />
-      {/* Fine film grain over everything: it hides banding in the dark gradients and gives the picture a photographic finish. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.1] mix-blend-overlay" style={{ backgroundImage: 'var(--u-grain)', backgroundSize: '96px 96px' }} />
-    </div>
-  )
+  return <canvas ref={ref} className={className} style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden />
 }
