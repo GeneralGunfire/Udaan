@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
 import { emit } from '@tauri-apps/api/event'
 import { AnimatePresence, motion } from 'framer-motion'
-import { contentEnter, springs } from '@/os/motion/systemMotion'
+import { contentEnter } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 import { cn } from '@/shared/lib/cn'
 import { WallpaperBrowser } from '@/os/wallpaper/WallpaperBrowser'
@@ -18,13 +18,14 @@ import { createElement } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
 import { QuickstartsSection } from './QuickstartsSection'
+import { AppearanceExtras, LockSection, PerformanceGroup } from './sections'
 import { ActionButton, Group, IconTile, KeyCaps, Row, SearchField, Segmented, Select, Stack, Switch } from './ui'
-import { AppearanceGlyph, DockGlyph, GeneralGlyph, KeyboardGlyph, NotificationsGlyph, QuickstartsGlyph, SoundGlyph, WidgetsGlyph, WindowsGlyph } from './glyphs'
+import { LockGlyph, AppearanceGlyph, DockGlyph, GeneralGlyph, KeyboardGlyph, NotificationsGlyph, QuickstartsGlyph, SoundGlyph, WidgetsGlyph, WindowsGlyph } from './glyphs'
 import { getVersion } from '@tauri-apps/api/app'
 import { listNotifications } from '@/integrations/notifications/client'
 import { notificationSource } from '@/os/ui/NotificationIcon'
 
-type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system'
+type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock'
 
 interface NavItem {
   id: Section
@@ -46,8 +47,9 @@ const NAV: NavItem[][] = [
     { id: 'keyboard', label: 'Keyboard', icon: KeyboardGlyph },
   ],
   [
+    { id: 'lock', label: 'Lock Screen', icon: LockGlyph },
     { id: 'windows', label: 'Windows & Hot Corners', icon: WindowsGlyph },
-    { id: 'system', label: 'General', icon: GeneralGlyph },
+    { id: 'system', label: 'General & Performance', icon: GeneralGlyph },
   ],
 ]
 const SECTIONS = NAV.flat()
@@ -72,6 +74,11 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Motivation video', section: 'dock', keywords: 'focus pill youtube menu bar' },
   { title: 'Windows key', section: 'keyboard', keywords: 'win shortcut launcher start' },
   { title: 'Keyboard shortcuts', section: 'keyboard', keywords: 'keys hotkeys' },
+  { title: 'Change lock PIN', section: 'lock', keywords: 'password pin lock screen security' },
+  { title: 'Screensaver', section: 'lock', keywords: 'idle clock saver' },
+  { title: 'Accent colour', section: 'personalization', keywords: 'colour color blue theme highlight' },
+  { title: 'Solid surfaces', section: 'personalization', keywords: 'transparency glass blur opaque' },
+  { title: 'CPU and memory', section: 'system', keywords: 'performance processor ram usage' },
   { title: 'Hot corners', section: 'windows', keywords: 'screen corner mission control' },
   { title: 'Always maximize new windows', section: 'windows', keywords: 'fullscreen zoom' },
   { title: 'Start Udaan when I sign in', section: 'system', keywords: 'login items autostart startup' },
@@ -109,6 +116,7 @@ function Personalization() {
   return (
     <div className="flex flex-col gap-6">
       <WallpaperBrowser />
+      <AppearanceExtras />
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold">Colours</h3>
         <Row title="Mode" description="Applies to the dock, menus, and every Udaan app.">
@@ -422,6 +430,7 @@ function SystemSection() {
   }, [])
   return (
     <Stack>
+      <PerformanceGroup />
       <Group title="About">
         <Row title="Udaan">
           <span className="text-[13px] text-[var(--color-text-secondary)]">{version ? `Version ${version}` : ''}</span>
@@ -504,38 +513,16 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
 
   return (
     <div className="flex h-full">
-      <nav onKeyDown={onNavKey} className="flex w-[240px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-[var(--border-hairline)] bg-[var(--surface-raised)] p-3">
+      <nav onKeyDown={onNavKey} className="u-scroll flex w-[244px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-(--u-edge) bg-(--u-wash-hover) p-3">
         <SearchField value={query} onChange={setQuery} />
         {NAV.map((group, gi) => (
           <div key={gi} className="flex flex-col gap-0.5">
             {group.map(({ id, label, icon }) => {
               const active = !searching && section === id
               return (
-                <button
-                  key={id}
-                  type="button"
-                  aria-current={active ? 'page' : undefined}
-                  onClick={() => pick(id)}
-                  className={cn(
-                    'relative isolate flex h-9 items-center gap-2.5 rounded-(--os-radius-control) px-2 text-left text-[13px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-accent/60',
-                    active ? 'font-medium text-(--color-accent-contrast)' : 'text-(--color-text-primary) hover:bg-(--os-hover)',
-                  )}
-                >
-                  {/* The selection slides between items instead of cutting.
-                      A shared layoutId means Framer moves one element
-                      rather than cross-fading two, which is what makes the
-                      list read as a single control with a position. */}
-                  {active && (
-                    <motion.span
-                      layoutId={reduced ? undefined : 'settings-nav-selection'}
-                      aria-hidden
-                      className="absolute inset-0 -z-10 rounded-(--os-radius-control) bg-accent"
-                      style={{ boxShadow: 'var(--os-edge), var(--os-shadow-sm)' }}
-                      transition={springs.standard}
-                    />
-                  )}
+                <button key={id} type="button" aria-current={active ? 'page' : undefined} data-selected={active || undefined} onClick={() => pick(id)} className="u-row h-10 gap-2.5 px-2">
                   <IconTile icon={icon} />
-                  <span className="truncate">{label}</span>
+                  <span className={cn('truncate', active && 'font-semibold')}>{label}</span>
                 </button>
               )
             })}
@@ -544,7 +531,7 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
       </nav>
       <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto max-w-[680px]">
-          <h1 className="mb-6 text-[26px] font-bold tracking-tight text-[var(--color-text-primary)]">{searching ? 'Search' : current.label}</h1>
+          <h1 className="mb-6 text-[28px] font-light tracking-tight">{searching ? 'Search' : current.label}</h1>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={searching ? 'search' : section} {...(reduced ? { initial: false, animate: {} } : contentEnter)}>
               {searching && <SearchResults query={query} onPick={pick} />}
@@ -557,6 +544,7 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
               {!searching && section === 'keyboard' && <KeyboardSection />}
               {!searching && section === 'windows' && <WindowsSection />}
               {!searching && section === 'system' && <SystemSection />}
+              {!searching && section === 'lock' && <LockSection />}
             </motion.div>
           </AnimatePresence>
         </div>

@@ -180,6 +180,7 @@ export function MenuBarWindow() {
   }
   const [panel, setPanel] = useState<PanelKind | null>(null)
   const panelRef = useLatest(panel)
+  const lastHidden = useRef<{ panel: PanelKind | null; at: number }>({ panel: null, at: 0 })
   const refs = {
     'notifications-panel': useRef<HTMLButtonElement>(null),
     calendar: useRef<HTMLButtonElement>(null),
@@ -231,7 +232,12 @@ export function MenuBarWindow() {
   }, [])
 
   useEffect(() => {
-    const un = listen('taskbar-popup:hidden', () => setPanel(null))
+    const un = listen('taskbar-popup:hidden', () => {
+      // Remember what just closed: pressing its own button to close it first makes the popup lose focus
+      // (hiding it), and the click that follows must not open it again.
+      lastHidden.current = { panel: panelRef.current, at: Date.now() }
+      setPanel(null)
+    })
     return () => void un.then((fn) => fn())
   }, [])
 
@@ -240,6 +246,10 @@ export function MenuBarWindow() {
       if (panelRef.current === which) {
         setPanel(null)
         void emit('taskbar-popup:hide')
+        return
+      }
+      if (lastHidden.current.panel === which && Date.now() - lastHidden.current.at < 450) {
+        lastHidden.current = { panel: null, at: 0 }
         return
       }
       const r = refs[which].current?.getBoundingClientRect()

@@ -81,3 +81,11 @@ export const GeneralGlyph = (p: SVGProps<SVGSVGElement>) => (
     <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7" />
   </Glyph>
 )
+
+export const LockGlyph = (p: SVGProps<SVGSVGElement>) => (
+  <Glyph {...p}>
+    <rect x="5" y="10.5" width="14" height="9.5" rx="2.4" />
+    <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    <circle cx="12" cy="15.3" r="1.3" fill="currentColor" stroke="none" />
+  </Glyph>
+)

@@ -10,6 +10,7 @@ import { listNotes, readNoteBody, saveNoteBody, type NoteMeta } from '@/integrat
 import { openApp } from '@/os/kernel/shell'
 import { AnalogClock } from '@/os/ui/AnalogClock'
 import { playSound } from '@/os/sound/sounds'
+import { CountdownWidget, CpuGraphWidget, MoonWidget, PhotoWidget, StopwatchWidget, TodoWidget, YearWidget } from './more'
 
 export type WidgetKind =
   | 'clock'
@@ -27,6 +28,13 @@ export type WidgetKind =
   | 'quick-actions'
   | 'focus-timer'
   | 'progress'
+  | 'stopwatch'
+  | 'countdown'
+  | 'todo'
+  | 'photo'
+  | 'moon'
+  | 'year'
+  | 'cpu-graph'
 
 export interface PlacedWidget {
   id: string
@@ -51,6 +59,13 @@ export const WIDGET_CATALOG: Record<WidgetKind, { name: string; description: str
   battery: { name: 'Battery', description: 'Charge level and status.', w: 170, h: 170 },
   storage: { name: 'Storage', description: 'Free space on your main drive.', w: 170, h: 170 },
   'quick-note': { name: 'Quick Note', description: 'Jot something down without opening Notes.', w: 356, h: 170 },
+  stopwatch: { name: 'Stopwatch', description: 'Start, pause and reset a stopwatch.', w: 170, h: 170 },
+  countdown: { name: 'Countdown', description: 'Days to (or since) an event you pick.', w: 170, h: 170 },
+  todo: { name: 'To-do', description: 'A checklist that stays on your desktop.', w: 170, h: 170 },
+  photo: { name: 'Photo Frame', description: 'Your wallpaper pictures; click for the next one.', w: 170, h: 170 },
+  moon: { name: 'Moon', description: 'The current phase of the moon.', w: 170, h: 170 },
+  year: { name: 'Year', description: 'Every day of the year as a dot, today lit.', w: 356, h: 170 },
+  'cpu-graph': { name: 'Processor Graph', description: 'A live graph of processor use.', w: 356, h: 170 },
   'quick-actions': { name: 'Quick Actions', description: 'One-tap shortcuts to common tasks.', w: 356, h: 170 },
 }
 
@@ -644,4 +659,11 @@ export const WIDGET_VIEWS: Record<WidgetKind, () => ReactNode> = {
   'quick-note': QuickNoteWidget,
   'quick-actions': QuickActionsWidget,
   agenda: AgendaWidget,
+  stopwatch: StopwatchWidget,
+  countdown: CountdownWidget,
+  todo: TodoWidget,
+  photo: PhotoWidget,
+  moon: MoonWidget,
+  year: YearWidget,
+  'cpu-graph': CpuGraphWidget,
 }

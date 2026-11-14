@@ -42,20 +42,25 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!inTauri()) return
-    // Start from what the engine says is current; with nothing chosen yet, take the first picture.
-    void invoke<string | null>('wallpaper_current').then(async (id) => {
-      if (id && isValidWallpaperId(id)) {
+    // Start from what the engine says is current; if that picture is gone (or nothing was chosen yet),
+    // take the first one in the library.
+    void (async () => {
+      const [id, lib] = await Promise.all([
+        invoke<string | null>('wallpaper_current').catch(() => null),
+        invoke<{ items: { id: string }[] }>('wallpaper_library').catch(() => null),
+      ])
+      const exists = !!id && (id.startsWith('color:') || !lib || lib.items.some((i) => i.id === id))
+      if (id && exists && isValidWallpaperId(id)) {
         if (!readStored().startsWith('color:')) {
           setWallpaperIdState(id)
           remember(id)
         }
         return
       }
-      if (readStored()) return
-      const lib = await invoke<{ items: { id: string }[] }>('wallpaper_library').catch(() => null)
+      if (readStored().startsWith('color:')) return
       const first = lib?.items[0]?.id
       if (first) void invoke('wallpaper_set', { id: first })
-    }, () => {})
+    })()
     const un = listen<string>('wallpaper://changed', (e) => {
       if (!isValidWallpaperId(e.payload)) return
       setWallpaperIdState(e.payload)

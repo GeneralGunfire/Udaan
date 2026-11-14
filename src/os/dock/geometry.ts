@@ -18,7 +18,7 @@ export function dockMetrics() {
     barHeight,
     // Room for the hover lift and launch bounce above the bar.
     // Room above the bar for the hover lift and the name label.
-    windowHeight: barHeight + DOCK.margin + 50,
+    windowHeight: barHeight + 12,
     reserve: barHeight + DOCK.margin * 2,
   }
 }

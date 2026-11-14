@@ -23,11 +23,10 @@ const exePin = (match: string, launch: string, name: string): Pin => ({ key: exe
 const INIT_KEY = 'dock.pinsInitialized.v3'
 const DEFAULT_PINS: Pin[] = [
   exePin('explorer.exe', 'explorer.exe', 'File Explorer'),
-  exePin('claude.exe', 'Claude.exe', 'Claude'),
   exePin('Code.exe', 'Code.exe', 'Visual Studio Code'),
 ]
 /** Uninstalled programs that were once permanent pins and must not linger. */
-const RETIRED_KEYS = new Set([exeKey('NortonBrowser.exe')])
+const RETIRED_KEYS = new Set([exeKey('NortonBrowser.exe'), exeKey('claude.exe')])
 
 /** The programs that can't be unpinned. */
 export const isPermanent = (key: string) => DEFAULT_PINS.some((d) => d.key === key)
@@ -65,7 +64,7 @@ export async function loadPins(): Promise<Pin[]> {
     .filter((p): p is Pin => p !== null)
   const retired = pins.some((p) => RETIRED_KEYS.has(p.key))
   if (retired) pins = pins.filter((p) => !RETIRED_KEYS.has(p.key))
-  // File Explorer, Claude and VS Code are always pinned: any that went
+  // File Explorer and VS Code are always pinned: any that went
   // missing come back in their usual place.
   const missing = DEFAULT_PINS.filter((d) => !pins.some((p) => p.key === d.key))
   if (!missing.length) {

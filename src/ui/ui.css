@@ -612,3 +612,17 @@
   .u-wp-in { animation: u-wp-fade 700ms ease-out; }
   @keyframes u-wp-fade { from { opacity: 0; } to { opacity: 1; } }
 }
+
+@layer components {
+  .u-popup--tip { border-radius: 8px; overflow: hidden; }
+}
+
+/* Solid surfaces preference: glass becomes charcoal everywhere. */
+[data-opaque] .u-surface,
+[data-opaque] .u-dock,
+[data-opaque] .u-menubar { background: var(--u-m-solid) !important; }
+[data-opaque] .u-surface--card { background: var(--u-m-solid-hi) !important; }
+
+@layer components {
+  .u-popup--tip { width: max-content; }
+}

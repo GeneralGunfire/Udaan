@@ -44,6 +44,10 @@ struct Bar {
   window_px: i32,
   /// Thickness of the strip reserved from the work area; 0 means overlay (reserve nothing).
   reserve_px: i32,
+  /// Length of the window along the edge; 0 = the whole edge. A floating dock is narrower and centred.
+  width_px: i32,
+  /// Gap between the window and the screen edge (a floating dock hovers above the edge).
+  inset_px: i32,
   registered: bool,
   /// The strip the system last gave us (only meaningful while reserving).
   strip: RECT,
@@ -84,6 +88,30 @@ fn window_rect(edge: Edge, strip: &RECT, window_px: i32) -> RECT {
     Edge::Top => RECT { left: strip.left, top: strip.top, right: strip.right, bottom: strip.top + window_px },
     Edge::Bottom => RECT { left: strip.left, top: strip.bottom - window_px, right: strip.right, bottom: strip.bottom },
   }
+}
+
+/// The window's rectangle for a bar: the strip's rectangle, narrowed and centred if the bar is
+/// floating, and lifted off the edge by its inset.
+fn bar_rect(bar: &Bar, strip: &RECT) -> RECT {
+  let mut r = window_rect(bar.edge, strip, bar.window_px);
+  if bar.width_px > 0 {
+    let mid = (strip.left + strip.right) / 2;
+    r.left = mid - bar.width_px / 2;
+    r.right = r.left + bar.width_px;
+  }
+  if bar.inset_px > 0 {
+    match bar.edge {
+      Edge::Bottom => {
+        r.top -= bar.inset_px;
+        r.bottom -= bar.inset_px;
+      }
+      Edge::Top => {
+        r.top += bar.inset_px;
+        r.bottom += bar.inset_px;
+      }
+    }
+  }
+  r
 }
 
 fn appbar_data(hwnd: HWND, edge: Edge) -> APPBARDATA {
@@ -161,7 +189,7 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
           bar.strip = strip;
           with_bars(|b| b.insert(h, bar));
           if moved {
-            place(hwnd, &window_rect(bar.edge, &strip, bar.window_px));
+            place(hwnd, &bar_rect(&bar, &strip));
           }
         }
       }
@@ -182,7 +210,7 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
 /// placed on. `window_px` is the window's thickness; `reserve_px` is how much of the work
 /// area to claim (0 = overlay, claim nothing). Safe to call again to change either.
 #[tauri::command]
-pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32, reserve_px: i32) -> Result<Rect, String> {
+pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32, reserve_px: i32, width_px: Option<i32>, inset_px: Option<i32>) -> Result<Rect, String> {
   let hwnd = window.hwnd().map_err(|e| e.to_string())?;
   let h = hwnd.0 as isize;
   let m = monitor_rect(hwnd);
@@ -191,6 +219,8 @@ pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32
     edge,
     window_px,
     reserve_px,
+    width_px: 0,
+    inset_px: 0,
     registered: false,
     strip: RECT::default(),
   });
@@ -203,6 +233,8 @@ pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32
   bar.edge = edge;
   bar.window_px = window_px.max(1);
   bar.reserve_px = reserve_px.max(0);
+  bar.width_px = width_px.unwrap_or(0).max(0);
+  bar.inset_px = inset_px.unwrap_or(0).max(0);
 
   let strip = if bar.reserve_px > 0 {
     reserve_strip(hwnd, &mut bar, &m)
@@ -215,7 +247,7 @@ pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32
     edge_strip(edge, &m, bar.window_px)
   };
   bar.strip = strip;
-  let rect = window_rect(edge, &strip, bar.window_px);
+  let rect = bar_rect(&bar, &strip);
   place(hwnd, &rect);
   with_bars(|b| b.insert(h, bar));
   unsafe {
@@ -249,7 +281,7 @@ pub fn reassert(fullscreen: bool) {
   for (h, bar) in bars {
     let hwnd = HWND(h as *mut core::ffi::c_void);
     let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &monitor_rect(hwnd), bar.window_px) };
-    place(hwnd, &window_rect(bar.edge, &strip, bar.window_px));
+    place(hwnd, &bar_rect(&bar, &strip));
   }
 }
 
@@ -261,7 +293,7 @@ pub fn check(heal: bool) -> (usize, usize) {
   for (h, bar) in &bars {
     let hwnd = HWND(*h as *mut core::ffi::c_void);
     let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &monitor_rect(hwnd), bar.window_px) };
-    let want = window_rect(bar.edge, &strip, bar.window_px);
+    let want = bar_rect(&bar, &strip);
     let mut cur = RECT::default();
     unsafe {
       let _ = GetWindowRect(hwnd, &mut cur);

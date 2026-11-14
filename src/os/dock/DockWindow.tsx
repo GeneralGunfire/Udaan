@@ -15,7 +15,7 @@ import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { useShellMenu, type ShellMenuItemDef } from '@/os/ui/useShellMenu'
 import { StartTile, TrashGlyph } from '@/os/ui/icons/SystemGlyphs'
 import { useLatest } from '@/os/ui/useLatest'
-import { launchBounce, minimizeNudge, restoreNudge, focusPop, curve, dur } from '@/os/motion/systemMotion'
+import { launchBounce, minimizeNudge, restoreNudge, focusPop } from '@/os/motion/systemMotion'
 import { playSound } from '@/os/sound/sounds'
 import { dockMetrics } from './geometry'
 import { isPermanent, savePins, togglePin } from './pins'
@@ -24,7 +24,6 @@ import { GlassSlice } from '@/ui/GlassSlice'
 
 const METRICS = dockMetrics()
 const LAUNCH_TIMEOUT_MS = 8000
-const REVEAL_EDGE_PX = 2
 const HIDE_DELAY_MS = 450
 const DRAG_THRESHOLD = 6
 const UNPIN_LIFT = 60
@@ -201,15 +200,40 @@ function DockIcon({
  * rather than letting it read as a free-floating tooltip. The window count
  * rides along, so a glance answers "how many of these are open".
  */
+/* Hover names are popups of their own (the dock window is only as big as the dock). Module level, so
+   every item shares one timer and moving between icons swaps the name instead of stacking them. */
+let tipTimer: ReturnType<typeof setTimeout> | undefined
+function hideTip() {
+  clearTimeout(tipTimer)
+  void emit('taskbar-tip:hide')
+}
+function showTip(el: HTMLElement, text: string, sub?: string) {
+  clearTimeout(tipTimer)
+  tipTimer = setTimeout(() => {
+    const r = el.getBoundingClientRect()
+    void emit('taskbar-popup:show', { kind: 'tip', x: window.screenX + r.left + r.width / 2, y: window.screenY + r.top, placement: 'above', items: [{ label: text, id: sub }] })
+  }, 350)
+}
+
+/** Declares an item's hover name. Renders nothing; it listens on the button it sits in. */
 function DockLabel({ text, count, sub }: { text: string; count: number; sub?: string }) {
-  const shown = sub && sub !== text && sub.length > 0 ? (sub.length > 46 ? `${sub.slice(0, 45)}…` : sub) : ''
-  return (
-    <span className="u-dock__label">
-      {text}
-      {shown && <span className="block max-w-[260px] truncate text-[11px] font-normal text-(--u-ink-3)">{shown}</span>}
-      {count > 1 && <span className="tabular-nums text-(--u-ink-3)"> · {count}</span>}
-    </span>
-  )
+  const ref = useRef<HTMLSpanElement>(null)
+  const label = count > 1 ? `${text} · ${count}` : text
+  const detail = sub && sub !== text ? (sub.length > 46 ? `${sub.slice(0, 45)}…` : sub) : undefined
+  useEffect(() => {
+    const el = ref.current?.parentElement
+    if (!el) return
+    const enter = () => showTip(el, label, detail)
+    el.addEventListener('pointerenter', enter)
+    el.addEventListener('pointerleave', hideTip)
+    el.addEventListener('pointerdown', hideTip)
+    return () => {
+      el.removeEventListener('pointerenter', enter)
+      el.removeEventListener('pointerleave', hideTip)
+      el.removeEventListener('pointerdown', hideTip)
+    }
+  }, [label, detail])
+  return <span ref={ref} hidden />
 }
 
 function DockGlyph({ item }: { item: DockItem }) {
@@ -239,7 +263,6 @@ export function DockWindow() {
   const foreground = useShell((s) => s.foreground)
   const immersive = useImmersive()
   const fullscreen = useShell((s) => s.fullscreen) || immersive
-  const reduced = prefersReducedMotion()
 
   const barRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ key: string; startX: number; startY: number; active: boolean } | null>(null)
@@ -300,122 +323,75 @@ export function DockWindow() {
   const visibleRef = useLatest(visible)
   const itemsRef = useLatest(items)
 
-  /* ---------- placement: one fixed spot, bottom-centre ---------- */
+  /* ---------- placement: the window IS the bar ----------
+     The window is exactly as wide as the dock and sits on its reserved strip, so every pixel of it is
+     the dock: always clickable, nothing to toggle, no click-through. The engine centres it and keeps it
+     there (`engine_edge_bind`). Names on hover are popups of their own (see `tip` below). */
+  const [barWidth, setBarWidth] = useState(0)
   useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const measure = () => setBarWidth(Math.ceil(el.offsetWidth))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!barWidth) return
     let cancelled = false
-    async function place() {
-      const win = getCurrentWindow()
+    const bind = async () => {
       const scale = pxScale()
       try {
-        const h = Math.round(METRICS.windowHeight * scale)
-        // One call: reserve the strip (not while auto-hiding), put the window exactly on it,
-        // and from then on the engine keeps it there and releases it however the window ends.
         const r = await invoke<{ left: number; top: number }>('engine_edge_bind', {
           edge: 'bottom',
-          windowPx: h,
+          windowPx: Math.round(METRICS.windowHeight * scale),
           reservePx: autoHide ? 0 : Math.round(METRICS.reserve * scale),
+          widthPx: Math.round(barWidth * scale),
+          insetPx: Math.round(METRICS.margin * scale),
         })
         if (cancelled) return
         geometry.current = { x: r.left, y: r.top, scale }
-        await win.show()
-        // Showing can nudge a window; binding is idempotent, so just assert it once more.
-        await invoke('engine_edge_bind', {
-          edge: 'bottom',
-          windowPx: h,
-          reservePx: autoHide ? 0 : Math.round(METRICS.reserve * scale),
-        })
       } catch (err) {
         console.error('[dock] placement failed', err)
       }
     }
-    void place()
-    const un = getCurrentWindow().onScaleChanged(() => void place())
-    const offLayout = onLayoutChange(() => void place())
+    void bind()
+    const un = getCurrentWindow().onScaleChanged(() => void bind())
+    const offLayout = onLayoutChange(() => void bind())
     return () => {
       offLayout()
       cancelled = true
       void un.then((fn) => fn())
     }
-  }, [autoHide])
+  }, [autoHide, barWidth])
 
-  /* ---------- click-through + auto-hide ----------
-     The window spans the screen width; a transparent window takes clicks
-     over its whole rectangle, so outside the bar it ignores the cursor.
-     While ignoring or auto-hiding, one cursor read per tick (geometry is
-     cached) decides whether to take input back or reveal the dock. */
-  const ignoring = useRef(false)
-  const setIgnore = useCallback((v: boolean) => {
-    if (ignoring.current === v) return
-    ignoring.current = v
-    getCurrentWindow()
-      .setIgnoreCursorEvents(v)
-      .catch((err) => {
-        ignoring.current = false
-        console.error('[dock] click-through unavailable', err)
-      })
-  }, [])
-
-  // The native click-through flag outlives a reload of this webview, while
-  // `ignoring` starts false again: sync them once on mount or the dock can
-  // be left unclickable.
+  // Shown or hidden as a whole (auto-hide, full-screen apps).
   useEffect(() => {
-    ignoring.current = false
-    void getCurrentWindow().setIgnoreCursorEvents(false).catch(() => {})
-  }, [])
+    const win = getCurrentWindow()
+    void (visible ? win.show() : win.hide())
+  }, [visible])
 
+  // Auto-hide: the native mouse hook reports the pointer only while it is near the bottom edge.
   useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      if (dragRef.current) return
-      if (!barRef.current?.contains(e.target as Node)) setIgnore(true)
-    }
-    document.addEventListener('pointermove', onMove)
-    return () => document.removeEventListener('pointermove', onMove)
-  }, [setIgnore])
-
-  // Pointer reports come from the native mouse hook, only while the cursor
-  // is near the bottom edge (no polling): reveal at the edge, take clicks
-  // over the bar, hide a moment after leaving.
-  useEffect(() => {
-    void invoke('shell_set_dock_band', { heightPx: Math.round(METRICS.windowHeight * (window.devicePixelRatio || 1)) + 8 }).catch(() => {})
+    if (!shouldHide) return
+    void invoke('shell_set_dock_band', { heightPx: Math.round((METRICS.windowHeight + METRICS.margin) * (window.devicePixelRatio || 1)) + 8 }).catch(() => {})
     let hideTimer: ReturnType<typeof setTimeout> | undefined
-    const scheduleHide = () => {
-      if (!shouldHide || hideTimer) return
-      hideTimer = setTimeout(() => {
-        hideTimer = undefined
-        setRevealed(false)
-      }, HIDE_DELAY_MS)
-    }
-    const cancelHide = () => {
-      clearTimeout(hideTimer)
-      hideTimer = undefined
-    }
-    const un = listen<{ x: number; y: number }>('dock://pointer', ({ payload: { x: cx, y: cy } }) => {
+    const un = listen<{ x: number; y: number }>('dock://pointer', ({ payload: { y } }) => {
       if (dragRef.current) return
-      if (cy < 0) {
-        // Left the bottom band entirely.
-        setIgnore(true)
-        if (visibleRef.current) scheduleHide()
-        return
-      }
-      const g = geometry.current
-      const x = (cx - g.x) / g.scale
-      const y = (cy - g.y) / g.scale
-      const bar = barRef.current?.getBoundingClientRect()
-      const inBar = !!bar && visibleRef.current && x >= bar.left - 4 && x <= bar.right + 4 && y >= bar.top - 4 && y <= METRICS.windowHeight
-      setIgnore(!inBar)
-      if (!shouldHide) return
-      const atEdge = y >= METRICS.windowHeight - REVEAL_EDGE_PX && x >= 0 && x <= window.innerWidth
-      if (!visibleRef.current && atEdge && !fullscreen) {
-        cancelHide()
+      clearTimeout(hideTimer)
+      if (y < 0) {
+        hideTimer = setTimeout(() => setRevealed(false), HIDE_DELAY_MS)
+      } else if (!visibleRef.current && !fullscreen) {
         setRevealed(true)
-      } else if (visibleRef.current && !inBar) scheduleHide()
-      else cancelHide()
+      }
     })
     return () => {
-      cancelHide()
+      clearTimeout(hideTimer)
       void un.then((fn) => fn())
     }
-  }, [shouldHide, fullscreen, setIgnore, visibleRef])
+  }, [shouldHide, fullscreen, visibleRef])
 
   useEffect(() => {
     const refresh = () => void shell.recycleBinInfo().then((i) => setBinCount(i.itemCount), () => {})
@@ -521,15 +497,11 @@ export function DockWindow() {
   }, [])
 
   return (
-    <div className="fixed inset-0 flex select-none items-end justify-center" style={{ paddingBottom: METRICS.margin }} onContextMenu={(e) => e.preventDefault()}>
-      <motion.div
+    <div className="fixed inset-0 flex select-none items-end justify-center" onContextMenu={(e) => e.preventDefault()}>
+      <div
         ref={barRef}
-        initial={false}
-        animate={{ y: visible ? 0 : METRICS.windowHeight + 8 }}
-        transition={reduced ? { duration: dur.fade } : visible ? { type: 'spring', stiffness: 420, damping: 36 } : { duration: dur.normal, ease: curve.accelerate }}
-        onPointerEnter={() => setIgnore(false)}
-        onPointerDownCapture={() => setSuppressLabels(true)}
-        onPointerLeave={() => setSuppressLabels(false)}
+        onPointerDownCapture={() => (setSuppressLabels(true), hideTip())}
+        onPointerLeave={() => (setSuppressLabels(false), hideTip())}
         onContextMenu={(e) => {
           e.preventDefault()
           openMenu(e, dockMenuItems)
@@ -592,7 +564,7 @@ export function DockWindow() {
         </button>
         <Divider />
         <DockClock />
-      </motion.div>
+      </div>
     </div>
   )
 }

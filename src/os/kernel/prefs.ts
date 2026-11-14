@@ -49,6 +49,13 @@ export interface Prefs {
   'notifications.duration': number
   /** JSON array of app names whose banners are silenced (they still reach Notification Center). */
   'notifications.muted': string
+  /** Accent colour for active and live states (hex). */
+  'ui.accent': string
+  /** Solid surfaces instead of translucent glass. */
+  'ui.opaque': boolean
+  /** SHA-256 of the Udaan Lock PIN; empty = the built-in default. */
+  'lock.pinHash': string
+  'lock.pinLength': number
 }
 
 export type CornerAction = 'none' | 'task-view' | 'start' | 'show-desktop' | 'notifications' | 'screensaver'
@@ -84,6 +91,10 @@ export const PREF_DEFAULTS: Prefs = {
   'notifications.previews': true,
   'notifications.duration': 6,
   'notifications.muted': '[]',
+  'ui.accent': '#3072f0',
+  'ui.opaque': false,
+  'lock.pinHash': '',
+  'lock.pinLength': 4,
 }
 
 export type PrefKey = keyof Prefs

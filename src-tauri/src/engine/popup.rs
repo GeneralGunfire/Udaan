@@ -131,6 +131,7 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
     WM_ACTIVATE if (wp.0 & 0xFFFF) as u32 == WA_INACTIVE => {
       let h = hwnd.0 as isize;
       if with_open(|o| o.remove(&h)).is_some() {
+        super::trace::line("popup dismissed (lost focus)");
         let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
         if let Some(app) = APP.get() {
           let _ = app.emit("engine://popup-dismissed", h);
@@ -185,9 +186,18 @@ pub fn engine_popup_open(
     let _ = SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0);
   }
   apply(hwnd, rect, radius.unwrap_or(0));
-  if first {
-    window.show().map_err(|e| e.to_string())?;
+  // Always make sure it is visible: the open-state table can outlive a hidden window, and a popup that
+  // is placed but never shown is exactly the 'nothing opens' failure.
+  let _ = first;
+  // Shown with the system call, not the window library's `show()`: a popup dismissed on focus loss is
+  // hidden natively (below), the library's own idea of 'visible' is then stale, and its `show()` would
+  // do nothing, so no popup would ever open again after the first dismissal.
+  unsafe {
+    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOW, SW_SHOWNOACTIVATE};
+    // A tooltip must never take focus from what the user is working in.
+    let _ = ShowWindow(hwnd, if focus.unwrap_or(true) { SW_SHOW } else { SW_SHOWNOACTIVATE });
   }
+  super::trace::line(&format!("popup open at {},{} {}x{}", rect.left, rect.top, rect.width(), rect.height()));
   if focus.unwrap_or(true) {
     let _ = window.set_focus();
   }

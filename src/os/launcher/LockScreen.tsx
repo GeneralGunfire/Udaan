@@ -7,14 +7,7 @@ import { Wallpaper } from '@/os/desktop/Wallpaper'
 import { playSound } from '@/os/sound/sounds'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 
-/** SHA-256 of the Udaan Lock PIN. It only ever stands between the desktop and a passer-by. */
-const PIN_HASH = 'REMOVED-HASH'
-const PIN_LENGTH = 4
-
-async function sha256(text: string) {
-  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+import { DEFAULT_PIN_HASH, DEFAULT_PIN_LENGTH, loadPinConfig, sha256, type PinConfig } from '@/os/kernel/lockPin'
 
 const ease = [0.16, 1, 0.3, 1] as const
 
@@ -203,6 +196,11 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
   const np = useNowPlaying()
   const [entering, setEntering] = useState(false)
   const [pin, setPin] = useState('')
+  const [cfg, setCfg] = useState<PinConfig>({ hash: DEFAULT_PIN_HASH, length: DEFAULT_PIN_LENGTH })
+  useEffect(() => {
+    void loadPinConfig().then(setCfg)
+  }, [])
+  const PIN_LENGTH = cfg.length
   const [wrong, setWrong] = useState(0)
   const [unlocking, setUnlocking] = useState(false)
   const shake = useAnimationControls()
@@ -210,7 +208,7 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
 
   const submit = useCallback(
     async (value: string) => {
-      if ((await sha256(value)) === PIN_HASH) {
+      if ((await sha256(value)) === cfg.hash) {
         setUnlocking(true)
         playSound('unlock')
         setTimeout(onUnlock, 100)
@@ -221,7 +219,7 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
         setPin('')
       }
     },
-    [onUnlock, shake],
+    [onUnlock, shake, cfg.hash],
   )
 
   useEffect(() => {
@@ -242,7 +240,7 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [entering])
+  }, [entering, PIN_LENGTH])
 
   useEffect(() => {
     if (pin.length === PIN_LENGTH) void submit(pin)

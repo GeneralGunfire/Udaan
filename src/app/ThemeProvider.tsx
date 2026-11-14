@@ -1,3 +1,4 @@
+import { getPref, onPrefChanged } from '@/os/kernel/prefs'
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
 import { ThemeContext, type Theme } from '@/shared/hooks/useTheme'
 import { applyMaterial, type MaterialKind } from '@/os/kernel/material'
@@ -75,6 +76,20 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }
     void applyMaterial(material, theme === 'dark', !SQUARE.has(kind))
   }, [theme])
+
+  // Accent colour and solid surfaces are preferences; every window follows them.
+  useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return
+    const apply = (key: string, value: unknown) => {
+      const root = document.documentElement
+      if (key === 'ui.accent' && typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty('--u-accent', value)
+      if (key === 'ui.opaque') root.toggleAttribute('data-opaque', value === true)
+    }
+    void getPref('ui.accent').then((v) => apply('ui.accent', v))
+    void getPref('ui.opaque').then((v) => apply('ui.opaque', v))
+    const un = onPrefChanged(apply)
+    return () => void un.then((fn) => fn())
+  }, [])
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {

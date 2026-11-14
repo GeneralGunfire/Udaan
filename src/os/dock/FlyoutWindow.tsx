@@ -31,7 +31,7 @@ import type { FlyoutMenuItem, FlyoutPlacement, ShowTaskbarPopupPayload } from '.
  * anchored to.
  */
 
-const WIDTH = { 'notifications-panel': 340, calendar: 312, layouts: 380, network: 300, sound: 360, media: 340, 'context-menu': 220 } as const
+const WIDTH = { 'notifications-panel': 340, calendar: 312, layouts: 380, network: 300, sound: 360, media: 340, 'context-menu': 220, tip: 0 } as const
 const MAX_HEIGHT = 640
 type Kind = keyof typeof WIDTH
 
@@ -56,13 +56,14 @@ export function FlyoutWindow() {
 
   const close = useCallback(() => {
     if (!payload.current) return
+    const wasTip = payload.current.kind === 'tip'
     payload.current = null
     opened.current = false
     openCall.current++
     setShown(false)
     setKind(null)
     void invoke('engine_popup_close').catch(() => {})
-    void emit('taskbar-popup:hidden')
+    if (!wasTip) void emit('taskbar-popup:hidden')
   }, [])
 
   useEffect(() => {
@@ -70,6 +71,8 @@ export function FlyoutWindow() {
       listen<ShowTaskbarPopupPayload>('taskbar-popup:show', (e) => {
         const p = e.payload
         if (!(p.kind in WIDTH)) return
+        // A name tip never replaces a real popup that is open.
+        if (p.kind === 'tip' && payload.current && payload.current.kind !== 'tip') return
         payload.current = p
         opened.current = false
         setShown(false)
@@ -89,6 +92,7 @@ export function FlyoutWindow() {
         }
       }),
       listen('taskbar-popup:hide', close),
+      listen('taskbar-tip:hide', () => payload.current?.kind === 'tip' && close()),
       // The engine hid the popup because it lost focus; just bring the UI state in line.
       listen('engine://popup-dismissed', () => {
         if (!payload.current) return
@@ -128,8 +132,8 @@ export function FlyoutWindow() {
       width: w,
       height: placement === 'sheet-right' ? 100000 : h,
       placement,
-      focus: true,
-      radius: p.kind === 'context-menu' ? 10 : 16,
+      focus: p.kind !== 'tip',
+      radius: p.kind === 'tip' ? 8 : p.kind === 'context-menu' ? 10 : 16,
     })
       .then(() => {
         // Only reveal if this is still the popup that was asked for.
@@ -165,6 +169,7 @@ export function FlyoutWindow() {
   }, [close])
 
   const isMenu = kind === 'context-menu'
+  const isTip = kind === 'tip'
   const sheet = payload.current?.placement === 'sheet-right'
 
   return (
@@ -175,15 +180,20 @@ export function FlyoutWindow() {
           ref={cardRef}
           data-shown={shown}
           data-origin={origin}
-          className={`u-surface u-popup u-scroll ${isMenu ? 'u-popup--menu' : ''}`}
+          className={`u-surface u-popup u-scroll ${isMenu ? 'u-popup--menu' : ''} ${isTip ? 'u-popup--tip' : ''}`}
           style={{
-            width: isMenu ? undefined : WIDTH[kind],
+            width: isMenu || isTip ? undefined : WIDTH[kind],
             minWidth: isMenu ? WIDTH[kind] : undefined,
             maxHeight: sheet ? '100%' : MAX_HEIGHT,
             height: sheet ? '100%' : undefined,
           }}
         >
-          {kind === 'network' ? (
+          {isTip ? (
+            <div className="whitespace-nowrap px-2.5 py-1.5 text-[12px] font-medium">
+              {menuItems[0]?.label}
+              {menuItems[0]?.id && <span className="block max-w-[260px] truncate text-[11px] font-normal text-(--u-ink-3)">{menuItems[0].id}</span>}
+            </div>
+          ) : kind === 'network' ? (
             <NetworkPanel />
           ) : kind === 'sound' ? (
             <SoundPanel />
