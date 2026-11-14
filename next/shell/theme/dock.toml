@@ -1,0 +1,43 @@
+# Dock items, in order. Each [[app]] is one tile. `path` is the executable (icons are
+# extracted from it; environment variables allowed). `name` is the label. Entries whose
+# executable is missing are skipped. Hot-reloaded like theme.toml.
+
+[[app]]
+name = "Files"
+path = "%WINDIR%\\explorer.exe"
+
+[[app]]
+name = "Edge"
+path = "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"
+
+[[app]]
+name = "Code"
+path = "%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe"
+
+[[app]]
+name = "Word"
+path = "%ProgramFiles%\\Microsoft Office\\root\\Office16\\WINWORD.EXE"
+
+[[app]]
+name = "Excel"
+path = "%ProgramFiles%\\Microsoft Office\\root\\Office16\\EXCEL.EXE"
+
+[[app]]
+name = "Outlook"
+path = "%ProgramFiles%\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE"
+
+[[app]]
+name = "Blender"
+path = "%ProgramFiles%\\Blender Foundation\\Blender 5.2\\blender.exe"
+
+[[app]]
+name = "Terminal"
+path = "%ProgramFiles%\\PowerShell\\7\\pwsh.exe"
+
+[[app]]
+name = "Notepad"
+path = "%WINDIR%\\system32\\notepad.exe"
+
+[[app]]
+name = "Settings"
+path = "%WINDIR%\\ImmersiveControlPanel\\SystemSettings.exe"

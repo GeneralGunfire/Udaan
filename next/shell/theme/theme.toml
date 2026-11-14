@@ -1,0 +1,152 @@
+# Udaan Next design language. Hot-reloaded: save this file and the shell rebuilds its
+# visuals (watch the console for "theme: reloaded" or a parse warning).
+#
+# Format: [section] headers, `key = value`. Values: number (12, 0.55), colour
+# (#RRGGBB or #RRGGBBAA), number list (220, 0.55), string ("blur"), bool (true).
+# Unknown keys are ignored; a missing key falls back to the compiled default, so a
+# typo can never take the shell down.
+#
+# Geometry below is MEASURED from the macOS reference screenshot and scaled to this
+# 1920x1080 screen: 55 px dock icons, 6 px gaps, 17 px off the bottom edge.
+
+# ---------------------------------------------------------------------------------
+# Type scale: Segoe UI (Windows 10 has no Segoe UI Variable). Sizes in logical px.
+# Weight: 300 light, 400 regular, 600 semibold, 700 bold.
+[type]
+family        = "Segoe UI"
+mono          = "Cascadia Mono"
+icons         = "Segoe MDL2 Assets"
+caption       = 11
+label         = 12
+body          = 13
+title         = 15
+headline      = 20
+display       = 34
+display_weight = 300
+clock_bar     = 12
+
+# ---------------------------------------------------------------------------------
+# Spacing on a 4 px grid, radii, strokes. Logical px; scaled per monitor DPI.
+[space]
+xs = 4
+sm = 8
+md = 12
+lg = 16
+xl = 24
+xxl = 32
+
+[radius]
+sm     = 6
+md     = 10
+lg     = 16
+dock   = 20      # the reference dock plate is a soft, wide-radius pill
+widget = 16
+icon   = 11      # app icon plate corner
+
+# ---------------------------------------------------------------------------------
+# Elevation: compositor drop shadows. "blur radius, y offset, opacity".
+# Neutral black, never coloured (no glows anywhere).
+[elevation]
+rest  = 10, 2, 0.18
+float = 30, 10, 0.34
+lift  = 18, 6, 0.26
+
+# ---------------------------------------------------------------------------------
+# Glass. Measured on this PC (see the win10-glass-material note): accent blur-behind
+# on the window DOES respect a composition rounded clip, and the blur is strong, so
+# the tint over it must be a thin film. CreateHostBackdropBrush is never used: on
+# Windows 10 it paints black.
+[material]
+mode          = "blur"   # "blur" | "none" (opaque fallback)
+edge          = 1
+border        = 1
+
+# ---------------------------------------------------------------------------------
+# Colour. The active set follows the Windows app theme.
+# Dock/top-bar tints are deliberately LIGHT: over a real blur a heavy dark tint reads
+# as a 2010 widget, which is what the first attempt looked like.
+[dark]
+glass_tint     = #FFFFFF1A   # a light film over the blur, not a dark slab
+glass_opaque   = #1D2029F2   # when transparency is off
+glass_edge     = #FFFFFF26
+glass_border   = #FFFFFF24
+glass_shade    = #00000014
+text           = #FFFFFFF2
+text_secondary = #FFFFFFB0
+text_tertiary  = #FFFFFF70
+accent         = #FF4D4D     # the reference calendar's red accent
+accent_text    = #FFFFFF
+indicator      = #FFFFFFD8
+icon_plate     = #FFFFFF00   # no plate: real icons sit directly on the glass
+separator      = #FFFFFF1C
+widget_tint    = #1C1F28E6
+widget_edge    = #FFFFFF2A
+shadow         = #000000
+
+[light]
+glass_tint     = #FFFFFF59
+glass_opaque   = #F4F6FAF2
+glass_edge     = #FFFFFFC0
+glass_border   = #00000018
+glass_shade    = #0000000A
+text           = #1B1F28F2
+text_secondary = #1B1F28A6
+text_tertiary  = #1B1F2866
+accent         = #FF3B30
+accent_text    = #FFFFFF
+indicator      = #1B1F28CC
+icon_plate     = #00000000
+separator      = #00000018
+widget_tint    = #FFFFFFE8
+widget_edge    = #FFFFFFF0
+shadow         = #000000
+
+# ---------------------------------------------------------------------------------
+# Motion. Springs run on the compositor and stop by themselves; nothing loops.
+# "period ms, damping ratio". Damping 1.0 = critically damped (no overshoot).
+# Dock magnification is computed directly per mouse move, NOT sprung per sample:
+# springs only carry the wave's enter and exit.
+[motion]
+tap        = 140, 0.70
+hover      = 220, 0.80
+magnify    = 260, 0.90   # enter/exit of the magnification wave only
+enter      = 520, 0.80
+exit       = 200, 1.00
+slide      = 320, 1.00
+settle     = 700, 0.80
+hover_lift = 2
+press_scale = 0.90
+
+# ---------------------------------------------------------------------------------
+# Dock geometry, measured from the reference and scaled to 1080p.
+[dock]
+icon          = 55      # measured: 44 px in a 865 px-tall reference -> 55 at 1080
+gap           = 6       # icons nearly touch
+pad_x         = 7
+pad_y         = 5
+bottom        = 17      # measured gap from the screen's bottom edge
+magnify_max   = 1.45
+magnify_sigma = 1.30
+magnify_rise  = 16
+tilt          = 0       # the reference dock does not tilt; keep it flat and clean
+indicator     = 4
+reserve       = true    # keep an AppBar strip so maximised windows stop above it
+
+# ---------------------------------------------------------------------------------
+# Top menu bar: text on a faint darkening, NO fill and NO border (as measured).
+[topbar]
+height    = 26
+pad_x     = 14
+item_gap  = 18
+darken    = 0.22        # how much the bar strip darkens the wallpaper, 0 = nothing
+
+# ---------------------------------------------------------------------------------
+# Desktop layer.
+[desktop]
+wallpaper      = "wallpapers/alhambra.jpg"   # rendered ONLY in our layer; the Windows
+                                             # wallpaper setting is never changed.
+photo          = "wallpapers/machu-picchu.jpg"
+widget_width   = 220
+widget_margin  = 22
+widget_gap     = 14
+vignette       = 0.30
