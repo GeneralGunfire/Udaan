@@ -241,12 +241,12 @@ fn is_symlink(path: &Path) -> bool {
   fs::symlink_metadata(path).map(|m| m.file_type().is_symlink()).unwrap_or(false)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cnc_check_precondition() -> SymlinkPrecondition {
   precondition::check()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cnc_get_status(app: AppHandle) -> GameStatus {
   let precondition = precondition::check();
   match resolve_game_root(&app) {
@@ -318,7 +318,7 @@ fn stage_symlink(source_file: &Path, target: &Path) -> Result<(), String> {
     .map_err(|e| format!("Failed to create symlink at {} -> {}: {e}", target.display(), source_file.display()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cnc_switch_mod(app: AppHandle, mod_name: String, version: String) -> Result<(), String> {
   let precondition = precondition::check();
   if !precondition.can_create_symlinks {
@@ -344,7 +344,7 @@ pub fn cnc_switch_mod(app: AppHandle, mod_name: String, version: String) -> Resu
   Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cnc_launch_game(app: AppHandle) -> Result<(), String> {
   let game_root = resolve_game_root(&app)?;
   let modded_exe = game_root.join("modded.exe");
@@ -361,7 +361,7 @@ pub fn cnc_launch_game(app: AppHandle) -> Result<(), String> {
   Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cnc_restore_backup(app: AppHandle) -> Result<(), String> {
   let manifest_path = manifest_path(&app)?;
   let data = fs::read_to_string(&manifest_path).map_err(|_| "No backup found to restore.".to_string())?;

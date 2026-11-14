@@ -14,7 +14,7 @@ fn page_count_of(doc: &Document) -> u32 {
 }
 
 /// Rotates the given 1-based pages (all when empty) by a multiple of 90°.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_rotate(input_path: String, output_path: String, pages: Vec<u32>, degrees: i64) -> Result<PdfInfo, String> {
   let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
   let all = doc.get_pages();
@@ -31,7 +31,7 @@ pub fn pdf_tool_rotate(input_path: String, output_path: String, pages: Vec<u32>,
 }
 
 /// Removes the given 1-based pages.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_delete_pages(input_path: String, output_path: String, pages: Vec<u32>) -> Result<PdfInfo, String> {
   let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
   if pages.is_empty() {
@@ -48,7 +48,7 @@ pub fn pdf_tool_delete_pages(input_path: String, output_path: String, pages: Vec
 
 /// Rewrites the file with compressed streams and unused objects removed.
 /// Returns (before, after) sizes in bytes.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_compress(input_path: String, output_path: String) -> Result<(u64, u64), String> {
   let before = std::fs::metadata(&input_path).map(|m| m.len()).unwrap_or(0);
   let mut doc = Document::load(&input_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
@@ -60,7 +60,7 @@ pub fn pdf_tool_compress(input_path: String, output_path: String) -> Result<(u64
   Ok((before, after))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_inspect(file_path: String) -> Result<PdfInfo, String> {
   let doc = Document::load(&file_path).map_err(|e| format!("Failed to load PDF: {e}"))?;
   Ok(PdfInfo { path: file_path, page_count: page_count_of(&doc) })
@@ -69,7 +69,7 @@ pub fn pdf_tool_inspect(file_path: String) -> Result<PdfInfo, String> {
 /// Merges multiple PDFs into one, in the given order. Ports the page-tree-stitching approach
 /// from lopdf's own `merge` example: renumber each source document's objects into a shared ID
 /// space, then rebuild a single Catalog/Pages tree pointing at every page across all inputs.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_merge(input_paths: Vec<String>, output_path: String) -> Result<PdfInfo, String> {
   if input_paths.len() < 2 {
     return Err("Provide at least two PDFs to merge".to_string());
@@ -162,7 +162,7 @@ pub fn pdf_tool_merge(input_paths: Vec<String>, output_path: String) -> Result<P
 /// `start-end` 1-indexed inclusive strings). Each output is a clone of the source document
 /// with every page outside the target range deleted via lopdf's own `delete_pages`, which
 /// keeps all fonts/resources/structure intact rather than hand-rebuilding a page tree.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_split(
   input_path: String,
   output_dir: String,
@@ -233,7 +233,7 @@ fn parse_range(spec: &str, total_pages: u32) -> Result<(u32, u32), String> {
 /// Basic annotate: stamps a line of text onto one page at a caller-given position. Appends a
 /// new content stream to the page's existing "Contents" array rather than replacing it, so the
 /// page's original content is preserved underneath the stamp.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_stamp_text(
   input_path: String,
   output_path: String,
@@ -306,7 +306,7 @@ pub fn pdf_tool_stamp_text(
 
 /// Generates a small multi-page PDF for smoke-testing merge/split/stamp without needing a
 /// user-supplied sample file. Uses the same content-stream pattern as lopdf's own examples.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pdf_tool_generate_sample(output_path: String, page_count: u32, title: String) -> Result<PdfInfo, String> {
   let mut doc = Document::with_version("1.5");
   let pages_id = doc.new_object_id();

@@ -9,10 +9,11 @@ use std::sync::Mutex;
 
 type Undo = Box<dyn FnOnce() + Send>;
 
-static UNDOS: Mutex<Vec<(&'static str, Undo)>> = Mutex::new(Vec::new());
+static UNDOS: Mutex<Vec<(String, Undo)>> = Mutex::new(Vec::new());
 
 /// Registers `undo` under `name`. Registering the same name again replaces the old undo.
-pub fn register(name: &'static str, undo: impl FnOnce() + Send + 'static) {
+pub fn register(name: impl Into<String>, undo: impl FnOnce() + Send + 'static) {
+  let name = name.into();
   if let Ok(mut all) = UNDOS.lock() {
     all.retain(|(n, _)| *n != name);
     all.push((name, Box::new(undo)));
@@ -20,9 +21,9 @@ pub fn register(name: &'static str, undo: impl FnOnce() + Send + 'static) {
 }
 
 /// Runs and removes the undo registered under `name`, if any.
-pub fn release(name: &'static str) {
+pub fn release(name: &str) {
   let undo = UNDOS.lock().ok().and_then(|mut all| {
-    let i = all.iter().position(|(n, _)| *n == name)?;
+    let i = all.iter().position(|(n, _)| n == name)?;
     Some(all.remove(i).1)
   });
   if let Some(u) = undo {
@@ -32,9 +33,9 @@ pub fn release(name: &'static str) {
 
 /// Forgets the undo registered under `name` without running it (the change was already
 /// reverted by the normal path).
-pub fn cancel(name: &'static str) {
+pub fn cancel(name: &str) {
   if let Ok(mut all) = UNDOS.lock() {
-    all.retain(|(n, _)| *n != name);
+    all.retain(|(n, _)| n != name);
   }
 }
 

@@ -140,13 +140,13 @@ pub fn start_clipboard_watch(app: AppHandle) {
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clip_history_list() -> Vec<ClipItem> {
   CLIPS.lock().unwrap().clone()
 }
 
 /// Puts an item back on the clipboard.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clip_history_copy(id: String) -> Result<(), String> {
   let item = CLIPS.lock().unwrap().iter().find(|c| c.id == id).cloned().ok_or("Item not found")?;
   #[cfg(windows)]
@@ -167,7 +167,7 @@ pub fn clip_history_copy(id: String) -> Result<(), String> {
   Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clip_history_pin(app: AppHandle, id: String, pinned: bool) {
   if let Some(c) = CLIPS.lock().unwrap().iter_mut().find(|c| c.id == id) {
     c.pinned = pinned;
@@ -176,7 +176,7 @@ pub fn clip_history_pin(app: AppHandle, id: String, pinned: bool) {
   let _ = app.emit("clipboard://changed", ());
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clip_history_delete(app: AppHandle, id: Option<String>) {
   let removed: Vec<ClipItem> = {
     let mut list = CLIPS.lock().unwrap();
@@ -259,7 +259,7 @@ pub async fn screenshot_capture(app: AppHandle) -> Result<String, String> {
 
 /// Saves an edited screenshot (PNG bytes) to Pictures\Screenshots and/or
 /// the clipboard. Returns the saved file path when saved.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn screenshot_save(png: Vec<u8>, to_file: bool, to_clipboard: bool) -> Result<Option<String>, String> {
   let img = image::load_from_memory_with_format(&png, image::ImageFormat::Png).map_err(|e| e.to_string())?;
   let mut saved = None;
@@ -370,7 +370,7 @@ fn fxhash(s: &str) -> u64 {
 }
 
 /// Saves edited image bytes (PNG) next to the original as "name (edited).png".
-#[tauri::command]
+#[tauri::command(async)]
 pub fn photos_save_copy(original: String, png: Vec<u8>) -> Result<String, String> {
   let orig = PathBuf::from(&original);
   let stem = orig.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "photo".into());
@@ -509,7 +509,7 @@ pub struct DriveInfo {
   pub free: u64,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn storage_drives() -> Vec<DriveInfo> {
   sysinfo::Disks::new_with_refreshed_list()
     .iter()

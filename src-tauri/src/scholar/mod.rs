@@ -26,29 +26,29 @@ pub fn init(app: &AppHandle) -> Result<ScholarState, String> {
 
 // --- Subjects ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_subjects(state: State<ScholarState>) -> Result<Vec<Subject>, String> {
   state.store.list_subjects().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_subject(state: State<ScholarState>, subject: Subject) -> Result<(), String> {
   state.store.create_subject(&subject).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_update_subject(state: State<ScholarState>, subject: Subject) -> Result<(), String> {
   state.store.update_subject(&subject).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_subject(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_subject(&id).map_err(|e| e.to_string())
 }
 
 // --- Blocks ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_blocks_for_week(
   state: State<ScholarState>,
   week_start: String,
@@ -57,7 +57,7 @@ pub fn scholar_list_blocks_for_week(
   state.store.list_blocks_for_week(&week_start, &week_end).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_blocks_for_date(
   state: State<ScholarState>,
   date: String,
@@ -65,17 +65,17 @@ pub fn scholar_list_blocks_for_date(
   state.store.list_blocks_for_date(&date).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_block(state: State<ScholarState>, block: StudyBlock) -> Result<(), String> {
   state.store.create_block(&block).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_update_block(state: State<ScholarState>, block: StudyBlock) -> Result<(), String> {
   state.store.update_block(&block).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_block_completed(
   state: State<ScholarState>,
   id: String,
@@ -84,14 +84,14 @@ pub fn scholar_set_block_completed(
   state.store.set_block_completed(&id, completed).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_block(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_block(&id).map_err(|e| e.to_string())
 }
 
 // --- Reflections ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_get_reflection(
   state: State<ScholarState>,
   date: String,
@@ -99,7 +99,7 @@ pub fn scholar_get_reflection(
   state.store.get_reflection(&date).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_reflection(
   state: State<ScholarState>,
   reflection: DailyReflection,
@@ -109,12 +109,12 @@ pub fn scholar_set_reflection(
 
 // --- Streaks ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_streaks(state: State<ScholarState>) -> Result<Vec<SubjectStreak>, String> {
   state.store.list_streaks().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_update_streak(
   state: State<ScholarState>,
   streak: SubjectStreak,
@@ -124,7 +124,7 @@ pub fn scholar_update_streak(
 
 // --- Resources ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_resources(
   state: State<ScholarState>,
   subject_id: String,
@@ -132,7 +132,7 @@ pub fn scholar_list_resources(
   state.store.list_resources(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_resource(
   state: State<ScholarState>,
   resource: Resource,
@@ -140,14 +140,14 @@ pub fn scholar_create_resource(
   state.store.create_resource(&resource).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_resource(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_resource(&id).map_err(|e| e.to_string())
 }
 
 // --- Settings ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_get_setting(
   state: State<ScholarState>,
   key: String,
@@ -155,7 +155,7 @@ pub fn scholar_get_setting(
   state.store.get_setting(&key).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_setting(
   state: State<ScholarState>,
   key: String,
@@ -166,7 +166,7 @@ pub fn scholar_set_setting(
 
 // --- Chapters ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_chapters(
   state: State<ScholarState>,
   subject_id: String,
@@ -174,12 +174,12 @@ pub fn scholar_list_chapters(
   state.store.list_chapters(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_chapter(state: State<ScholarState>, chapter: Chapter) -> Result<(), String> {
   state.store.create_chapter(&chapter).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_chapter_status(
   state: State<ScholarState>,
   id: String,
@@ -192,7 +192,7 @@ pub fn scholar_set_chapter_status(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_chapter_completed(
   state: State<ScholarState>,
   id: String,
@@ -201,7 +201,7 @@ pub fn scholar_set_chapter_completed(
   state.store.set_chapter_completed(&id, completed).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_rename_chapter(
   state: State<ScholarState>,
   id: String,
@@ -210,14 +210,14 @@ pub fn scholar_rename_chapter(
   state.store.rename_chapter(&id, &name).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_chapter(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_chapter(&id).map_err(|e| e.to_string())
 }
 
 // --- Lessons ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_lessons(
   state: State<ScholarState>,
   chapter_id: String,
@@ -225,7 +225,7 @@ pub fn scholar_list_lessons(
   state.store.list_lessons(&chapter_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_lessons_for_subject(
   state: State<ScholarState>,
   subject_id: String,
@@ -233,7 +233,7 @@ pub fn scholar_list_lessons_for_subject(
   state.store.list_lessons_for_subject(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_replace_lessons(
   state: State<ScholarState>,
   chapter_id: String,
@@ -242,7 +242,7 @@ pub fn scholar_replace_lessons(
   state.store.replace_lessons(&chapter_id, &lessons).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_lesson_mastery(
   state: State<ScholarState>,
   id: String,
@@ -257,7 +257,7 @@ pub fn scholar_set_lesson_mastery(
 
 // --- Notes ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_notes(
   state: State<ScholarState>,
   subject_id: String,
@@ -265,19 +265,19 @@ pub fn scholar_list_notes(
   state.store.list_notes(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_upsert_note(state: State<ScholarState>, note: Note) -> Result<(), String> {
   state.store.upsert_note(&note).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_note(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_note(&id).map_err(|e| e.to_string())
 }
 
 // --- Tests ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_tests(
   state: State<ScholarState>,
   subject_id: String,
@@ -285,17 +285,17 @@ pub fn scholar_list_tests(
   state.store.list_tests(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_results(state: State<ScholarState>) -> Result<Vec<Test>, String> {
   state.store.list_results().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_test(state: State<ScholarState>, test: Test) -> Result<(), String> {
   state.store.create_test(&test).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_record_test_result(
   state: State<ScholarState>,
   id: String,
@@ -309,14 +309,14 @@ pub fn scholar_record_test_result(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_test(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_test(&id).map_err(|e| e.to_string())
 }
 
 // --- Past papers ---
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_list_past_papers(
   state: State<ScholarState>,
   subject_id: String,
@@ -324,7 +324,7 @@ pub fn scholar_list_past_papers(
   state.store.list_past_papers(&subject_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_create_past_paper(
   state: State<ScholarState>,
   paper: PastPaper,
@@ -332,7 +332,7 @@ pub fn scholar_create_past_paper(
   state.store.create_past_paper(&paper).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_set_past_paper_chapters(
   state: State<ScholarState>,
   id: String,
@@ -344,7 +344,7 @@ pub fn scholar_set_past_paper_chapters(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_delete_past_paper(state: State<ScholarState>, id: String) -> Result<(), String> {
   state.store.delete_past_paper(&id).map_err(|e| e.to_string())
 }
@@ -378,7 +378,7 @@ const MAX_PAGE_BYTES: u64 = 24 * 1024 * 1024;
 /// plugin: the plugin would need a broad read scope covering wherever
 /// Phone Link happens to save (user-configurable, so not scopeable up
 /// front), whereas this only ever stats the exact files the user picked.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_verify_pages(paths: Vec<String>) -> Result<(), String> {
   if paths.is_empty() {
     return Err("No pages were selected.".into());
@@ -422,7 +422,7 @@ pub fn scholar_verify_pages(paths: Vec<String>) -> Result<(), String> {
 /// `Pictures`) and returns `None` when neither exists rather than handing
 /// the dialog a path that isn't there - the picker then just opens
 /// wherever the OS would, and the user navigates once.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scholar_phone_photos_dir() -> Option<String> {
   let pictures = dirs::picture_dir()?;
   let camera_roll = pictures.join("Camera Roll");

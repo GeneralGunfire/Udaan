@@ -215,12 +215,12 @@ fn extract_pdf_paragraphs(file_path: &str) -> Result<(Vec<String>, Option<String
   Ok((paragraphs, warning))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_list_books(state: State<StudyState>) -> Result<Vec<Book>, String> {
   state.store.list_books().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_delete_book(state: State<StudyState>, id: String) -> Result<(), String> {
   state.store.delete_book(&id).map_err(|e| e.to_string())
 }
@@ -274,32 +274,32 @@ pub async fn study_retrieve(
   Ok(scored)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_create_session(state: State<StudyState>, session: StudySession) -> Result<(), String> {
   state.store.create_session(&session).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_touch_session(state: State<StudyState>, id: String, updated_at: String) -> Result<(), String> {
   state.store.touch_session(&id, &updated_at).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_list_sessions(state: State<StudyState>) -> Result<Vec<StudySession>, String> {
   state.store.list_sessions().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_delete_session(state: State<StudyState>, id: String) -> Result<(), String> {
   state.store.delete_session(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_add_message(state: State<StudyState>, message: StudyMessage) -> Result<(), String> {
   state.store.insert_message(&message).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn study_list_messages(state: State<StudyState>, session_id: String) -> Result<Vec<StudyMessage>, String> {
   state.store.list_messages(&session_id).map_err(|e| e.to_string())
 }

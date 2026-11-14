@@ -33,7 +33,7 @@ fn truncate_title(text: &str) -> String {
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_create_session(
   state: State<GeneralChatState>,
   first_message: String,
@@ -53,22 +53,22 @@ pub fn general_chat_create_session(
 
 /// Lists sessions for one provider ("local" | "omniroute") — Local and
 /// OmniRoute chats are separate lists, never merged into one thread.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_list_sessions(state: State<GeneralChatState>, provider: String) -> Result<Vec<ChatSession>, String> {
   state.store.list_sessions(&provider).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_delete_session(state: State<GeneralChatState>, id: String) -> Result<(), String> {
   state.store.delete_session(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_list_messages(state: State<GeneralChatState>, session_id: String) -> Result<Vec<ChatMessage>, String> {
   state.store.list_messages(&session_id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_add_message(
   state: State<GeneralChatState>,
   session_id: String,
@@ -92,7 +92,7 @@ pub fn general_chat_add_message(
 
 /// Called as an assistant reply streams/completes, to persist its final text
 /// without creating a new row for every intermediate update.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_update_message(state: State<GeneralChatState>, id: String, content: String) -> Result<(), String> {
   state.store.update_message_content(&id, &content).map_err(|e| e.to_string())
 }
@@ -101,18 +101,18 @@ pub fn general_chat_update_message(state: State<GeneralChatState>, id: String, c
 /// "current_project"). This is a flat fact store, not a transcript — the
 /// model reads all facts back as short bullet lines prepended to its
 /// system prompt on every new chat.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_set_memory_fact(state: State<GeneralChatState>, key: String, value: String) -> Result<(), String> {
   let now = Utc::now().to_rfc3339();
   state.store.set_memory_fact(&key, &value, &now).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_delete_memory_fact(state: State<GeneralChatState>, key: String) -> Result<(), String> {
   state.store.delete_memory_fact(&key).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn general_chat_list_memory_facts(state: State<GeneralChatState>) -> Result<Vec<MemoryFact>, String> {
   state.store.list_memory_facts().map_err(|e| e.to_string())
 }

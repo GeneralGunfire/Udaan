@@ -31,7 +31,7 @@ pub struct SystemStats {
   pub disks: Vec<DiskStats>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn system_health_stats() -> Result<SystemStats, String> {
   let mut sys = sysinfo::System::new();
   sys.refresh_memory();

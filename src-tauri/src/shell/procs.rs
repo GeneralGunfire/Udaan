@@ -115,7 +115,7 @@ pub async fn shell_system_load() -> SystemLoad {
 
 /// Ends a process. Refuses Udaan itself and the core Windows processes
 /// whose termination would log the user out or crash the session.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_end_process(pid: u32) -> Result<(), String> {
   if pid == std::process::id() {
     return Err("Udaan can't end itself from here.".into());

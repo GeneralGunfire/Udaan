@@ -258,7 +258,7 @@ fn resolve_locator(locator: &Locator) -> Option<String> {
 /// Never errors — an app with no verified path/protocol is simply omitted,
 /// so the frontend never has to render a tile for something that would
 /// fail to launch.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_detect(group: AppGroup) -> Vec<DetectedApp> {
   known_apps_for_group(group)
     .iter()
@@ -278,7 +278,7 @@ pub fn installed_apps_detect(group: AppGroup) -> Vec<DetectedApp> {
 /// came from `installed_apps_detect` — this command does not re-validate
 /// against the registry, just hands it to the OS the same way
 /// double-clicking a file or a link would.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_launch(path: String) -> Result<(), String> {
   // A protocol URI (e.g. "ms-windows-store:") has a multi-character scheme
   // before its ':' — a real Windows path's ':' is always a single drive
@@ -320,7 +320,7 @@ pub fn resolve_launch_target(exe: &str) -> Option<String> {
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_launch_by_exe_name(exe: String) -> Result<(), String> {
   #[cfg(target_os = "windows")]
   {
@@ -520,14 +520,14 @@ mod windows_handlers {
 /// Resolves the OS's current default app for a file extension (no dot),
 /// asking the registry directly rather than hardcoding an extension map —
 /// stays correct if the user changes their default in Windows Settings.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_default_handler(extension: String) -> Option<FileHandler> {
   windows_handlers::default_handler(&extension)
 }
 
 /// All handlers Windows knows about for a file extension (the "Open with"
 /// list), default first.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_handlers_for_extension(extension: String) -> Vec<FileHandler> {
   windows_handlers::all_handlers(&extension)
 }
@@ -535,7 +535,7 @@ pub fn installed_apps_handlers_for_extension(extension: String) -> Vec<FileHandl
 /// Opens `file_path` with a specific handler executable — used by the
 /// "Open with" submenu when the user picks something other than the
 /// system default (which `file_explorer_open_with_system` already covers).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_apps_open_file_with(exe_path: String, file_path: String) -> Result<(), String> {
   std::process::Command::new(&exe_path)
     .arg(&file_path)

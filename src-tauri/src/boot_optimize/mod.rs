@@ -216,7 +216,7 @@ mod win {
 /// each step starts so the splash screen can show granular status text.
 /// Every step is independently fault-tolerant — a failure in one does not
 /// abort the rest, since none of these are load-bearing for the app to run.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn boot_optimize_run(app: tauri::AppHandle) -> Result<BootOptimizeReport, String> {
   let mut log_lines = Vec::new();
 

@@ -27,7 +27,7 @@ pub fn init(app: &AppHandle) -> Result<ClaudeCodeState, String> {
   Ok(ClaudeCodeState { store, queue })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_code_submit_task(
   state: State<ClaudeCodeState>,
   prompt: String,
@@ -39,17 +39,17 @@ pub fn claude_code_submit_task(
   state.queue.submit(prompt, cwd).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_code_list_tasks(state: State<ClaudeCodeState>) -> Result<Vec<Task>, String> {
   state.store.list_tasks().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_code_get_task(state: State<ClaudeCodeState>, id: String) -> Result<Option<Task>, String> {
   state.store.get_task(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_code_open_in_vscode(dir: String) -> Result<(), String> {
   vscode::open_in_vscode(&dir)
 }

@@ -44,7 +44,7 @@ pub struct ExtractedDocument {
 /// extraction happens on the frontend (mammoth/marked already parse into
 /// HTML there, and re-implementing that parsing here would just be a second,
 /// divergent source of truth) — call this only for `.txt`/`.pdf`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn document_reader_extract(file_path: String) -> Result<ExtractedDocument, String> {
   let ext = std::path::Path::new(&file_path)
     .extension()
@@ -121,7 +121,7 @@ fn extract_pdf(file_path: &str) -> Result<ExtractedDocument, String> {
   Ok(ExtractedDocument { paragraphs, warning: None })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn document_reader_get_position(
   state: State<DocumentReaderState>,
   document_key: String,
@@ -129,7 +129,7 @@ pub fn document_reader_get_position(
   state.store.get_position(&document_key).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn document_reader_save_position(
   state: State<DocumentReaderState>,
   document_key: String,

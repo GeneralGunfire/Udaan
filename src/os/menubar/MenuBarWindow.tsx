@@ -211,19 +211,18 @@ export function MenuBarWindow() {
     const place = async () => {
       const h = Math.round(MENU_BAR_HEIGHT * pxScale())
       try {
-        const m = await shell.reserveTopEdge(fullscreen ? 0 : h)
-        if (cancelled) return
         if (fullscreen) {
-          await invoke('engine_unpin')
+          // Give the strip back and step aside while something is full-screen.
+          await invoke('engine_edge_release')
           return void (await win.hide())
         }
-        // Rust has already placed the window flush with the top edge.
-        void m
+        // One call: reserve the strip, sit exactly on it, and stay there (the engine releases
+        // it however this window ends).
+        await invoke('engine_edge_bind', { edge: 'top', windowPx: h, reservePx: h })
+        if (cancelled) return
         await win.show()
-        // Showing can nudge it; put it back once it's visible, then let the engine keep it
-        // there: it re-checks only on real window events, instead of this window polling.
-        await invoke('shell_keep_at_top', { heightPx: h })
-        await invoke('engine_pin', { edge: 'top', heightPx: h })
+        // Showing can nudge a window; binding is idempotent, so assert it once more.
+        await invoke('engine_edge_bind', { edge: 'top', windowPx: h, reservePx: h })
       } catch (err) {
         console.error('[menubar] placement failed', err)
       }

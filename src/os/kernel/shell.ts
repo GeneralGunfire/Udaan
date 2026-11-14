@@ -59,11 +59,8 @@ export const shell = {
   toggleDesktop: () => invoke<boolean>('shell_toggle_desktop'),
   setExplorerChromeHidden: (hidden: boolean) => invoke<void>('shell_set_explorer_chrome_hidden', { hidden }),
   setKeyboardHook: (enabled: boolean) => invoke<void>('shell_set_keyboard_hook', { enabled }),
-  reserveTopEdge: (thicknessPx: number) => invoke<Rect>('shell_reserve_top_edge', { thicknessPx }),
-  reserveBottomEdge: (thicknessPx: number) => invoke<Rect>('shell_reserve_bottom_edge', { thicknessPx }),
   /** WebView2 trims this window's memory while it sits hidden. */
   setMemoryLow: (low: boolean) => invoke<void>('shell_set_webview_memory_low', { low }).catch(() => {}),
-  placeAtBottom: (heightPx: number) => invoke<Rect>('shell_place_at_bottom', { heightPx }),
   monitorOf: () => invoke<[Rect, Rect]>('shell_monitor_of'),
   autostartEnabled: () => invoke<boolean>('shell_autostart_enabled'),
   setHotCorners: (enabled: boolean) => invoke<void>('shell_set_hot_corners', { enabled }),

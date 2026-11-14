@@ -288,7 +288,7 @@ fn claude_projects_dir() -> Result<PathBuf, String> {
 /// otherwise re-parses every session log under `~/.claude/projects/` and
 /// caches the result. Pass `force_refresh: true` (the dashboard's manual
 /// refresh button) to bypass the cache regardless of its age.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn claude_usage_get_report(state: tauri::State<ClaudeUsageState>, force_refresh: bool) -> Result<UsageReport, String> {
   {
     let cache = state.cache.lock().unwrap();

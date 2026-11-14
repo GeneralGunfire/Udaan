@@ -1,0 +1,309 @@
+//! Popup manager: where a popup goes, and when it goes away.
+//!
+//! A popup (a menu, a panel, a flyout) is a small window that appears next to the thing that
+//! opened it. Getting that right is the same problem every time, so it lives here once:
+//!
+//! - [`place`] is a pure function that decides the rectangle: next to the anchor, flipped to
+//!   the other side when there is no room, clamped inside the monitor's work area, shrunk if
+//!   it is bigger than the screen. It is unit tested and knows nothing about windows.
+//! - [`engine_popup_open`] applies that rectangle and shows the window in ONE call, so a popup
+//!   never appears at the wrong size or place and then jumps. The popup UI measures its
+//!   content, asks for that size, and the engine does the rest.
+//! - A popup that loses focus is hidden by the engine (and the UI told), which is how a native
+//!   menu dismisses itself when you click elsewhere.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use tauri::{AppHandle, Emitter};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
+use windows::Win32::UI::WindowsAndMessaging::{
+  SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, WA_INACTIVE, WM_ACTIVATE, WM_NCDESTROY,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Rect {
+  pub left: i32,
+  pub top: i32,
+  pub right: i32,
+  pub bottom: i32,
+}
+
+impl Rect {
+  pub fn width(&self) -> i32 {
+    self.right - self.left
+  }
+  pub fn height(&self) -> i32 {
+    self.bottom - self.top
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Placement {
+  /// Centred under the anchor; flips above if there is no room below.
+  Below,
+  /// Centred over the anchor; flips below if there is no room above.
+  Above,
+  /// Beside the anchor, centred vertically; flips to the left if there is no room.
+  Right,
+  /// Beside the anchor, centred vertically; flips to the right if there is no room.
+  Left,
+  /// Top-left corner at a point (a context menu); flips up and/or left at the screen edge.
+  Point,
+  /// A full-height sheet against the right edge of the work area.
+  SheetRight,
+}
+
+/// Decides where a popup of `size` goes. `work` is the monitor's work area, `gap` the space
+/// between the anchor and the popup, `margin` the minimum distance kept from the work area's
+/// edges. Returns the rectangle and the placement actually used (it can differ from the one
+/// asked for when the popup had to flip).
+pub fn place(anchor: Rect, size: (i32, i32), want: Placement, work: Rect, gap: i32, margin: i32) -> (Rect, Placement) {
+  let inner = Rect { left: work.left + margin, top: work.top + margin, right: work.right - margin, bottom: work.bottom - margin };
+  let w = size.0.clamp(1, inner.width().max(1));
+  let mut h = size.1.clamp(1, inner.height().max(1));
+  let (cx, cy) = ((anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2);
+  let mut used = want;
+
+  let (x, y) = match want {
+    Placement::Below | Placement::Above => {
+      let room_below = inner.bottom - anchor.bottom - gap;
+      let room_above = anchor.top - gap - inner.top;
+      let go_below = match want {
+        Placement::Below => h <= room_below || room_below >= room_above,
+        _ => !(h <= room_above || room_above >= room_below),
+      };
+      used = if go_below { Placement::Below } else { Placement::Above };
+      (cx - w / 2, if go_below { anchor.bottom + gap } else { anchor.top - gap - h })
+    }
+    Placement::Right | Placement::Left => {
+      let room_right = inner.right - anchor.right - gap;
+      let room_left = anchor.left - gap - inner.left;
+      let go_right = match want {
+        Placement::Right => w <= room_right || room_right >= room_left,
+        _ => !(w <= room_left || room_left >= room_right),
+      };
+      used = if go_right { Placement::Right } else { Placement::Left };
+      (if go_right { anchor.right + gap } else { anchor.left - gap - w }, cy - h / 2)
+    }
+    Placement::Point => {
+      let x = if anchor.left + w > inner.right { anchor.left - w } else { anchor.left };
+      let y = if anchor.top + h > inner.bottom { anchor.top - h } else { anchor.top };
+      (x, y)
+    }
+    Placement::SheetRight => {
+      h = inner.height();
+      (inner.right - w, inner.top)
+    }
+  };
+
+  // Last resort: whatever side it landed on, it must be fully inside the work area.
+  let x = x.clamp(inner.left, (inner.right - w).max(inner.left));
+  let y = y.clamp(inner.top, (inner.bottom - h).max(inner.top));
+  (Rect { left: x, top: y, right: x + w, bottom: y + h }, used)
+}
+
+// ---------------------------------------------------------------------------------------
+// Windows: applying a placement, and dismissing on focus loss
+// ---------------------------------------------------------------------------------------
+
+const SUBCLASS_ID: usize = 0x55_50_50; // "UPP"
+const GAP: i32 = 6;
+const MARGIN: i32 = 8;
+
+struct Open {
+  anchor: Rect,
+  placement: Placement,
+}
+
+static OPEN: Mutex<Option<HashMap<isize, Open>>> = Mutex::new(None);
+static APP: OnceLock<AppHandle> = OnceLock::new();
+
+fn with_open<R>(f: impl FnOnce(&mut HashMap<isize, Open>) -> R) -> R {
+  let mut g = OPEN.lock().unwrap_or_else(|e| e.into_inner());
+  f(g.get_or_insert_with(HashMap::new))
+}
+
+/// Work area (the monitor minus the dock and menu bar) of the monitor nearest a point.
+fn work_area_at(x: i32, y: i32) -> Rect {
+  unsafe {
+    let mon = MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+    let _ = GetMonitorInfoW(mon, &mut mi);
+    Rect { left: mi.rcWork.left, top: mi.rcWork.top, right: mi.rcWork.right, bottom: mi.rcWork.bottom }
+  }
+}
+
+unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id: usize, _data: usize) -> LRESULT {
+  match msg {
+    // The popup lost focus (the user clicked elsewhere): hide it and tell the UI.
+    WM_ACTIVATE if (wp.0 & 0xFFFF) as u32 == WA_INACTIVE => {
+      let h = hwnd.0 as isize;
+      if with_open(|o| o.remove(&h)).is_some() {
+        let _ = windows::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_HIDE);
+        if let Some(app) = APP.get() {
+          let _ = app.emit("engine://popup-dismissed", h);
+        }
+      }
+    }
+    WM_NCDESTROY => {
+      with_open(|o| o.remove(&(hwnd.0 as isize)));
+      let _ = RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID);
+    }
+    _ => {}
+  }
+  DefSubclassProc(hwnd, msg, wp, lp)
+}
+
+fn apply(hwnd: HWND, r: Rect) {
+  unsafe {
+    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), r.left, r.top, r.width(), r.height(), SWP_NOACTIVATE);
+  }
+}
+
+/// Places the calling window next to `anchor` (physical pixels, screen coordinates) and shows
+/// it, in one step. Returns the rectangle it was given and the placement actually used.
+#[tauri::command]
+pub fn engine_popup_open(
+  app: AppHandle,
+  window: tauri::WebviewWindow,
+  anchor: Rect,
+  width: i32,
+  height: i32,
+  placement: Placement,
+  focus: Option<bool>,
+) -> Result<(Rect, Placement), String> {
+  let _ = APP.set(app);
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  let work = work_area_at((anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2);
+  let (rect, used) = place(anchor, (width, height), placement, work, GAP, MARGIN);
+  let key = hwnd.0 as isize;
+  let first = with_open(|o| o.insert(key, Open { anchor, placement }).is_none());
+  unsafe {
+    // Idempotent: attaching twice only replaces the same subclass.
+    let _ = SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0);
+  }
+  apply(hwnd, rect);
+  if first {
+    window.show().map_err(|e| e.to_string())?;
+  }
+  if focus.unwrap_or(true) {
+    let _ = window.set_focus();
+  }
+  Ok((rect, used))
+}
+
+/// The popup's content changed size: keep it anchored where it was, moving and resizing in
+/// one call (no frame at the old size or place).
+#[tauri::command]
+pub fn engine_popup_resize(window: tauri::WebviewWindow, width: i32, height: i32) -> Result<Option<Rect>, String> {
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  let Some((anchor, placement)) = with_open(|o| o.get(&(hwnd.0 as isize)).map(|s| (s.anchor, s.placement))) else {
+    return Ok(None);
+  };
+  let work = work_area_at((anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2);
+  let (rect, _) = place(anchor, (width, height), placement, work, GAP, MARGIN);
+  apply(hwnd, rect);
+  Ok(Some(rect))
+}
+
+/// Hides the popup.
+#[tauri::command]
+pub fn engine_popup_close(window: tauri::WebviewWindow) -> Result<(), String> {
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  with_open(|o| o.remove(&(hwnd.0 as isize)));
+  window.hide().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  const WORK: Rect = Rect { left: 0, top: 34, right: 1920, bottom: 1010 };
+  fn r(l: i32, t: i32, rr: i32, b: i32) -> Rect {
+    Rect { left: l, top: t, right: rr, bottom: b }
+  }
+
+  #[test]
+  fn below_the_menu_bar_when_there_is_room() {
+    let menu_item = r(1700, 0, 1740, 34);
+    let (p, used) = place(menu_item, (300, 400), Placement::Below, WORK, 6, 8);
+    assert_eq!(used, Placement::Below);
+    // The 6 px gap would put it at 40, but the 8 px margin from the work area's edge wins.
+    assert_eq!(p.top, 34 + 8);
+    assert_eq!(p.height(), 400);
+    assert!(p.right <= WORK.right - 8, "kept clear of the right edge");
+  }
+
+  #[test]
+  fn flips_above_when_there_is_no_room_below() {
+    let dock_icon = r(900, 990, 960, 1050);
+    let (p, used) = place(dock_icon, (300, 400), Placement::Below, WORK, 6, 8);
+    assert_eq!(used, Placement::Above);
+    assert_eq!(p.bottom, 990 - 6);
+  }
+
+  #[test]
+  fn above_flips_below_when_there_is_no_room_above() {
+    let near_top = r(900, 40, 960, 70);
+    let (p, used) = place(near_top, (300, 800), Placement::Above, WORK, 6, 8);
+    assert_eq!(used, Placement::Below);
+    assert!(p.top >= 70);
+  }
+
+  #[test]
+  fn clamps_horizontally_at_the_screen_edge() {
+    let corner = r(1880, 0, 1920, 34);
+    let (p, _) = place(corner, (300, 200), Placement::Below, WORK, 6, 8);
+    assert_eq!(p.right, 1920 - 8);
+    assert_eq!(p.width(), 300);
+  }
+
+  #[test]
+  fn a_context_menu_flips_up_and_left_at_the_corner() {
+    let click = r(1900, 1000, 1900, 1000);
+    let (p, used) = place(click, (200, 300), Placement::Point, WORK, 6, 8);
+    assert_eq!(used, Placement::Point);
+    assert_eq!(p.right, 1900, "flipped left of the click");
+    assert_eq!(p.bottom, 1000, "flipped above the click");
+    // and left alone when there is room
+    let (q, _) = place(r(100, 100, 100, 100), (200, 300), Placement::Point, WORK, 6, 8);
+    assert_eq!((q.left, q.top), (100, 100));
+  }
+
+  #[test]
+  fn a_sheet_fills_the_height_of_the_work_area_on_the_right() {
+    let (p, _) = place(r(0, 0, 0, 0), (380, 100), Placement::SheetRight, WORK, 6, 8);
+    assert_eq!(p.right, 1920 - 8);
+    assert_eq!((p.top, p.bottom), (34 + 8, 1010 - 8));
+  }
+
+  #[test]
+  fn a_popup_bigger_than_the_screen_is_shrunk_to_fit() {
+    let (p, _) = place(r(900, 0, 960, 34), (5000, 5000), Placement::Below, WORK, 6, 8);
+    assert!(p.width() <= WORK.width() - 16);
+    assert!(p.height() <= WORK.height() - 16);
+    assert!(p.left >= WORK.left + 8 && p.top >= WORK.top + 8);
+  }
+
+  #[test]
+  fn works_on_a_second_monitor_with_an_offset_work_area() {
+    let second = r(1920, 0, 3840, 1040);
+    let anchor = r(3800, 1000, 3840, 1040);
+    let (p, used) = place(anchor, (300, 300), Placement::Below, second, 6, 8);
+    assert_eq!(used, Placement::Above);
+    assert!(p.left >= 1920 + 8 && p.right <= 3840 - 8);
+    assert!(p.bottom <= anchor.top);
+  }
+
+  #[test]
+  fn beside_the_anchor_flips_to_the_left_at_the_right_edge() {
+    let item = r(1850, 400, 1910, 440);
+    let (p, used) = place(item, (300, 200), Placement::Right, WORK, 6, 8);
+    assert_eq!(used, Placement::Left);
+    assert_eq!(p.right, 1850 - 6);
+  }
+}

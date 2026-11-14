@@ -208,7 +208,7 @@ fn publish(app: &AppHandle) {
   let snap = build_snapshot(app);
   // The engine decides from the real window state which webviews may render.
   crate::engine::governor::reconcile(app, &snap);
-  crate::engine::pin::reassert(snap.fullscreen);
+  crate::engine::edges::reassert(snap.fullscreen);
   let windows_changed = {
     let mut prev = last().lock().unwrap();
     if *prev == snap {
@@ -449,41 +449,6 @@ pub struct Rect {
   pub bottom: i32,
 }
 
-/// Registers the CALLING window as an AppBar that reserves `thickness_px`
-/// physical pixels along the bottom of its own monitor, or unregisters it
-/// when `thickness_px` is 0 (auto-hide mode: the dock overlays instead).
-/// Returns that monitor's full rect so the caller can position itself.
-/// Same as `shell_reserve_bottom_edge`, along the top edge (the menu bar).
-#[tauri::command]
-pub fn shell_reserve_top_edge(window: tauri::WebviewWindow, thickness_px: i32) -> Result<Rect, String> {
-  let hwnd = hwnd_of(&window)?;
-  win::reserve_top_edge(hwnd, thickness_px)
-}
-
-/// Puts the CALLING window flush with the bottom of its monitor, full
-/// width and `height_px` tall, topmost. Done natively because moving it
-/// from the webview lands it offset once AppBars have changed the work area.
-/// Keeps the CALLING window flush with the top of its monitor (menu bar),
-/// without touching its AppBar registration.
-/// Puts a pinned bar back on its edge (see `engine::pin`). No-op if it is already there.
-pub(crate) fn enforce_pin(hwnd: isize, top: bool, height_px: i32) -> Result<(), String> {
-  let (m, _) = win::monitor_rects(hwnd)?;
-  if top {
-    win::keep_rect(hwnd, m.left, m.top, m.right - m.left, height_px);
-  } else {
-    win::keep_rect(hwnd, m.left, m.bottom - height_px, m.right - m.left, height_px);
-  }
-  Ok(())
-}
-
-#[tauri::command]
-pub fn shell_keep_at_top(window: tauri::WebviewWindow, height_px: i32) -> Result<(), String> {
-  let hwnd = hwnd_of(&window)?;
-  let (m, _) = win::monitor_rects(hwnd)?;
-  win::keep_rect(hwnd, m.left, m.top, m.right - m.left, height_px);
-  Ok(())
-}
-
 /// Asks the compositor to blur the desktop behind the CALLING window.
 ///
 /// This is what makes shell surfaces real glass rather than a tinted
@@ -513,18 +478,6 @@ pub fn shell_set_window_rect(window: tauri::WebviewWindow, x: i32, y: i32, w: i3
   let hwnd = hwnd_of(&window)?;
   win::set_rect(hwnd, x, y, w, h);
   Ok(())
-}
-
-#[tauri::command]
-pub fn shell_place_at_bottom(window: tauri::WebviewWindow, height_px: i32) -> Result<Rect, String> {
-  let hwnd = hwnd_of(&window)?;
-  win::place_at_bottom(hwnd, height_px)
-}
-
-#[tauri::command]
-pub fn shell_reserve_bottom_edge(window: tauri::WebviewWindow, thickness_px: i32) -> Result<Rect, String> {
-  let hwnd = hwnd_of(&window)?;
-  win::reserve_bottom_edge(hwnd, thickness_px)
 }
 
 /// The monitor rect (physical px) and work area of the monitor the
@@ -959,18 +912,6 @@ mod win {
     }
   }
 
-  pub fn reserve_bottom_edge(h: isize, thickness: i32) -> Result<Rect, String> {
-    reserve_edge(h, thickness, false)
-  }
-
-  pub fn place_at_bottom(h: isize, height: i32) -> Result<Rect, String> {
-    let (m, _) = monitor_rects(h)?;
-    unsafe {
-      keep_rect(h, m.left, m.bottom - height, m.right - m.left, height);
-    }
-    Ok(m)
-  }
-
   /// Moves the window to the rect only if it isn't already there, so a
   /// periodic check never causes a visible nudge or repaint.
   /// Moves and resizes in a single call, so the window never shows an in-between frame.
@@ -979,56 +920,6 @@ mod win {
       SetWindowPos(h as HWND, std::ptr::null_mut(), x, y, w, hgt, SWP_NOZORDER | SWP_NOACTIVATE);
     }
   }
-  pub fn keep_rect(h: isize, x: i32, y: i32, w: i32, hgt: i32) {
-    unsafe {
-      let hwnd = h as HWND;
-      let mut r: RECT = std::mem::zeroed();
-      GetWindowRect(hwnd, &mut r);
-      let topmost = (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32) & WS_EX_TOPMOST != 0;
-      if topmost && r.left == x && r.top == y && r.right - r.left == w && r.bottom - r.top == hgt {
-        return;
-      }
-      SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, hgt, SWP_NOACTIVATE);
-    }
-  }
-
-  pub fn reserve_top_edge(h: isize, thickness: i32) -> Result<Rect, String> {
-    reserve_edge(h, thickness, true)
-  }
-
-  fn reserve_edge(h: isize, thickness: i32, top: bool) -> Result<Rect, String> {
-    let (m, _) = monitor_rects(h)?;
-    unsafe {
-      let mut data: APPBARDATA = std::mem::zeroed();
-      data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-      data.hWnd = h as HWND;
-      if thickness <= 0 {
-        SHAppBarMessage(ABM_REMOVE, &mut data);
-        return Ok(m);
-      }
-      // ABM_NEW fails harmlessly when already registered.
-      SHAppBarMessage(ABM_NEW, &mut data);
-      if top {
-        data.uEdge = ABE_TOP;
-        data.rc = RECT { left: m.left, top: m.top, right: m.right, bottom: m.top + thickness };
-        SHAppBarMessage(ABM_QUERYPOS, &mut data);
-        data.rc.bottom = data.rc.top + thickness;
-      } else {
-        data.uEdge = ABE_BOTTOM;
-        data.rc = RECT { left: m.left, top: m.bottom - thickness, right: m.right, bottom: m.bottom };
-        SHAppBarMessage(ABM_QUERYPOS, &mut data);
-        data.rc.top = data.rc.bottom - thickness;
-      }
-      SHAppBarMessage(ABM_SETPOS, &mut data);
-      if top {
-        // Place the bar exactly on the strip it just reserved, flush with
-        // the monitor's top edge.
-        keep_rect(h, m.left, m.top, m.right - m.left, thickness);
-      }
-    }
-    Ok(m)
-  }
-
   // --- Event hook + keyboard hook thread -------------------------------
 
   unsafe extern "system" fn on_win_event(
@@ -1307,17 +1198,7 @@ mod win {
   pub fn set_explorer_chrome_visible(_: bool) {}
   pub fn set_keyboard_hook(_: bool) {}
   pub fn start_hook_thread() {}
-  pub fn reserve_bottom_edge(_: isize, _: i32) -> Result<Rect, String> {
-    Err("Windows only".into())
-  }
   pub fn set_rect(_: isize, _: i32, _: i32, _: i32, _: i32) {}
-  pub fn keep_rect(_: isize, _: i32, _: i32, _: i32, _: i32) {}
-  pub fn place_at_bottom(_: isize, _: i32) -> Result<Rect, String> {
-    Err("Windows only".into())
-  }
-  pub fn reserve_top_edge(_: isize, _: i32) -> Result<Rect, String> {
-    Err("Windows only".into())
-  }
   pub fn monitor_rects(_: isize) -> Result<(Rect, Rect), String> {
     Err("Windows only".into())
   }

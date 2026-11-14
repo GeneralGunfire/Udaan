@@ -30,11 +30,40 @@ pub fn ensure_started() {
     .unwrap_or(original);
   use std::os::windows::process::CommandExt;
   const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-  match std::process::Command::new(&guard).arg("--guard").arg(std::process::id().to_string()).creation_flags(CREATE_NO_WINDOW).spawn() {
+  // The guard must NOT be a child of Udaan. Ending Udaan's process tree (Task Manager's
+  // "End task" does exactly that) would take a child guard down with it, which is the one
+  // case it exists for. So it is started through `cmd /c start`: cmd launches it and exits at
+  // once, leaving the guard with no living parent, outside Udaan's tree.
+  let command = format!("/c start \"\" /B \"{}\" --guard {}", guard.display(), std::process::id());
+  match std::process::Command::new("cmd").raw_arg(command).creation_flags(CREATE_NO_WINDOW).spawn() {
     Ok(_) => super::trace::line("external guard started"),
     Err(e) => {
       super::trace::line(&format!("external guard failed to start: {e}"));
       STARTED.store(false, Ordering::SeqCst);
     }
+  }
+}
+
+/// True while the guard process for this Udaan is alive (it holds a named mutex).
+pub fn is_alive() -> bool {
+  use windows::core::HSTRING;
+  use windows::Win32::Foundation::CloseHandle;
+  use windows::Win32::System::Threading::{OpenMutexW, SYNCHRONIZATION_ACCESS_RIGHTS};
+  const SYNCHRONIZE: SYNCHRONIZATION_ACCESS_RIGHTS = SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000);
+  let name = HSTRING::from(format!("Local\\UdaanGuard.{}", std::process::id()));
+  match unsafe { OpenMutexW(SYNCHRONIZE, false, &name) } {
+    Ok(h) => {
+      let _ = unsafe { CloseHandle(h) };
+      true
+    }
+    Err(_) => false,
+  }
+}
+
+/// Starts the guard again if it is not running (it may have been killed).
+pub fn ensure_alive() {
+  if !is_alive() {
+    STARTED.store(false, Ordering::SeqCst);
+    ensure_started();
   }
 }

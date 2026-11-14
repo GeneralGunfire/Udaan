@@ -26,7 +26,7 @@ pub fn init(app: &AppHandle) -> Result<TemplateLibraryState, String> {
   Ok(TemplateLibraryState { store })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn template_library_list(
   state: State<TemplateLibraryState>,
   owner: Option<String>,
@@ -34,7 +34,7 @@ pub fn template_library_list(
   state.store.list_templates(owner.as_deref()).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn template_library_register(
   state: State<TemplateLibraryState>,
   template: Template,

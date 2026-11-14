@@ -413,18 +413,6 @@ pub(crate) mod win {
     Ok(())
   }
 
-  /// Unregisters the appbar, restoring the normal full-screen work area.
-  /// Idempotent — safe to call even if `register_appbar` was never called
-  /// or already failed.
-  pub fn unregister_appbar(hwnd: isize) {
-    unsafe {
-      let mut data: APPBARDATA = std::mem::zeroed();
-      data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-      data.hWnd = hwnd as HWND;
-      SHAppBarMessage(ABM_REMOVE, &mut data);
-    }
-  }
-
   /// Registers a live DWM thumbnail of `source_hwnd` (a real app's window)
   /// to be composited into `dest_hwnd` (the taskbar-popup window) — the
   /// exact mechanism the real Windows 11 taskbar uses for its own hover
@@ -512,7 +500,6 @@ pub(crate) mod win {
   pub fn close_window(_handle: isize) -> Result<(), String> {
     Err("Taskbar window control is only supported on Windows.".to_string())
   }
-  pub fn unregister_appbar(_hwnd: isize) {}
   pub fn register_thumbnail(_dest_hwnd: isize, _source_hwnd: isize) -> Result<isize, String> {
     Err("Live thumbnails are only supported on Windows.".to_string())
   }
@@ -544,16 +531,6 @@ pub struct AppbarRect {
 #[tauri::command]
 pub fn taskbar_list_windows() -> Vec<OpenWindow> {
   win::list_windows()
-}
-
-/// Same as `taskbar_unregister_appbar` but by raw HWND, not exposed as a
-/// Tauri command — used by `lib.rs`'s `on_window_event` handler, which
-/// already has a `tauri::Window` and its HWND in a plain
-/// `WindowEvent::CloseRequested` callback (not an invoked command context),
-/// so it calls this directly instead of round-tripping through the IPC
-/// command layer.
-pub fn unregister_appbar_by_hwnd(hwnd: isize) {
-  win::unregister_appbar(hwnd);
 }
 
 /// Registers a live DWM thumbnail of `source_handle` (a real app's window,

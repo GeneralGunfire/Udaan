@@ -118,7 +118,7 @@ fn read_track_tags(path: &Path) -> AudioTrack {
 /// Scans a single directory (non-recursive, matching the original v1
 /// design note: predictable — the user picks the folder that holds their
 /// tracks) for supported audio files and reads each one's tags.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_scan_folder(folder_path: String) -> Result<Vec<AudioTrack>, String> {
   let dir = Path::new(&folder_path);
   if !dir.is_dir() {
@@ -143,7 +143,7 @@ pub fn audio_library_scan_folder(folder_path: String) -> Result<Vec<AudioTrack>,
 /// the file has no embedded picture rather than erroring, since "no cover
 /// art" is an expected, common case this feature falls back on a generated
 /// placeholder for.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_read_cover(file_path: String) -> Result<Option<(String, Vec<u8>)>, String> {
   use lofty::file::TaggedFileExt;
 
@@ -159,52 +159,52 @@ pub fn audio_library_read_cover(file_path: String) -> Result<Option<(String, Vec
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_get_settings(state: State<AudioLibraryState>) -> Result<PlayerSettings, String> {
   state.store.get_settings().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_save_settings(state: State<AudioLibraryState>, settings: PlayerSettings) -> Result<(), String> {
   state.store.save_settings(&settings).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_list_playlists(state: State<AudioLibraryState>) -> Result<Vec<StoredPlaylist>, String> {
   state.store.list_playlists().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_save_playlist(state: State<AudioLibraryState>, playlist: StoredPlaylist) -> Result<(), String> {
   state.store.upsert_playlist(&playlist).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_delete_playlist(state: State<AudioLibraryState>, id: String) -> Result<(), String> {
   state.store.delete_playlist(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_list_favorites(state: State<AudioLibraryState>) -> Result<Vec<String>, String> {
   state.store.list_favorites().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_set_favorite(state: State<AudioLibraryState>, track_path: String, favorite: bool) -> Result<(), String> {
   state.store.set_favorite(&track_path, favorite).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_list_dj_presets(state: State<AudioLibraryState>) -> Result<Vec<DjPreset>, String> {
   state.store.list_dj_presets().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_save_dj_preset(state: State<AudioLibraryState>, preset: DjPreset) -> Result<(), String> {
   state.store.save_dj_preset(&preset).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_delete_dj_preset(state: State<AudioLibraryState>, id: String) -> Result<(), String> {
   state.store.delete_dj_preset(&id).map_err(|e| e.to_string())
 }
@@ -216,7 +216,7 @@ pub fn audio_library_delete_dj_preset(state: State<AudioLibraryState>, id: Strin
 /// the folder if the imported file has no cover art of its own. Returns
 /// the new file's scanned AudioTrack so the frontend can add it to the
 /// current view without a full re-scan.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_import_file(source_path: String, music_folder: String) -> Result<AudioTrack, String> {
   use lofty::file::{AudioFile, TaggedFileExt};
   use lofty::picture::{Picture, PictureType};
@@ -374,7 +374,7 @@ pub async fn audio_library_analyze_track(
 
 /// Paths that already have cached analysis, so the UI can show progress
 /// across a library without issuing one call per track.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_list_analyzed(state: State<'_, AudioLibraryState>) -> Result<Vec<String>, String> {
   state
     .store
@@ -384,7 +384,7 @@ pub fn audio_library_list_analyzed(state: State<'_, AudioLibraryState>) -> Resul
 
 /// What can be done with a track's stems right now — ready, needs
 /// separating, or needs the model downloading first.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_stem_status(
   app: AppHandle,
   track_path: String,
@@ -418,7 +418,7 @@ pub async fn audio_library_separate_stems(
 
 /// Deletes a track's separated stems. Four WAV stems of a five-minute
 /// track run to roughly 200MB, so this is a real need, not a tidy-up.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_clear_stems(app: AppHandle, track_path: String) -> Result<(), String> {
   let data_dir = app
     .path()
@@ -428,7 +428,7 @@ pub fn audio_library_clear_stems(app: AppHandle, track_path: String) -> Result<(
 }
 
 /// Total bytes used by separated stems across the library.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_library_stems_disk_usage(app: AppHandle) -> Result<u64, String> {
   let data_dir = app
     .path()

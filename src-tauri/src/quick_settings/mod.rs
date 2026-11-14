@@ -315,12 +315,12 @@ mod win {
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_battery_status() -> BatteryStatus {
   win::battery_status()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_send_volume_command(action: VolumeAction) {
   win::send_volume_command(action)
 }
@@ -330,7 +330,7 @@ pub fn quick_settings_send_volume_command(action: VolumeAction) {
 /// well-known local resolver rather than a real adapter/SSID enumeration,
 /// which needs WLAN COM APIs out of scope for this pass. Good enough for
 /// "online vs offline" quick-settings display, not a full network panel.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_network_online() -> bool {
   use std::net::{SocketAddr, TcpStream};
   use std::time::Duration;
@@ -348,7 +348,7 @@ pub fn quick_settings_network_online() -> bool {
 /// expected result on a machine with no WLAN hardware (e.g. wired-only
 /// desktops), which the frontend renders around rather than treating as
 /// a failure.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_wifi_details() -> WifiDetails {
   win::wifi_details()
 }
@@ -357,7 +357,7 @@ pub fn quick_settings_wifi_details() -> WifiDetails {
 /// comment — driver support for this varies, and a failure here is a
 /// real, surfaceable error (not every adapter honors software radio
 /// control), not a bug to silently swallow.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_set_wifi_radio_enabled(enabled: bool) -> Result<(), String> {
   win::set_wifi_radio_enabled(enabled)
 }
@@ -433,7 +433,7 @@ fn launch_utility(_utility: SystemUtility) -> Result<(), String> {
 
 /// Opens Task Manager or a Windows Settings page from the taskbar's
 /// right-click menu.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn quick_settings_open_system_utility(utility: SystemUtility) -> Result<(), String> {
   launch_utility(utility)
 }

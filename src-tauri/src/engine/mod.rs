@@ -13,19 +13,27 @@
 //! - [`apps`]: how long closed app windows stay warm; capped, shorter when RAM is tight.
 //! - [`desktop`]: the wallpaper/icons layer: always the bottom of the stack, fitted to the
 //!   primary monitor, and recovered when monitors, DPI or Explorer change.
+//! - [`doctor`]: checks the engine's own invariants and repairs them after a display change or an
+//!   Explorer restart.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
-//! - [`pin`]: keeps the dock and menu bar on their screen edge, event-driven instead of by timer.
+//! - [`popup`]: where a popup goes (flip, clamp, fit) and when it dismisses itself.
+//! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
+//!   it back however the window ends.
 //! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
+//! - [`stores`]: databases that open resiliently; a damaged one is set aside, never fatal.
 //! - [`trace`]: a small crash-safe breadcrumb log, because a release build has no console.
 
 pub mod apps;
 pub mod desktop;
+pub mod doctor;
+pub mod edges;
 pub mod governor;
 pub mod guard;
-pub mod pin;
+pub mod popup;
 pub mod resources;
+pub mod stores;
 pub mod supervisor;
 pub mod trace;
 pub mod wallpapers;
@@ -81,4 +89,13 @@ fn install_panic_hook() {
 #[tauri::command]
 pub fn engine_health() -> Vec<supervisor::ServiceHealth> {
   supervisor::health()
+}
+
+/// Raises the calling window to the top of the topmost layer without moving, resizing or
+/// focusing it. The lock screen uses this to stay in front when something tries to cover it.
+#[tauri::command]
+pub fn engine_raise_topmost(window: tauri::WebviewWindow) -> Result<(), String> {
+  use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  unsafe { SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) }.map_err(|e| e.to_string())
 }

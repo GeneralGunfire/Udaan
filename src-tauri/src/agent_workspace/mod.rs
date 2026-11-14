@@ -167,12 +167,12 @@ pub struct AgentFileEntry {
 
 /// Returns the workspace's absolute path, so the UI can show the user
 /// exactly where to drop files in via normal Windows Explorer.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_workspace_path(app: AppHandle) -> Result<String, String> {
   Ok(workspace_root(&app)?.to_string_lossy().to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_read_file(app: AppHandle, relative_path: String) -> Result<String, String> {
   let root = workspace_root(&app)?;
   let resolved = resolve_in_workspace(&root, &relative_path)?;
@@ -183,7 +183,7 @@ pub fn agent_read_file(app: AppHandle, relative_path: String) -> Result<String, 
     .map_err(|e| format!("Failed to read \"{relative_path}\": {e}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_write_file(app: AppHandle, relative_path: String, content: String) -> Result<(), String> {
   let root = workspace_root(&app)?;
   let resolved = resolve_in_workspace(&root, &relative_path)?;
@@ -193,7 +193,7 @@ pub fn agent_write_file(app: AppHandle, relative_path: String, content: String) 
   std::fs::write(&resolved.target, content).map_err(|e| format!("Failed to write \"{relative_path}\": {e}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_list_directory(app: AppHandle, relative_path: String) -> Result<Vec<AgentFileEntry>, String> {
   let root = workspace_root(&app)?;
   // An empty path means "the workspace root itself" — list_dir's own
@@ -234,7 +234,7 @@ pub fn agent_list_directory(app: AppHandle, relative_path: String) -> Result<Vec
 /// path, so the containment boundary that matters here is the
 /// *destination* (must land inside the workspace), which this still
 /// enforces via the same helper.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_workspace_add_file(app: AppHandle, source_path: String) -> Result<String, String> {
   let root = workspace_root(&app)?;
   let source = PathBuf::from(&source_path);
@@ -248,7 +248,7 @@ pub fn agent_workspace_add_file(app: AppHandle, source_path: String) -> Result<S
   Ok(file_name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn agent_delete_file(app: AppHandle, relative_path: String) -> Result<(), String> {
   let root = workspace_root(&app)?;
   let resolved = resolve_in_workspace(&root, &relative_path)?;

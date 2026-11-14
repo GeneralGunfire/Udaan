@@ -21,7 +21,7 @@ pub struct NewFileEntry {
   pub file_name: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn folder_watcher_poll(
   state: tauri::State<FolderWatcherState>,
   folder_path: String,

@@ -23,9 +23,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-  ICoreWebView2Controller, ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
-  COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+  ICoreWebView2, ICoreWebView2Controller, ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+  COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL, COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED,
+  COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE,
 };
+use webview2_com::ProcessFailedEventHandler;
 use windows::core::Interface;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{MonitorFromWindow, MONITOR_DEFAULTTONEAREST};
@@ -50,6 +52,46 @@ struct Entry {
 thread_local! {
   // Touched only on the UI thread: the subclass proc and `with_webview` closures run there.
   static ENTRIES: RefCell<HashMap<isize, Entry>> = RefCell::new(HashMap::new());
+  // When each window's page was last reloaded after a crash, to stop a crash loop.
+  static RELOADS: RefCell<HashMap<String, Vec<std::time::Instant>>> = RefCell::new(HashMap::new());
+}
+
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// A window's renderer crashed or stopped responding: reload that page. A page that keeps
+/// crashing is left alone after three reloads in a minute rather than looped on forever. If
+/// the whole browser process died, every window is dead, so Udaan restarts itself.
+fn on_process_failed(label: &str, kind: COREWEBVIEW2_PROCESS_FAILED_KIND, sender: Option<ICoreWebView2>) {
+  if kind == COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED {
+    super::trace::line(&format!("'{label}': the browser process exited; restarting Udaan"));
+    if let Some(app) = APP.get() {
+      app.restart();
+    }
+    return;
+  }
+  if kind != COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED && kind != COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE {
+    super::trace::line(&format!("'{label}': a helper process failed (kind {})", kind.0));
+    return;
+  }
+  let now = std::time::Instant::now();
+  let allowed = RELOADS.with(|r| {
+    let mut r = r.borrow_mut();
+    let v = r.entry(label.to_string()).or_default();
+    v.retain(|t| now.duration_since(*t) < std::time::Duration::from_secs(60));
+    if v.len() >= 3 {
+      return false;
+    }
+    v.push(now);
+    true
+  });
+  if !allowed {
+    super::trace::line(&format!("'{label}': renderer keeps failing; leaving it alone"));
+    return;
+  }
+  super::trace::line(&format!("'{label}': renderer failed (kind {}); reloading its page", kind.0));
+  if let Some(core) = sender {
+    let _ = unsafe { core.Reload() };
+  }
 }
 
 /// Brings WebView2 in line with the entry's state. Runs on the UI thread.
@@ -173,12 +215,26 @@ fn attach_with(window: &tauri::WebviewWindow, policy: Policy) {
       apply(entry);
     });
     let _ = SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0);
+    if let Ok(core) = wv.controller().CoreWebView2() {
+      let name = label.clone();
+      let handler = ProcessFailedEventHandler::create(Box::new(move |sender, args| {
+        if let Some(args) = args {
+          let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
+          args.ProcessFailedKind(&mut kind)?;
+          on_process_failed(&name, kind, sender);
+        }
+        Ok(())
+      }));
+      let mut token = 0i64;
+      let _ = core.add_ProcessFailed(&handler, &mut token);
+    }
     super::trace::line(&format!("governor: attached to '{label}' (visible now: {visible_now})"));
   });
 }
 
 /// Attaches to every window that exists now. Windows created later call [`attach`].
 pub fn attach_all(app: &AppHandle) {
+  let _ = APP.set(app.clone());
   for (_, w) in app.webview_windows() {
     attach(&w);
   }

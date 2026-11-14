@@ -10,7 +10,7 @@
 //! Explorer's own desktop windows (Progman / WorkerW) if they exist, otherwise at the very
 //! bottom. So clicking it, showing it or Win+D can never raise it above a real window.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::core::w;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY};
@@ -22,6 +22,8 @@ const WM_DPICHANGED_: u32 = 0x02E0;
 
 /// The registered "TaskbarCreated" message: broadcast when Explorer (re)starts.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+/// The desktop window, remembered so it can be checked later.
+static DESKTOP: AtomicIsize = AtomicIsize::new(0);
 
 /// The rectangle of the primary monitor. The desktop always belongs to the primary
 /// monitor, not to "whichever monitor the window is nearest", which can drift to the
@@ -88,6 +90,7 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id
       let r = DefSubclassProc(hwnd, msg, wp, lp);
       refit(hwnd);
       crate::shell::notify_display_changed();
+      super::doctor::heal_soon();
       return r;
     }
     WM_SETTINGCHANGE if wp.0 as u32 == SPI_SETWORKAREA.0 => {
@@ -101,6 +104,7 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id
       // desktop back above them and hide Explorer's taskbar again if we had hidden it.
       refit(hwnd);
       crate::shell::on_explorer_restarted();
+      super::doctor::heal_soon();
     }
     _ => {}
   }
@@ -118,8 +122,37 @@ pub fn install(window: &tauri::WebviewWindow) -> Result<(), String> {
     if !SetWindowSubclass(hwnd, Some(proc), SUBCLASS_ID, 0).as_bool() {
       return Err("SetWindowSubclass failed".into());
     }
+    DESKTOP.store(hwnd.0 as isize, Ordering::Relaxed);
     refit(hwnd);
   }
   super::trace::line("desktop layer installed");
   Ok(())
+}
+
+/// Whether the desktop is where it must be: at the bottom of the stack and exactly covering the
+/// primary monitor. With `heal`, puts it right if not.
+pub fn check(heal: bool) -> (bool, String) {
+  let h = DESKTOP.load(Ordering::Relaxed);
+  if h == 0 {
+    return (false, "the desktop layer is not installed".into());
+  }
+  let hwnd = HWND(h as *mut core::ffi::c_void);
+  let Some(want) = primary_rect() else { return (false, "no primary monitor".into()) };
+  unsafe {
+    let mut cur = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut cur);
+    let fitted = (cur.left, cur.top, cur.right, cur.bottom) == (want.left, want.top, want.right, want.bottom);
+    let at_bottom = match insert_after(hwnd) {
+      None => true,
+      Some(after) => after == HWND_BOTTOM && GetWindow(hwnd, GW_HWNDNEXT).is_err(),
+    };
+    if fitted && at_bottom {
+      return (true, "at the bottom, covering the primary monitor".into());
+    }
+    if heal {
+      refit(hwnd);
+      return (true, "was out of place; put back".into());
+    }
+    (false, format!("fitted: {fitted}, at bottom: {at_bottom}"))
+  }
 }

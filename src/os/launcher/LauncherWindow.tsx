@@ -212,7 +212,7 @@ export function LauncherWindow() {
       if (!focused && modeRef.current === 'lock') {
         setTimeout(() => {
           if (modeRef.current !== 'lock') return
-          void invoke('taskbar_force_topmost').catch(() => {})
+          void invoke('engine_raise_topmost').catch(() => {})
           void getCurrentWindow().setFocus()
         }, 60)
         return

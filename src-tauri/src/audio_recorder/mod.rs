@@ -127,7 +127,7 @@ fn is_recording() -> bool {
   RECORDER.lock().unwrap().is_some()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_status() -> RecorderStatus {
   RecorderStatus {
     state: if is_recording() { RecorderState::Recording } else { RecorderState::Idle },
@@ -135,7 +135,7 @@ pub fn audio_recorder_status() -> RecorderStatus {
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_start(app: AppHandle) -> Result<RecorderStatus, String> {
   let mut guard = RECORDER.lock().unwrap();
   if guard.is_some() {
@@ -172,7 +172,7 @@ pub fn audio_recorder_start(app: AppHandle) -> Result<RecorderStatus, String> {
   Ok(RecorderStatus { state: RecorderState::Recording, elapsed_seconds: 0 })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_stop() -> Result<RecorderStatus, String> {
   let recorder = RECORDER.lock().unwrap().take();
   if let Some(recorder) = recorder {
@@ -189,7 +189,7 @@ pub fn audio_recorder_stop() -> Result<RecorderStatus, String> {
   Ok(RecorderStatus { state: RecorderState::Idle, elapsed_seconds: ELAPSED_SECONDS.load(Ordering::Relaxed) })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_open_downloads() -> Result<(), String> {
   let downloads_dir = dirs::download_dir().ok_or_else(|| "Could not resolve the Downloads folder".to_string())?;
   opener::open(downloads_dir).map_err(|e| format!("Failed to open Downloads folder: {e}"))
@@ -202,7 +202,7 @@ pub fn audio_recorder_open_downloads() -> Result<(), String> {
 /// how long the recording was. Refuses to clobber an existing file with
 /// the target name (matches the same collision-avoidance convention as
 /// audio_library_import_file) rather than silently overwriting something.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_rename(old_path: String, new_name: String) -> Result<String, String> {
   let old = std::path::Path::new(&old_path);
   let dir = old.parent().ok_or_else(|| "Recording path has no parent directory".to_string())?;
@@ -232,12 +232,12 @@ pub fn audio_recorder_rename(old_path: String, new_name: String) -> Result<Strin
   Ok(new_path.to_string_lossy().to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_get_settings(state: tauri::State<AudioRecorderState>) -> Result<RecorderSettings, String> {
   state.store.get_settings().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_recorder_save_settings(state: tauri::State<AudioRecorderState>, settings: RecorderSettings) -> Result<(), String> {
   state.store.save_settings(&settings).map_err(|e| e.to_string())
 }

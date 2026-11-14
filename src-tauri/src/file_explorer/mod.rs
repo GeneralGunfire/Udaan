@@ -62,13 +62,13 @@ fn entry_info(path: PathBuf) -> Option<DirEntryInfo> {
 }
 
 /// Stats a single path — used by the Properties dialog.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_stat(path: String) -> Result<DirEntryInfo, String> {
   entry_info(PathBuf::from(&path)).ok_or_else(|| format!("Couldn't read \"{path}\""))
 }
 
 /// Non-recursive listing of a single directory's immediate children.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_list_dir(dir_path: String) -> Result<Vec<DirEntryInfo>, String> {
   let dir = Path::new(&dir_path);
   if !dir.is_dir() {
@@ -155,7 +155,7 @@ fn search_dir(
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_create_folder(parent_dir: String, name: String) -> Result<DirEntryInfo, String> {
   let new_path = Path::new(&parent_dir).join(&name);
   if new_path.exists() {
@@ -165,7 +165,7 @@ pub fn file_explorer_create_folder(parent_dir: String, name: String) -> Result<D
   entry_info(new_path).ok_or_else(|| "Failed to stat created folder".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_rename(old_path: String, new_name: String) -> Result<DirEntryInfo, String> {
   let old = Path::new(&old_path);
   let new_path = old
@@ -222,7 +222,7 @@ impl NewFileKind {
 /// Creates a new file of `kind` in `parent_dir`, named uniquely from that
 /// kind's default base name (Explorer's "New Text Document (2).txt"
 /// pattern) so callers never have to pre-check for a collision.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_create_file(parent_dir: String, kind: NewFileKind) -> Result<DirEntryInfo, String> {
   let dir = Path::new(&parent_dir);
   let file_name = format!("{}.{}", kind.default_base_name(), kind.extension());
@@ -243,7 +243,7 @@ fn remove_path(path: &Path) -> std::io::Result<()> {
 /// confirming with the user first — this command performs no confirmation
 /// of its own, matching the "no silent/instant delete" requirement being
 /// enforced at the UI layer.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_delete(paths: Vec<String>) -> Result<(), String> {
   for p in paths {
     remove_path(Path::new(&p)).map_err(|e| format!("{p}: {e}"))?;
@@ -276,7 +276,7 @@ pub struct TrashedEntry {
 /// about making that confirmed action reversible, not about skipping the
 /// confirmation. Not a full Recycle Bin: no restore UI beyond the app's own
 /// undo stack, and entries accumulate here rather than expiring.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_soft_delete(app: tauri::AppHandle, paths: Vec<String>) -> Result<Vec<TrashedEntry>, String> {
   let trash = trash_dir(&app)?;
   let mut results = Vec::new();
@@ -306,7 +306,7 @@ pub fn file_explorer_soft_delete(app: tauri::AppHandle, paths: Vec<String>) -> R
 
 /// Moves a previously soft-deleted item back to its original path — the
 /// undo half of `file_explorer_soft_delete`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_restore(trash_path: String, original_path: String) -> Result<DirEntryInfo, String> {
   let trash = Path::new(&trash_path);
   let dest = Path::new(&original_path);
@@ -537,7 +537,7 @@ pub async fn file_explorer_move(
 /// the same name in `dest_dir` — called before copy/move so the frontend
 /// can prompt the user once, up front, rather than failing/clobbering
 /// mid-batch.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_check_conflicts(source_paths: Vec<String>, dest_dir: String) -> Vec<String> {
   let dest_dir = Path::new(&dest_dir);
   source_paths
@@ -571,7 +571,7 @@ fn duplicate_destination(dir: &Path, file_name: &str) -> PathBuf {
 /// Duplicates a single item into the same folder, named "<name> - Copy"
 /// (Explorer's paste-into-same-folder convention) without needing a
 /// separate copy+paste round trip.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_duplicate(path: String) -> Result<DirEntryInfo, String> {
   let src = Path::new(&path);
   let file_name = src
@@ -624,7 +624,7 @@ pub async fn file_explorer_read_thumbnail(file_path: String, max_dimension: u32)
 
 /// Reads a text file as UTF-8 (lossy) for the in-app text preview, capped
 /// so opening a huge log/binary-ish file can't stall the UI.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_read_text_preview(file_path: String) -> Result<String, String> {
   let bytes = std::fs::read(&file_path).map_err(|e| e.to_string())?;
   let capped = &bytes[..bytes.len().min(200_000)];
@@ -632,7 +632,7 @@ pub fn file_explorer_read_text_preview(file_path: String) -> Result<String, Stri
 }
 
 /// Opens a file (or reveals a folder) with the OS default handler.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_open_with_system(path: String) -> Result<(), String> {
   opener::open(&path).map_err(|e| e.to_string())
 }
@@ -640,7 +640,7 @@ pub fn file_explorer_open_with_system(path: String) -> Result<(), String> {
 /// Best-effort quick-access locations detectable on this system (home,
 /// desktop, documents, downloads, pictures, music) — entries that don't
 /// exist on this machine are simply omitted.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_explorer_quick_access() -> Vec<QuickAccessLocation> {
   let mut locations = Vec::new();
   let candidates: Vec<(&str, Option<PathBuf>)> = vec![

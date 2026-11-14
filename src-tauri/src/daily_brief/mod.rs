@@ -57,7 +57,7 @@ fn today() -> String {
 /// and the "Udaan wasn't running at 5am, generate on next launch instead"
 /// case identically: there's no separate "missed schedule" state to
 /// track, just "does today have a row."
-#[tauri::command]
+#[tauri::command(async)]
 pub fn daily_brief_get_today(state: State<DailyBriefState>) -> Result<Option<DailyBrief>, String> {
   state.store.get(&today()).map_err(|e| e.to_string())
 }
@@ -65,14 +65,14 @@ pub fn daily_brief_get_today(state: State<DailyBriefState>) -> Result<Option<Dai
 /// Fetches a specific past date's brief, for the News Brief app's history
 /// view. Returns the full stored row (including the degraded flag) so a
 /// past degraded day still shows its notice correctly when revisited.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn daily_brief_get_by_date(state: State<DailyBriefState>, date: String) -> Result<Option<DailyBrief>, String> {
   state.store.get(&date).map_err(|e| e.to_string())
 }
 
 /// Most-recent-first list of every date a brief exists for — backs the
 /// News Brief app's history sidebar.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn daily_brief_list_history(state: State<DailyBriefState>) -> Result<Vec<BriefHistoryEntry>, String> {
   state.store.list_history().map_err(|e| e.to_string())
 }
@@ -82,7 +82,7 @@ pub fn daily_brief_list_history(state: State<DailyBriefState>) -> Result<Vec<Bri
 /// fully succeeded, degraded to raw headlines, or failed outright —
 /// `generation_attempted: true` is what prevents retrying every single
 /// time the app opens on a day every backend was genuinely down.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn daily_brief_save(
   state: State<DailyBriefState>,
   report_markdown: Option<String>,
@@ -104,7 +104,7 @@ pub fn daily_brief_save(
 
 /// Wipes every stored brief — used when the user wants to clear history
 /// and regenerate from scratch.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn daily_brief_delete_all(state: State<DailyBriefState>) -> Result<(), String> {
   state.store.delete_all().map_err(|e| e.to_string())
 }

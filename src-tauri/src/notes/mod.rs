@@ -31,42 +31,42 @@ pub fn init(app: &AppHandle) -> Result<NotesState, String> {
   Ok(NotesState { store })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_list(state: State<NotesState>) -> Result<Vec<NoteMeta>, String> {
   state.store.list_notes().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_read_body(state: State<NotesState>, id: String) -> Result<String, String> {
   state.store.read_body(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_create(state: State<NotesState>, note: NoteMeta) -> Result<(), String> {
   state.store.create_note(&note).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_save_body(state: State<NotesState>, id: String, title: String, body: String) -> Result<(), String> {
   state.store.save_body(&id, &title, &body)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_delete(state: State<NotesState>, id: String) -> Result<(), String> {
   state.store.delete_note(&id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_set_order(state: State<NotesState>, ordered_ids: Vec<String>) -> Result<(), String> {
   state.store.set_order(&ordered_ids).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_get_active(state: State<NotesState>) -> Result<Option<String>, String> {
   state.store.get_active_note().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn notes_set_active(state: State<NotesState>, id: Option<String>) -> Result<(), String> {
   state.store.set_active_note(id.as_deref()).map_err(|e| e.to_string())
 }

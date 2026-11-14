@@ -48,6 +48,7 @@ extern "system" {
 }
 #[link(name = "kernel32")]
 extern "system" {
+  fn CreateMutexW(attrs: *const core::ffi::c_void, initial_owner: i32, name: *const u16) -> isize;
   fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
   fn WaitForSingleObject(handle: isize, millis: u32) -> u32;
   fn CloseHandle(handle: isize) -> i32;
@@ -78,6 +79,9 @@ fn guard(pid: u32) {
   const SYNCHRONIZE: u32 = 0x0010_0000;
   const INFINITE: u32 = 0xFFFF_FFFF;
   log_line(&format!("guard: watching Udaan pid {pid}"));
+  // A named mutex held for as long as this guard lives, so Udaan can check we are alive.
+  let name = wide(&format!("Local\\UdaanGuard.{pid}"));
+  let _alive = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
   let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
   if handle != 0 {
     unsafe {

@@ -112,11 +112,16 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       engine::engine_health,
       engine::apps::engine_app_closed,
-      engine::pin::engine_pin,
+      engine::doctor::engine_doctor,
+      engine::engine_raise_topmost,
+      engine::edges::engine_edge_bind,
+      engine::edges::engine_edge_release,
+      engine::popup::engine_popup_open,
+      engine::popup::engine_popup_resize,
+      engine::popup::engine_popup_close,
       engine::wallpapers::wallpaper_fit,
       engine::wallpapers::wallpaper_thumb,
       engine::wallpapers::wallpaper_scan,
-      engine::pin::engine_unpin,
       focus_video::focus_video_port,
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,
@@ -326,12 +331,8 @@ pub fn run() {
       shell::shell_toggle_desktop,
       shell::shell_set_explorer_chrome_hidden,
       shell::shell_set_keyboard_hook,
-      shell::shell_reserve_bottom_edge,
-      shell::shell_place_at_bottom,
-      shell::shell_keep_at_top,
       shell::shell_set_material,
       shell::shell_set_window_rect,
-      shell::shell_reserve_top_edge,
       shell::shell_monitor_of,
       shell::shell_open_app,
       shell::shell_prewarm_apps,
@@ -458,6 +459,7 @@ pub fn run() {
     .setup(|app| {
       eprintln!("[udaan] setup() entered");
       engine::install(app.handle());
+      engine::stores::verify_all(app.handle());
       focus_video::start();
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -466,41 +468,25 @@ pub fn run() {
             .build(),
         )?;
       }
-      eprintln!("[udaan] about to init claude_code");
-      let state = claude_code::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      eprintln!("[udaan] claude_code init done");
-      app.manage(state);
+      engine::stores::manage(app.handle(), "claude_code", claude_code::init(app.handle()));
       app.manage(taskbar::ThumbnailRegistry::default());
       app.manage(omniroute::OmniRouteProcess::default());
-      let general_chat_state = general_chat::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(general_chat_state);
-      let template_library_state = template_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(template_library_state);
-      let client_tracker_state = client_tracker::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(client_tracker_state);
+      engine::stores::manage(app.handle(), "general_chat", general_chat::init(app.handle()));
+      engine::stores::manage(app.handle(), "template_library", template_library::init(app.handle()));
+      engine::stores::manage(app.handle(), "client_tracker", client_tracker::init(app.handle()));
       app.manage(folder_watcher::FolderWatcherState::default());
-      let schedule_state = schedule::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(schedule_state);
-      let taskbar_prefs_state = taskbar_prefs::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(taskbar_prefs_state);
-      let document_reader_state = document_reader::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(document_reader_state);
-      let scholar_state = scholar::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(scholar_state);
-      let study_state = study::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(study_state);
-      let notes_state = notes::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(notes_state);
-      let notifications_state = notifications::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(notifications_state);
+      engine::stores::manage(app.handle(), "schedule", schedule::init(app.handle()));
+      engine::stores::manage(app.handle(), "taskbar_prefs", taskbar_prefs::init(app.handle()));
+      engine::stores::manage(app.handle(), "document_reader", document_reader::init(app.handle()));
+      engine::stores::manage(app.handle(), "scholar", scholar::init(app.handle()));
+      engine::stores::manage(app.handle(), "study", study::init(app.handle()));
+      engine::stores::manage(app.handle(), "notes", notes::init(app.handle()));
+      engine::stores::manage(app.handle(), "notifications", notifications::init(app.handle()));
       notifications::windows_mirror::start(app.handle().clone());
 
-      let audio_library_state = audio_library::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(audio_library_state);
-      let audio_recorder_state = audio_recorder::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(audio_recorder_state);
-      let daily_brief_state = daily_brief::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-      app.manage(daily_brief_state);
+      engine::stores::manage(app.handle(), "audio_library", audio_library::init(app.handle()));
+      engine::stores::manage(app.handle(), "audio_recorder", audio_recorder::init(app.handle()));
+      engine::stores::manage(app.handle(), "daily_brief", daily_brief::init(app.handle()));
       app.manage(claude_usage::ClaudeUsageState::default());
 
       // All state is registered: only now may the shell's pages start loading.
@@ -549,31 +535,6 @@ pub fn run() {
           }
           window.app_handle().exit(0);
         }
-
-        // Mirror the same "never leave the OS in a weird state" principle
-        // for the taskbar window: if it registered itself as a real
-        // Windows AppBar (see taskbar::taskbar_register_appbar), losing
-        // that window without unregistering would leave the desktop work
-        // area permanently shrunk. This always runs on close regardless
-        // of how the window closes (crash aside), independent of whatever
-        // cleanup the frontend itself attempts.
-        if window.label() == "taskbar" || window.label() == "menubar" {
-          if let Ok(hwnd) = window.hwnd() {
-            taskbar::unregister_appbar_by_hwnd(hwnd.0 as isize);
-          }
-        }
-
-        // Same "never leave the OS in a weird state" guarantee for DWM
-        // live thumbnails: if the taskbar-popup window closes (app quit,
-        // crash-adjacent teardown) while any thumbnail is still
-        // registered, sweep every tracked handle rather than relying
-        // solely on the frontend's own per-window/on-hide unregister
-        // calls (see taskbar::taskbar_unregister_all_thumbnails).
-        if window.label() == "taskbar-popup" {
-          if let Some(registry) = window.try_state::<taskbar::ThumbnailRegistry>() {
-            taskbar::unregister_all_thumbnails_by_state(&registry);
-          }
-        }
       }
     })
     .build(tauri::generate_context!())
@@ -582,15 +543,6 @@ pub fn run() {
       if let tauri::RunEvent::Exit = event {
         shell::live_audio::restore_all();
         shell::edge_light::shutdown();
-        // Give reserved screen edges back even if a window was torn down
-        // without a close event, so maximized windows fill the screen again.
-        for label in ["taskbar", "menubar"] {
-          if let Some(w) = app.get_webview_window(label) {
-            if let Ok(hwnd) = w.hwnd() {
-              taskbar::unregister_appbar_by_hwnd(hwnd.0 as isize);
-            }
-          }
-        }
         shell::restore_on_exit();
         // Anything still registered with the engine's guard: undo it.
         engine::guard::run_all();

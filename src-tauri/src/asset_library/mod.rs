@@ -31,7 +31,7 @@ fn classify(path: &Path) -> &'static str {
 /// Image Editor, Video Editor, and any future Creativity tool that needs a
 /// local asset browser. Same predictability rationale as audio_library:
 /// one chosen folder, not a recursive drive walk.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_library_scan_folder(folder_path: String) -> Result<Vec<AssetEntry>, String> {
   let dir = Path::new(&folder_path);
   if !dir.is_dir() {
@@ -65,7 +65,7 @@ pub fn asset_library_scan_folder(folder_path: String) -> Result<Vec<AssetEntry>,
   Ok(entries)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_library_read_file(file_path: String) -> Result<Vec<u8>, String> {
   std::fs::read(&file_path).map_err(|e| e.to_string())
 }
@@ -73,7 +73,7 @@ pub fn asset_library_read_file(file_path: String) -> Result<Vec<u8>, String> {
 /// Writes bytes to disk — used by the Image Editor's export (Save As).
 /// Only ever called with a path the user picked via the native save dialog,
 /// never a path derived from arbitrary user text input.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_library_write_file(file_path: String, data: Vec<u8>) -> Result<(), String> {
   std::fs::write(&file_path, data).map_err(|e| e.to_string())
 }
@@ -83,7 +83,7 @@ pub fn asset_library_write_file(file_path: String, data: Vec<u8>) -> Result<(), 
 /// produces. Skips paths that aren't files or aren't image/video —
 /// same "other" filtering as the folder scan, so mixed selections
 /// silently drop unsupported files rather than erroring.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_library_stat_files(paths: Vec<String>) -> Result<Vec<AssetEntry>, String> {
   let mut entries = Vec::new();
   for p in paths {

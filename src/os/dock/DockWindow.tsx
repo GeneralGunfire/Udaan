@@ -334,17 +334,23 @@ export function DockWindow() {
       const win = getCurrentWindow()
       const scale = pxScale()
       try {
-        const m = await shell.reserveBottomEdge(autoHide ? 0 : Math.round(METRICS.reserve * scale))
-        if (cancelled) return
         const h = Math.round(METRICS.windowHeight * scale)
-        const pos = { x: m.left, y: m.bottom - h }
-        await shell.placeAtBottom(h)
-        geometry.current = { ...pos, scale }
+        // One call: reserve the strip (not while auto-hiding), put the window exactly on it,
+        // and from then on the engine keeps it there and releases it however the window ends.
+        const r = await invoke<{ left: number; top: number }>('engine_edge_bind', {
+          edge: 'bottom',
+          windowPx: h,
+          reservePx: autoHide ? 0 : Math.round(METRICS.reserve * scale),
+        })
+        if (cancelled) return
+        geometry.current = { x: r.left, y: r.top, scale }
         await win.show()
-        await shell.placeAtBottom(h)
-        // From here the engine keeps the dock on its edge, event-driven: it re-checks
-        // only when a real window event arrives, instead of this window polling.
-        await invoke('engine_pin', { edge: 'bottom', heightPx: h })
+        // Showing can nudge a window; binding is idempotent, so just assert it once more.
+        await invoke('engine_edge_bind', {
+          edge: 'bottom',
+          windowPx: h,
+          reservePx: autoHide ? 0 : Math.round(METRICS.reserve * scale),
+        })
       } catch (err) {
         console.error('[dock] placement failed', err)
       }

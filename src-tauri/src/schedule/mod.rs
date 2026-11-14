@@ -22,27 +22,27 @@ pub fn init(app: &AppHandle) -> Result<ScheduleState, String> {
   Ok(ScheduleState { store })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn schedule_list_events(state: State<ScheduleState>) -> Result<Vec<ScheduleEvent>, String> {
   state.store.list_events().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn schedule_create_event(state: State<ScheduleState>, event: ScheduleEvent) -> Result<(), String> {
   state.store.create_event(&event).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn schedule_update_event(state: State<ScheduleState>, event: ScheduleEvent) -> Result<(), String> {
   state.store.update_event(&event).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn schedule_delete_event(state: State<ScheduleState>, id: String) -> Result<(), String> {
   state.store.delete_event(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn schedule_set_status(state: State<ScheduleState>, id: String, status: String) -> Result<(), String> {
   state.store.set_status(&id, &status).map_err(|e| e.to_string())
 }

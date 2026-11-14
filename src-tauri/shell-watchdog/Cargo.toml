@@ -1,0 +1,11 @@
+[package]
+name = "shell-watchdog"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone process registered as the Windows shell (Winlogon\\Shell) in place of Udaan.exe directly. Launches Udaan, supervises it, and falls back to explorer.exe if Udaan crashes or fails to start — this is the process that has to survive even if Udaan's own code is broken, so it deliberately has almost no logic and almost no dependencies."
+
+[[bin]]
+name = "shell-watchdog"
+path = "src/main.rs"
+
+[dependencies]
