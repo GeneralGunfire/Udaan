@@ -200,12 +200,16 @@ impl Keys {
       if !self.win {
         self.win = true;
         self.win_combo = false;
+        // Mask the key the moment it goes DOWN, so Windows always sees "Win + another key" and never
+        // opens its own Start on release. Masking only on release was too late some of the time: Start
+        // would still open, most visibly when Udaan's Start was already showing and Win was pressed to
+        // close it. (Win+<key> shortcuts are unaffected: the extra key is one nothing is assigned to.)
+        r.mask_win = true;
       }
     } else {
       self.win = false;
       if !std::mem::take(&mut self.win_combo) {
-        // A lone Win tap: mask it so Explorer's Start does not also open, then open Udaan's.
-        r.mask_win = true;
+        // A lone Win tap opens (or closes) Udaan's Start.
         r.hotkey = Some("start");
       }
     }
@@ -439,17 +443,23 @@ mod tests {
   }
 
   #[test]
-  fn a_lone_win_tap_opens_start_and_masks_the_key() {
+  fn a_lone_win_tap_masks_on_press_and_opens_start_on_release() {
     let (mut k, ctx) = (Keys::default(), Context::default());
-    assert_eq!(k.handle(ev(WIN, true, 0), &ctx), Reaction::default(), "pressing Win does nothing yet");
+    // the mask goes in as the key goes down, before Windows can decide to open its own Start
+    assert_eq!(k.handle(ev(WIN, true, 0), &ctx), Reaction { hotkey: None, mask_win: true, swallow: false });
+    // holding Win (auto-repeat) does not mask again
+    assert_eq!(k.handle(ev(WIN, true, 30), &ctx), Reaction::default());
     let up = k.handle(ev(WIN, false, 60), &ctx);
-    assert_eq!(up, Reaction { hotkey: Some("start"), mask_win: true, swallow: false });
+    assert_eq!(up, Reaction { hotkey: Some("start"), mask_win: false, swallow: false });
+    // and pressing it again to close Udaan's Start behaves identically every time
+    assert_eq!(k.handle(ev(WIN, true, 900), &ctx).mask_win, true);
+    assert_eq!(k.handle(ev(WIN, false, 940), &ctx).hotkey, Some("start"));
   }
 
   #[test]
   fn win_plus_a_key_is_a_shortcut_and_does_not_open_start() {
     let (mut k, ctx) = (Keys::default(), Context::default());
-    k.handle(ev(WIN, true, 0), &ctx);
+    assert!(k.handle(ev(WIN, true, 0), &ctx).mask_win);
     let d = k.handle(ev(0x44, true, 30), &ctx);
     assert_eq!(d, Reaction { hotkey: Some("show-desktop"), mask_win: false, swallow: true });
     k.handle(ev(0x44, false, 60), &ctx);
