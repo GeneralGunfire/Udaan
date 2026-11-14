@@ -24,7 +24,18 @@ Intel i5-3470 (2012), 4 cores, 8 GB RAM (about 1.3 GB free), Intel HD DX11.0 onl
 ## Build and test
 `cd next && cargo build --release` (workspace members: spike, shell, watchdog). Run `next\target\release\shell.exe --secs 10` (add `--replace` or `--autohide` as needed). Verify with real measurements and screenshots (`CopyFromScreen`), `SPI_GETWORKAREA`, maximizing a test window, `Get-Process` memory/CPU. Write scripts to the scratchpad with the Write tool rather than long inline heredocs. Report what was and was not verified.
 
+## Update 2026-11-14 (read this before the list below)
+The user rejected the first dock/top-bar attempt and chose a **scenic wallpaper rendered only in our own desktop layer** (never change their Windows wallpaper setting). Glass over flat grey looks muddy, so the desktop layer + wallpaper + widgets come BEFORE any dock/top-bar polish. Measured reference geometry: 55 px icons, 6 px gaps, 17 px off the bottom, near-invisible plate; top bar is text on a faint darkening with no fill or border; dock magnification is computed directly per mouse move (springs only for enter/exit, no spring storm).
+
+Honest foundation audit: the OS mechanics (AppBar, auto-hide, watchdog, text) are solid, but the engine layer is thin. Do this FIRST (step 0):
+- Split `main.rs` into modules (bar, appbar, core window, scene).
+- Share ONE Compositor and ONE D3D/D2D device across all bars (each bar currently creates its own).
+- Cache DirectWrite text formats; add tokens + theme files with hot reload; add scene primitives (rounded rect, shadow, mask, icon image), hit-testing, and `tools/measure`.
+- **Spike rounded blurred glass on Windows 10 before building the dock.** `SetWindowCompositionAttribute` blur fills the whole window rectangle (no rounded corners), and the compositor backdrop brush does not see behind the window on Windows 10. Options to measure: `SetWindowRgn` rounded region (jagged edge), or blurring our own wallpaper slice (correct over our desktop, not over other apps). Pick from numbers and screenshots.
+- Test the written-but-untested paths (second monitor, DPI change, Explorer restart) carefully.
+
 ## Do next, in this order
+0. Step 0 above, then the desktop layer + scenic wallpaper + widgets, then the rest.
 1. **Design language first**: tokens (colour, type scale, spacing, radii, elevation, light and dark), a material for glass on Windows 10, and a motion system (spring presets, asymmetric enter/exit, interruptible, bursty). Put them in data/theme files with hot reload so iteration is fast.
 2. **Dock**: turn the bar into the floating rounded glass dock from the reference (window sized exactly to its shape, rounded corners via composition geometry or mask, shadow/depth, magnification on hover with depth, real icons extracted from the apps' executables or monograms, running indicators), keeping AppBar reservation behaviour (or a documented floating alternative). Keep auto-hide.
 3. **Top menu bar**: a second AppBar at the top (title/menus placeholder, status area, clock), same material.
