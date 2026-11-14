@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["spike"]
+
+[workspace.package]
+edition = "2021"
+publish = false
+
+# One shared profile for measurement: what we ship is what we measure.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
