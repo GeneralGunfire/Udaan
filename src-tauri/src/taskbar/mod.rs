@@ -1,22 +1,11 @@
-//! Windows taskbar replacement — Part 2 of the shell-replacement feature.
-//! Two independent pieces:
+//! Window enumeration and small window helpers.
 //!
-//!   1. Open-window enumeration (`taskbar_list_windows`) — real OS-level
-//!      windows across every running app, via `EnumWindows`. Read-only,
-//!      safe to call regardless of whether Udaan is registered as the
-//!      shell — this alone is useful for a taskbar window list even while
-//!      testing against the normal explorer.exe-owned desktop.
-//!
-//!   2. Work-area reservation (`taskbar_register_appbar` /
-//!      `taskbar_unregister_appbar`) — registers the taskbar's own Tauri
-//!      window as a real Windows "AppBar" via `SHAppBarMessage`, the same
-//!      mechanism the real taskbar uses to shrink the desktop work area so
-//!      other windows maximize around it instead of underneath it.
-//!      Registering an appbar is reversible and does NOT touch the shell
-//!      registry key — safe to test independently of the Part 1 shell
-//!      switch, and `taskbar_unregister_appbar` (also called automatically
-//!      on window close, see `lib.rs`) restores the normal full-screen
-//!      work area.
+//! What is left of the old "taskbar replacement" module after the rebuild: the dock and
+//! menu bar are driven by `shell` and `engine` now, so everything that registered AppBars
+//! or duplicated focus/minimise commands has been removed. This keeps only what the rest
+//! of the shell genuinely calls: listing real top-level windows (with Alt+Tab rules),
+//! closing one, extracting window and file icons, removing an AppBar registration by
+//! handle, and the DWM live thumbnails the Expose view draws.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,15 +40,6 @@ pub struct OpenWindow {
   /// extraction failed — the frontend falls back to a generic glyph in
   /// that case rather than rendering a broken image.
   pub icon_data_url: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ScreenEdge {
-  Top,
-  Bottom,
-  Left,
-  Right,
 }
 
 #[cfg(target_os = "windows")]
@@ -417,27 +397,6 @@ pub(crate) mod win {
     windows
   }
 
-  pub fn focus_window(handle: isize) -> Result<(), String> {
-    unsafe {
-      let hwnd = handle as HWND;
-      if IsIconic(hwnd) != 0 {
-        ShowWindow(hwnd, SW_RESTORE);
-      }
-      if SetForegroundWindow(hwnd) == 0 {
-        return Err("Could not focus that window — it may have closed.".to_string());
-      }
-    }
-    Ok(())
-  }
-
-  pub fn minimize_window(handle: isize) -> Result<(), String> {
-    unsafe {
-      let hwnd = handle as HWND;
-      ShowWindow(hwnd, SW_MINIMIZE);
-    }
-    Ok(())
-  }
-
   /// Requests the window close itself via `WM_CLOSE`, the same message a
   /// real window's own close button/Alt-F4 sends — `PostMessageW` (not
   /// `SendMessageW`) so this never blocks waiting on an unresponsive or
@@ -454,142 +413,6 @@ pub(crate) mod win {
     Ok(())
   }
 
-  /// Minimizes every window `list_windows` currently reports — the same
-  /// visible/titled/non-tool/non-helper filter the taskbar's own window
-  /// list already applies, so "minimize all" only ever touches windows a
-  /// user would actually recognize as "an open app" on the bar, not every
-  /// OS-level top-level window.
-  pub fn minimize_all() -> Result<(), String> {
-    for win in list_windows() {
-      unsafe {
-        ShowWindow(win.handle as HWND, SW_MINIMIZE);
-      }
-    }
-    Ok(())
-  }
-
-  /// Launches Task Manager — backs the taskbar's right-click-on-empty-space
-  /// context menu, matching the real Explorer taskbar's own "Task Manager"
-  /// entry. `taskmgr.exe` is a well-known Windows system binary resolved
-  /// straight off PATH (it lives in `%SystemRoot%\System32`, always present
-  /// on a real Windows install) — no App Paths registry lookup needed, so
-  /// this doesn't go through `installed_apps_launch_by_exe_name`.
-  pub fn open_task_manager() -> Result<(), String> {
-    // Plain "taskmgr.exe" relies on PATH resolution, which is normally
-    // fine (System32 is always on PATH) but Tauri-spawned processes have
-    // occasionally been observed with a trimmed/non-standard PATH in some
-    // Windows configurations — falling back to the fully-qualified path
-    // under %SystemRoot% (always System32 on every real Windows install,
-    // regardless of PATH state) makes this robust either way rather than
-    // trusting PATH resolution alone.
-    if std::process::Command::new("taskmgr.exe").spawn().is_ok() {
-      return Ok(());
-    }
-    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
-    let full_path = format!("{system_root}\\System32\\taskmgr.exe");
-    std::process::Command::new(&full_path)
-      .spawn()
-      .map(|_| ())
-      .map_err(|e| format!("Could not open Task Manager: {e}"))
-  }
-
-  /// Physical-pixel cursor position, screen-relative — backs auto-hide's
-  /// proximity detection (see TaskbarWindow.tsx). The dock is a small
-  /// floating window, not a full-width edge-docked bar, so it only ever
-  /// receives mouse events when the cursor is already over it — there's
-  /// no way to detect "the cursor approached the bottom edge" from inside
-  /// the window itself. `GetCursorPos` is a plain, read-only, one-shot
-  /// query (not a global mouse HOOK, which would require its own message
-  /// pump and carry real event-interception risk) — the frontend polls
-  /// this on the same interval as everything else already polls
-  /// (WINDOW_POLL_MS) rather than this needing any new architecture.
-  pub fn cursor_position() -> (i32, i32) {
-    unsafe {
-      let mut point = std::mem::zeroed();
-      windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut point);
-      (point.x, point.y)
-    }
-  }
-
-  pub fn foreground_window_handle() -> isize {
-    unsafe { GetForegroundWindow() as isize }
-  }
-
-  fn edge_flag(edge: ScreenEdge) -> u32 {
-    match edge {
-      ScreenEdge::Top => ABE_TOP,
-      ScreenEdge::Bottom => ABE_BOTTOM,
-      ScreenEdge::Left => ABE_LEFT,
-      ScreenEdge::Right => ABE_RIGHT,
-    }
-  }
-
-  /// Registers `hwnd` as a real Windows AppBar docked to `edge` with
-  /// thickness `thickness_px`, reserving that strip of the work area so
-  /// other windows maximize around it — the same mechanism the real
-  /// taskbar uses. Returns the rect the bar should actually occupy
-  /// (Windows may adjust it slightly to avoid overlapping another appbar).
-  pub fn register_appbar(hwnd: isize, edge: ScreenEdge, thickness_px: i32) -> Result<RECT, String> {
-    unsafe {
-      let mut data: APPBARDATA = std::mem::zeroed();
-      data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-      data.hWnd = hwnd as HWND;
-
-      // ABM_NEW registers this window as a candidate appbar — required
-      // before ABM_SETPOS will do anything. Its return is a real
-      // success/failure signal (unlike ABM_SETPOS, whose return is
-      // documented as unused) — checked here because a silent failure
-      // here previously meant every following ABM_SETPOS was a silent
-      // no-op, and the caller would get back a zeroed rect (position/size
-      // all 0), producing an invisible, zero-size window with no error
-      // anywhere in the chain.
-      let new_result = SHAppBarMessage(ABM_NEW, &mut data);
-      if new_result == 0 {
-        return Err(format!(
-          "SHAppBarMessage(ABM_NEW) failed for hwnd {hwnd} (GetLastError={})",
-          windows_sys::Win32::Foundation::GetLastError()
-        ));
-      }
-
-      let screen_w = GetSystemMetrics(SM_CXSCREEN);
-      let screen_h = GetSystemMetrics(SM_CYSCREEN);
-      if screen_w == 0 || screen_h == 0 {
-        return Err(format!("GetSystemMetrics returned an implausible screen size ({screen_w}x{screen_h})"));
-      }
-
-      data.uEdge = edge_flag(edge);
-      data.rc = match edge {
-        ScreenEdge::Bottom => RECT { left: 0, top: screen_h - thickness_px, right: screen_w, bottom: screen_h },
-        ScreenEdge::Top => RECT { left: 0, top: 0, right: screen_w, bottom: thickness_px },
-        ScreenEdge::Left => RECT { left: 0, top: 0, right: thickness_px, bottom: screen_h },
-        ScreenEdge::Right => RECT { left: screen_w - thickness_px, top: 0, right: screen_w, bottom: screen_h },
-      };
-
-      // ABM_QUERYPOS lets Windows adjust the rect to avoid overlapping
-      // another appbar BEFORE we commit to it with ABM_SETPOS — the
-      // documented two-step flow (skipping straight to ABM_SETPOS is
-      // also technically permitted, but querying first is what
-      // real taskbar-replacement implementations do, and produces the
-      // rect ABM_SETPOS is guaranteed to actually honor).
-      SHAppBarMessage(ABM_QUERYPOS, &mut data);
-      SHAppBarMessage(ABM_SETPOS, &mut data);
-
-      if data.rc.right <= data.rc.left || data.rc.bottom <= data.rc.top {
-        // Belt-and-suspenders: if Windows still handed back a degenerate
-        // rect, fall back to our own requested geometry rather than ever
-        // asking the caller to resize a window to zero/negative size.
-        data.rc = match edge {
-          ScreenEdge::Bottom => RECT { left: 0, top: screen_h - thickness_px, right: screen_w, bottom: screen_h },
-          ScreenEdge::Top => RECT { left: 0, top: 0, right: screen_w, bottom: thickness_px },
-          ScreenEdge::Left => RECT { left: 0, top: 0, right: thickness_px, bottom: screen_h },
-          ScreenEdge::Right => RECT { left: screen_w - thickness_px, top: 0, right: screen_w, bottom: screen_h },
-        };
-      }
-
-      Ok(data.rc)
-    }
-  }
-
   /// Unregisters the appbar, restoring the normal full-screen work area.
   /// Idempotent — safe to call even if `register_appbar` was never called
   /// or already failed.
@@ -599,70 +422,6 @@ pub(crate) mod win {
       data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
       data.hWnd = hwnd as HWND;
       SHAppBarMessage(ABM_REMOVE, &mut data);
-    }
-  }
-
-  /// `Shell_TrayWnd` is Explorer's documented window class name for its
-  /// own taskbar — `FindWindowW` locating it by class (not by title,
-  /// which Explorer's taskbar doesn't have) is the standard way other
-  /// shell-replacement tools identify it. Returns null if Explorer isn't
-  /// running as the shell (already the case once the actual shell switch
-  /// happens) or genuinely has no taskbar window for some other reason.
-  fn find_explorer_taskbar() -> HWND {
-    let class_name: Vec<u16> = "Shell_TrayWnd\0".encode_utf16().collect();
-    unsafe { FindWindowW(class_name.as_ptr(), std::ptr::null()) }
-  }
-
-  /// Hides Explorer's own taskbar — purely a window-visibility toggle via
-  /// `ShowWindow`/`SW_HIDE`, not a registry change and not the actual
-  /// shell switch: fully reversible with `show_explorer_taskbar()`, and
-  /// harmless to try even before Udaan is ever set as the real shell.
-  /// Explorer keeps running underneath; only its taskbar window's
-  /// visibility changes, so nothing else about the desktop is disturbed.
-  pub fn hide_explorer_taskbar() -> Result<(), String> {
-    let hwnd = find_explorer_taskbar();
-    if hwnd.is_null() {
-      return Err("Could not find the Windows taskbar (Shell_TrayWnd) — it may already be hidden or Explorer isn't running.".to_string());
-    }
-    unsafe {
-      ShowWindow(hwnd, SW_HIDE);
-    }
-    Ok(())
-  }
-
-  pub fn show_explorer_taskbar() -> Result<(), String> {
-    let hwnd = find_explorer_taskbar();
-    if hwnd.is_null() {
-      return Err("Could not find the Windows taskbar (Shell_TrayWnd) to restore.".to_string());
-    }
-    unsafe {
-      ShowWindow(hwnd, SW_SHOW);
-    }
-    Ok(())
-  }
-
-  /// Re-asserts the taskbar window's topmost z-order position.
-  /// `alwaysOnTop: true` in tauri.conf.json only sets `HWND_TOPMOST` once
-  /// at window creation — Explorer's own taskbar is ALSO topmost, and can
-  /// still win transient z-order fights against another topmost window
-  /// (e.g. right after a focus change, or a new topmost window appearing
-  /// elsewhere), which read as "the taskbar disappears behind the Windows
-  /// taskbar." Called periodically from the frontend's own poll loop (see
-  /// TaskbarWindow.tsx) rather than once, matching how real
-  /// taskbar-replacement tools keep themselves pinned. SWP_NOMOVE/
-  /// SWP_NOSIZE/SWP_NOACTIVATE mean this only changes z-order — position,
-  /// size, and focus are untouched.
-  pub fn force_topmost(hwnd: isize) {
-    unsafe {
-      SetWindowPos(
-        hwnd as HWND,
-        HWND_TOPMOST,
-        0,
-        0,
-        0,
-        0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-      );
     }
   }
 
@@ -750,45 +509,10 @@ pub(crate) mod win {
   pub fn list_windows() -> Vec<OpenWindow> {
     Vec::new()
   }
-  pub fn focus_window(_handle: isize) -> Result<(), String> {
-    Err("Taskbar window control is only supported on Windows.".to_string())
-  }
-  pub fn minimize_window(_handle: isize) -> Result<(), String> {
-    Err("Taskbar window control is only supported on Windows.".to_string())
-  }
   pub fn close_window(_handle: isize) -> Result<(), String> {
     Err("Taskbar window control is only supported on Windows.".to_string())
   }
-  pub fn minimize_all() -> Result<(), String> {
-    Err("Taskbar window control is only supported on Windows.".to_string())
-  }
-  pub fn open_task_manager() -> Result<(), String> {
-    Err("Task Manager is only available on Windows.".to_string())
-  }
-  pub fn cursor_position() -> (i32, i32) {
-    (0, 0)
-  }
-  pub fn foreground_window_handle() -> isize {
-    0
-  }
-  #[derive(Debug, Clone, Copy)]
-  pub struct AppbarRect {
-    pub left: i32,
-    pub top: i32,
-    pub right: i32,
-    pub bottom: i32,
-  }
-  pub fn register_appbar(_hwnd: isize, _edge: ScreenEdge, _thickness_px: i32) -> Result<AppbarRect, String> {
-    Err("The taskbar appbar is only supported on Windows.".to_string())
-  }
   pub fn unregister_appbar(_hwnd: isize) {}
-  pub fn hide_explorer_taskbar() -> Result<(), String> {
-    Err("Only supported on Windows.".to_string())
-  }
-  pub fn show_explorer_taskbar() -> Result<(), String> {
-    Err("Only supported on Windows.".to_string())
-  }
-  pub fn force_topmost(_hwnd: isize) {}
   pub fn register_thumbnail(_dest_hwnd: isize, _source_hwnd: isize) -> Result<isize, String> {
     Err("Live thumbnails are only supported on Windows.".to_string())
   }
@@ -822,80 +546,6 @@ pub fn taskbar_list_windows() -> Vec<OpenWindow> {
   win::list_windows()
 }
 
-/// Brings `handle` to the foreground, restoring it first if minimized —
-/// clicking a taskbar entry for a minimized window should restore+focus,
-/// matching real taskbar behavior.
-#[tauri::command]
-pub fn taskbar_focus_window(handle: isize) -> Result<(), String> {
-  win::focus_window(handle)
-}
-
-#[tauri::command]
-pub fn taskbar_minimize_window(handle: isize) -> Result<(), String> {
-  win::minimize_window(handle)
-}
-
-/// Closes `handle` via WM_CLOSE — used by the taskbar's right-click "Close
-/// window" and multi-window flyout's per-window close button.
-#[tauri::command]
-pub fn taskbar_close_window(handle: isize) -> Result<(), String> {
-  win::close_window(handle)
-}
-
-/// Minimizes every window the taskbar currently lists — backs the
-/// show-desktop button.
-#[tauri::command]
-pub fn taskbar_minimize_all() -> Result<(), String> {
-  win::minimize_all()
-}
-
-/// Opens Task Manager — backs the "Task Manager" item on the taskbar's
-/// right-click-on-empty-space context menu, matching real Windows.
-#[tauri::command]
-pub fn taskbar_open_task_manager() -> Result<(), String> {
-  win::open_task_manager()
-}
-
-/// Screen-relative physical-pixel cursor position `(x, y)` — see
-/// `win::cursor_position` for why this is a plain poll rather than a
-/// mouse hook. Backs the taskbar dock's auto-hide reveal-on-approach.
-#[tauri::command]
-pub fn taskbar_cursor_position() -> (i32, i32) {
-  win::cursor_position()
-}
-
-/// The handle of whichever window currently has focus — lets the taskbar
-/// UI highlight the active entry the same way the real taskbar does.
-#[tauri::command]
-pub fn taskbar_foreground_window() -> isize {
-  win::foreground_window_handle()
-}
-
-/// Registers the CALLING window as a real Windows AppBar, reserving
-/// `thickness_px` of the given screen edge so other windows maximize
-/// around it. Tauri's JS `Window` API has no `hwnd()` accessor, so the
-/// HWND is resolved here, server-side, from the invoking window itself
-/// (via `tauri::Window`, which Tauri auto-injects into any command that
-/// declares it as a parameter) — this always acts on whichever window
-/// actually called it, never a guessed or passed-in handle.
-#[tauri::command]
-pub fn taskbar_register_appbar(
-  window: tauri::Window,
-  edge: ScreenEdge,
-  thickness_px: i32,
-) -> Result<AppbarRect, String> {
-  let hwnd = window_hwnd(&window)?;
-  let rect = win::register_appbar(hwnd, edge, thickness_px)?;
-  Ok(AppbarRect { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom })
-}
-
-#[tauri::command]
-pub fn taskbar_unregister_appbar(window: tauri::Window) -> Result<(), String> {
-  let hwnd = window_hwnd(&window)?;
-  win::unregister_appbar(hwnd);
-  Ok(())
-}
-
 /// Same as `taskbar_unregister_appbar` but by raw HWND, not exposed as a
 /// Tauri command — used by `lib.rs`'s `on_window_event` handler, which
 /// already has a `tauri::Window` and its HWND in a plain
@@ -904,29 +554,6 @@ pub fn taskbar_unregister_appbar(window: tauri::Window) -> Result<(), String> {
 /// command layer.
 pub fn unregister_appbar_by_hwnd(hwnd: isize) {
   win::unregister_appbar(hwnd);
-}
-
-/// Hides the real Windows taskbar (Explorer's `Shell_TrayWnd`) — a plain
-/// window-visibility toggle, not a shell/registry change, and fully
-/// reversible via `taskbar_show_windows_taskbar`. Safe to use regardless
-/// of whether Udaan is ever set as the actual shell.
-#[tauri::command]
-pub fn taskbar_hide_windows_taskbar() -> Result<(), String> {
-  win::hide_explorer_taskbar()
-}
-
-#[tauri::command]
-pub fn taskbar_show_windows_taskbar() -> Result<(), String> {
-  win::show_explorer_taskbar()
-}
-
-/// Re-asserts the CALLING window's topmost z-order — see `win::force_topmost`
-/// for why this needs to be called periodically rather than once.
-#[tauri::command]
-pub fn taskbar_force_topmost(window: tauri::Window) -> Result<(), String> {
-  let hwnd = window_hwnd(&window)?;
-  win::force_topmost(hwnd);
-  Ok(())
 }
 
 /// Registers a live DWM thumbnail of `source_handle` (a real app's window,
@@ -1062,10 +689,4 @@ mod tests {
     assert!(!windows.is_empty(), "expected at least one visible titled window on a real desktop");
   }
 
-  #[test]
-  fn foreground_window_resolves() {
-    let handle = taskbar_foreground_window();
-    println!("foreground window handle: {handle}");
-    assert_ne!(handle, 0, "expected a real foreground window on a real desktop");
-  }
 }

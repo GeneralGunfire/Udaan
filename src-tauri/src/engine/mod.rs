@@ -10,6 +10,7 @@
 //!   recorded, and the service restarted with backoff; health is queryable.
 //! - [`guard`]: every change made to the OS registers its own undo. All undos run on
 //!   exit and on a main-thread panic, so the OS is never left altered.
+//! - [`apps`]: how long closed app windows stay warm; capped, shorter when RAM is tight.
 //! - [`desktop`]: the wallpaper/icons layer: always the bottom of the stack, fitted to the
 //!   primary monitor, and recovered when monitors, DPI or Explorer change.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
@@ -18,6 +19,7 @@
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
 //! - [`trace`]: a small crash-safe breadcrumb log, because a release build has no console.
 
+pub mod apps;
 pub mod desktop;
 pub mod governor;
 pub mod guard;

@@ -111,6 +111,7 @@ pub fn run() {
     )
     .invoke_handler(tauri::generate_handler![
       engine::engine_health,
+      engine::apps::engine_app_closed,
       engine::pin::engine_pin,
       engine::pin::engine_unpin,
       focus_video::focus_video_port,
@@ -433,18 +434,6 @@ pub fn run() {
       study::study_list_messages,
       boot_optimize::boot_optimize_run,
       taskbar::taskbar_list_windows,
-      taskbar::taskbar_focus_window,
-      taskbar::taskbar_minimize_window,
-      taskbar::taskbar_close_window,
-      taskbar::taskbar_minimize_all,
-      taskbar::taskbar_open_task_manager,
-      taskbar::taskbar_cursor_position,
-      taskbar::taskbar_foreground_window,
-      taskbar::taskbar_register_appbar,
-      taskbar::taskbar_unregister_appbar,
-      taskbar::taskbar_hide_windows_taskbar,
-      taskbar::taskbar_show_windows_taskbar,
-      taskbar::taskbar_force_topmost,
       taskbar::taskbar_register_thumbnail,
       taskbar::taskbar_update_thumbnail,
       taskbar::taskbar_unregister_thumbnail,
@@ -512,6 +501,7 @@ pub fn run() {
 
       // All state is registered: only now may the shell's pages start loading.
       engine::create_windows(app.handle());
+      engine::apps::start(app.handle().clone());
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);

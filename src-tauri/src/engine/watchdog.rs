@@ -15,12 +15,19 @@ pub fn ensure_started() {
     return;
   }
   let Ok(exe) = std::env::current_exe() else { return };
-  let guard = exe.with_file_name("shell-watchdog.exe");
-  if !guard.is_file() {
+  let original = exe.with_file_name("shell-watchdog.exe");
+  if !original.is_file() {
     super::trace::line("external guard not found next to the executable; relying on in-process undo only");
     STARTED.store(false, Ordering::SeqCst);
     return;
   }
+  // Run the guard from a COPY in the data folder. A running exe cannot be overwritten, so
+  // running the original would make every rebuild of it fail while Udaan is open. If the
+  // copy fails (an older guard still holds it), the existing copy is used.
+  let guard = dirs::data_local_dir()
+    .map(|d| d.join("dev.udaan.workstation").join("udaan-guard.exe"))
+    .filter(|copy| std::fs::copy(&original, copy).is_ok() || copy.is_file())
+    .unwrap_or(original);
   use std::os::windows::process::CommandExt;
   const CREATE_NO_WINDOW: u32 = 0x0800_0000;
   match std::process::Command::new(&guard).arg("--guard").arg(std::process::id().to_string()).creation_flags(CREATE_NO_WINDOW).spawn() {

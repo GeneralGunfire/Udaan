@@ -181,25 +181,13 @@ export function AppWindow({ appId }: { appId: AppId }) {
   }, [def.name])
 
   const win = getCurrentWindow()
-  // Closing hides the window instantly and keeps it warm for a few minutes,
-  // so reopening is immediate; after that it is destroyed to free memory.
-  // The TV always closes fully (its players must stop).
-  const reap = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Closing hides the window instantly so reopening is immediate. How long it then stays
+  // warm is the engine's decision (engine::apps): briefly, capped, and shorter when the PC
+  // is short of memory. The TV always closes fully (its players must stop).
   const close = () => {
     if (appId === 'tv') return void win.close()
-    void win.hide()
-    clearTimeout(reap.current)
-    reap.current = setTimeout(() => void win.destroy(), 180_000)
+    void invoke('engine_app_closed')
   }
-  useEffect(() => {
-    const onVisible = () => document.visibilityState === 'visible' && clearTimeout(reap.current)
-    document.addEventListener('visibilitychange', onVisible)
-    const un = getCurrentWindow().onFocusChanged(({ payload }) => payload && clearTimeout(reap.current))
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      void un.then((f) => f())
-    }
-  }, [])
   const content: ReactNode = <Component {...(args ?? {})} onClose={close} />
 
   return (
