@@ -126,7 +126,12 @@ fn policy_for(label: &str) -> Policy {
   match label {
     // Reveals itself with `requestAnimationFrame(...show())` on every banner.
     "toast" => Policy::Never,
-    "launcher" | "taskbar-popup" | "edgelight" => Policy::FromStart,
+    // Measures its content before showing, and that content grows through animations,
+    // which do not run in a webview that has been told it is invisible: it measured a
+    // collapsed card and sized its window wrong (popups took ~1 s to settle instead of
+    // ~250 ms). It is also a tiny window, so quieting it saves almost nothing.
+    "taskbar-popup" => Policy::Never,
+    "launcher" | "edgelight" => Policy::FromStart,
     _ => Policy::AfterFirstShow,
   }
 }
