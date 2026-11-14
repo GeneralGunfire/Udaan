@@ -47,3 +47,19 @@ Show the user the result (screenshots) at the end of each of steps 2, 3 and 4, a
 
 ## Measured result: rounded glass (supersedes the warning above)
 Spike on this PC: accent blur + composition rounded clip blurs the backdrop (stripe contrast 125 to 3) with clean antialiased rounded corners; accent blur + SetWindowRgn also works but with a harder edge; `CreateHostBackdropBrush` paints black on Windows 10 and must not be used; no blur leaves the backdrop untouched. Use accent blur + composition clip for the dock/top bar, and remove any host-backdrop-brush code (e.g. `glass.rs`). The blur is strong enough that the dock plate can be very light.
+
+## Design direction (user decision 2026-11-14; supersedes "copy the macOS reference")
+The user wants: keep the reference's SIZING and a little of its design language, but make the look match the ORIGINAL Udaan direction and the original goal for this new OS: performance first, a clean modern premium look, refined from-scratch components, some real 3D/depth, good (bursty) animation. It must be unique, not a macOS copy, and must work well on the target hardware. Only the BASICS of the original look carry over. Do NOT build or re-create original-Udaan features (3D window switcher, edge light, live/video wallpapers, audio, apps, launcher): the user will rebuild those later.
+
+Keep from the macOS reference (sizing and structure only): 55 px dock icons, 6 px gaps, about 17 px off the bottom, about 26 px top bar, top bar as text with no fill or separator, a floating dock.
+
+Carry over from original Udaan (the basics, see `DESIGN_SYSTEM.md` and memory `app-visual-language`):
+- Content sits directly on the wallpaper; no card/slab behind things. Weight comes from typography (light, oversized, tight tracking) and soft text shadow for legibility, not scrims. Asymmetric anchoring, not centred boxes or a macOS-style card grid for widgets (e.g. a large light clock/date typeset straight on the wallpaper instead of frosted cards).
+- Monochrome: charcoal scale with real depth (never pure black/white), warm off-white text (#faf8f4 at 96/72/52% alpha), ONE accent: logo blue #3072f0, used only for active/live/selected/focus (running-app dot, focus ring); never a second base colour. Danger is a desaturated brick red (#d9736a). Keep the tokens in the theme files with light and dark.
+- No glows anywhere: shadows are neutral dark only. No hairline-bordered pills, no dark slabs.
+- Type: Poppins (display) and Montserrat (body), loaded as private fonts via DirectWrite, not Segoe UI.
+- Restraint: the lit-window rule; few things use the accent at once.
+
+Make it unique (not a macOS clone): put the originality in depth and material, not in extra features. Examples to evaluate against the hardware limits: subtle perspective/parallax on the wallpaper and dock responding to the cursor (bursty, stops at rest), icons that tilt in 3D on hover, light that reads from one consistent direction across dock/widgets/bar, very light glass (strong blur, almost no tint). Pick a small set, prove each on this PC (idle CPU stays about 0), and drop anything that costs more than it earns.
+
+Keep the existing behaviour that already works (AppBar reservation, auto-hide, watchdog). Fix the known regression first: the blur band above the dock (the dock window is larger than its plate and the accent blur fills the window rectangle, so clip the blur to the plate or size the window to the plate) and the top bar height regression. Screenshot before and after each change and show the user.
