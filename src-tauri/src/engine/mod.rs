@@ -16,6 +16,7 @@
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
 //! - [`pin`]: keeps the dock and menu bar on their screen edge, event-driven instead of by timer.
+//! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
 //! - [`trace`]: a small crash-safe breadcrumb log, because a release build has no console.
 
@@ -27,6 +28,7 @@ pub mod pin;
 pub mod resources;
 pub mod supervisor;
 pub mod trace;
+pub mod wallpapers;
 pub mod watchdog;
 
 use tauri::AppHandle;

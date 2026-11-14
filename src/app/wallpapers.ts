@@ -1,4 +1,4 @@
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { GENERATED_WALLPAPERS } from '@/os/desktop/generatedWallpapers'
 import { LIVE_WALLPAPERS, liveWallpaper } from '@/os/desktop/liveWallpapers'
 
@@ -54,4 +54,26 @@ export function isValidWallpaperId(id: string): boolean {
     /^color:#[0-9a-f]{6}$/i.test(id) ||
     WALLPAPERS.some((w) => w.id === id)
   )
+}
+
+/**
+ * What to actually draw for a wallpaper. A picture from disk is asked of the engine's
+ * wallpaper service at this screen's size: a cached, screen-sized copy that decodes to a
+ * fraction of the memory of the original (a 5120x2880 image is ~59 MB decoded, a
+ * 1920x1080 copy ~8 MB). Anything else, or if the service fails, draws as before.
+ */
+export async function fittedWallpaperSrc(id: string): Promise<string> {
+  const original = getWallpaper(id).src
+  if (!id.startsWith('file:')) return original
+  try {
+    const dpr = window.devicePixelRatio || 1
+    const fitted = await invoke<string>('wallpaper_fit', {
+      path: id.slice(5),
+      width: Math.round(window.screen.width * dpr),
+      height: Math.round(window.screen.height * dpr),
+    })
+    return convertFileSrc(fitted)
+  } catch {
+    return original
+  }
 }

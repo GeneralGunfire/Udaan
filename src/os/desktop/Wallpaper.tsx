@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useWallpaper } from '@/shared/hooks/useWallpaper'
-import { getWallpaper } from '@/app/wallpapers'
+import { fittedWallpaperSrc, getWallpaper } from '@/app/wallpapers'
 import { dur, curve } from '@/os/motion/systemMotion'
 import { renderWallpaper } from './generatedWallpapers'
 import { isLive, liveWallpaper } from './liveWallpapers'
@@ -41,7 +41,9 @@ export const Wallpaper = memo(function Wallpaper({
   // A live wallpaper shows its own fallback scene beneath the canvas.
   const staticId = live ? live.fallback : wallpaperId
   const wp = useMemo(() => getWallpaper(staticId), [staticId])
-  const [readySrc, setReadySrc] = useState(wp.src)
+  // A picture from disk is not drawn until the engine's screen-sized copy is ready, so the
+  // full-size original is never decoded here.
+  const [readySrc, setReadySrc] = useState(wp.id.startsWith('file:') ? '' : wp.src)
   const [liveFailed, setLiveFailed] = useState(false)
 
   useEffect(() => setLiveFailed(false), [wallpaperId])
@@ -61,16 +63,19 @@ export const Wallpaper = memo(function Wallpaper({
   useEffect(() => {
     if (!wp.src) return
     let cancelled = false
-    const img = new Image()
-    img.src = wp.src
-    img.decode().then(
-      () => !cancelled && setReadySrc(wp.src),
-      () => !cancelled && setReadySrc(wp.src),
-    )
+    void fittedWallpaperSrc(wp.id).then((src) => {
+      if (cancelled) return
+      const img = new Image()
+      img.src = src
+      img.decode().then(
+        () => !cancelled && setReadySrc(src),
+        () => !cancelled && setReadySrc(src),
+      )
+    })
     return () => {
       cancelled = true
     }
-  }, [wp.src])
+  }, [wp.src, wp.id])
 
   return (
     <div className="fixed -inset-1 overflow-hidden" style={{ background: wp.color ?? '#0b0f16' }}>
