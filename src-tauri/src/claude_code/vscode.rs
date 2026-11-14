@@ -11,7 +11,7 @@ pub fn open_in_vscode(dir: &str) -> Result<(), String> {
     return Err("Not a directory".into());
   }
 
-  Command::new(super::exe::resolve("code"))
+  crate::engine::process::hidden(super::exe::resolve("code"))
     .arg(path)
     .spawn()
     .map(|_| ())

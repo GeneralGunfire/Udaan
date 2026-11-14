@@ -80,7 +80,7 @@ fn python_command() -> &'static str {
 }
 
 fn which_exists(name: &str) -> bool {
-  std::process::Command::new(name)
+  crate::engine::process::hidden(name)
     .arg("--version")
     .stdout(Stdio::null())
     .stderr(Stdio::null())
@@ -112,7 +112,7 @@ impl EmbedProcess {
     }
 
     let script = embed_script_path()?;
-    let mut child = Command::new(python_command())
+    let mut child = crate::engine::process::hidden_async(python_command())
       .arg(&script)
       .stdin(Stdio::piped())
       .stdout(Stdio::piped())

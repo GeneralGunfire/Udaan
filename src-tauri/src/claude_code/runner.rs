@@ -86,7 +86,7 @@ impl Queue {
     let _ = self.store.set_status(&task_id, TaskStatus::Running, Some("started_at"), Some(&Utc::now().to_rfc3339()));
     emit(&self.app, &TaskEvent::Status { task_id: &task_id, status: "running" });
 
-    let mut child = match Command::new(super::exe::resolve("claude"))
+    let mut child = match crate::engine::process::hidden_async(super::exe::resolve("claude"))
       .arg("-p")
       .arg(&task.prompt)
       .arg("--output-format")

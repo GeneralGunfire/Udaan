@@ -16,7 +16,7 @@ pub async fn ai_claude_complete(
   timeout_secs: Option<u64>,
 ) -> Result<String, String> {
   let images = images.unwrap_or_default();
-  let mut cmd = Command::new(crate::claude_code::exe::resolve("claude"));
+  let mut cmd = crate::engine::process::hidden_async(crate::claude_code::exe::resolve("claude"));
   cmd
     .arg("-p")
     .args(["--model", model.as_deref().unwrap_or("haiku")])

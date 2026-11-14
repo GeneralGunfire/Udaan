@@ -94,7 +94,7 @@ pub async fn synthesize(text: &str, voice_id: &str, speed: f32) -> Result<Vec<u8
   // text mode and turns every 0x0A byte into 0x0D 0x0A, which corrupts the
   // WAV samples into crackle and static.
   let wav_path = std::env::temp_dir().join(format!("udaan-tts-{}-{}.wav", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
-  let mut child = Command::new(&piper);
+  let mut child = crate::engine::process::hidden_async(&piper);
   child
     .arg("--model")
     .arg(&model)

@@ -21,13 +21,13 @@ pub fn ensure_started() {
     STARTED.store(false, Ordering::SeqCst);
     return;
   }
-  // Run the guard from a COPY in the data folder. A running exe cannot be overwritten, so
-  // running the original would make every rebuild of it fail while Udaan is open. If the
-  // copy fails (an older guard still holds it), the existing copy is used.
-  let guard = dirs::data_local_dir()
-    .map(|d| d.join("dev.udaan.workstation").join("udaan-guard.exe"))
-    .filter(|copy| std::fs::copy(&original, copy).is_ok() || copy.is_file())
-    .unwrap_or(original);
+  // Run the guard from its OWN copy next to Udaan.exe. Never from `shell-watchdog.exe` itself: the
+  // build (and Tauri's sidecar copy) overwrite that file, and a running program cannot be
+  // overwritten, so a guard running from it made every rebuild fail while Udaan was open. Not in the
+  // user's data folder either: antivirus removed a copy placed there. If copying fails because an
+  // older guard still holds the copy, that copy is just used.
+  let copy = original.with_file_name("udaan-guard.exe");
+  let guard = if std::fs::copy(&original, &copy).is_ok() || copy.is_file() { copy } else { original };
   use std::os::windows::process::CommandExt;
   const CREATE_NO_WINDOW: u32 = 0x0800_0000;
   // The guard must NOT be a child of Udaan. Ending Udaan's process tree (Task Manager's

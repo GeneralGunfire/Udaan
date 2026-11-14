@@ -76,7 +76,7 @@ pub fn shell_power(action: PowerAction) -> Result<(), String> {
   #[cfg(target_os = "windows")]
   {
     use std::process::Command;
-    let run = |args: &[&str]| Command::new("shutdown").args(args).spawn().map(|_| ()).map_err(|e| e.to_string());
+    let run = |args: &[&str]| crate::engine::process::hidden("shutdown").args(args).spawn().map(|_| ()).map_err(|e| e.to_string());
     match action {
       PowerAction::Lock => unsafe {
         windows::Win32::System::Shutdown::LockWorkStation().map_err(|e| e.message().to_string())

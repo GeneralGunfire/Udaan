@@ -21,6 +21,7 @@
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
 //! - [`keyboard`]: the Win key, Win+<key>, double-tap Ctrl and Alt+`, as a tested state machine.
 //! - [`notify`]: notifications from arrival to expiry: policy, history, banner queue and timers.
+//! - [`process`]: background processes start with no console window, by default.
 //! - [`popup`]: where a popup goes (flip, clamp, fit) and when it dismisses itself.
 //! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
 //!   it back however the window ends.
@@ -46,6 +47,7 @@ pub mod guard;
 pub mod keyboard;
 pub mod notify;
 pub mod popup;
+pub mod process;
 pub mod resources;
 pub mod search;
 pub mod stores;

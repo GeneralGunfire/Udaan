@@ -192,7 +192,7 @@ mod win {
   /// Flushes the DNS resolver cache — a standard, fully safe maintenance
   /// action; the cache simply repopulates on the next lookup.
   pub fn flush_dns_cache() -> bool {
-    std::process::Command::new("ipconfig")
+    crate::engine::process::hidden("ipconfig")
       .arg("/flushdns")
       .status()
       .map(|s| s.success())

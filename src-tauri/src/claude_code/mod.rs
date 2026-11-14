@@ -71,7 +71,7 @@ pub async fn claude_code_check_cli() -> CliCheckResult {
 
   let result = tokio::time::timeout(
     std::time::Duration::from_secs(5),
-    tokio::process::Command::new(&exe_name).arg("--version").output(),
+    crate::engine::process::hidden_async(&exe_name).arg("--version").output(),
   )
   .await;
 

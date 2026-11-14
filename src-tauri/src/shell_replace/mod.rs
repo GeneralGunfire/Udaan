@@ -124,7 +124,7 @@ mod win {
     // If the user declines it, `Command::spawn`/`wait` still succeeds (the
     // process ran) but `reg add` itself exits non-zero — checked below so
     // a declined prompt is reported clearly rather than silently "working."
-    let status = std::process::Command::new("powershell")
+    let status = crate::engine::process::hidden("powershell")
       .args([
         "-NoProfile",
         "-Command",

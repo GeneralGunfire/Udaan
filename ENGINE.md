@@ -48,6 +48,11 @@ plain language; this page is the map for people building UI on top of it.
   keyboard hook and every background service, and repairs what it can. It also runs by itself after a
   display change or an Explorer restart.
 
+## Starting processes
+Background processes (CLIs, helpers, `netstat`...) start through `engine::process::hidden` /
+`hidden_async`, which give them no console window. Never call `Command::new` directly for a background
+process, or a black console window will flash on the user's screen.
+
 ## Safety nets (so the user's PC is never left altered)
 - Explorer's taskbar is hidden only with its undo registered; a separate guard process (outside Udaan's
   process tree) restores it even if Udaan is killed outright.

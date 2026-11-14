@@ -34,7 +34,7 @@ fn read_pidfile() -> Option<u32> {
 /// a-tracked-PID path, not anything performance-sensitive.
 #[cfg(target_os = "windows")]
 fn find_pid_by_port(port: u16) -> Option<u32> {
-  let output = std::process::Command::new("netstat").args(["-ano", "-p", "TCP"]).output().ok()?;
+  let output = crate::engine::process::hidden("netstat").args(["-ano", "-p", "TCP"]).output().ok()?;
   let text = String::from_utf8_lossy(&output.stdout);
   let needle = format!(":{port}");
   for line in text.lines() {
@@ -52,7 +52,7 @@ fn find_pid_by_port(port: u16) -> Option<u32> {
 #[cfg(not(target_os = "windows"))]
 fn find_pid_by_port(port: u16) -> Option<u32> {
   // `lsof -ti tcp:PORT -sTCP:LISTEN` prints just the PID(s), one per line.
-  let output = std::process::Command::new("lsof")
+  let output = crate::engine::process::hidden("lsof")
     .args(["-ti", &format!("tcp:{port}"), "-sTCP:LISTEN"])
     .output()
     .ok()?;
@@ -76,7 +76,7 @@ pub(crate) fn kill_pid(pid: u32) {
   // mode forks the real server into its own detached process and the
   // wrapper CLI we `spawn()`'d exits immediately, so there is no `Child`
   // handle to kill through by the time Stop is ever called.
-  let _ = std::process::Command::new("taskkill")
+  let _ = crate::engine::process::hidden("taskkill")
     .args(["/PID", &pid.to_string(), "/F"])
     .stdout(std::process::Stdio::null())
     .stderr(std::process::Stdio::null())
@@ -85,7 +85,7 @@ pub(crate) fn kill_pid(pid: u32) {
 
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn kill_pid(pid: u32) {
-  let _ = std::process::Command::new("kill").arg("-9").arg(pid.to_string()).status();
+  let _ = crate::engine::process::hidden("kill").arg("-9").arg(pid.to_string()).status();
 }
 
 #[tauri::command]
@@ -116,7 +116,7 @@ pub async fn omniroute_start(state: State<'_, OmniRouteProcess>) -> Result<(), S
   // Same fix `claude_code::exe::resolve` already applies for the `claude`
   // CLI, inlined here rather than reaching across modules for two lines.
   let omniroute_cmd = if cfg!(windows) { "omniroute.cmd".to_string() } else { "omniroute".to_string() };
-  let status = Command::new(omniroute_cmd)
+  let status = crate::engine::process::hidden_async(omniroute_cmd)
     .arg("serve")
     .arg("--daemon")
     .arg("--no-open")
