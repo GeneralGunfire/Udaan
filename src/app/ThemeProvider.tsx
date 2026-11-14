@@ -26,13 +26,30 @@ function readStored(): Theme {
  *
  * `none` for the desktop (it *is* the backdrop; blurring it would blur the
  * wallpaper against itself) and for app windows, which paint opaque content.
+ *
+ * THE RULE: a window material may only go on a window whose content FILLS
+ * it. DWM blurs the entire window rectangle, not the rounded shape the CSS
+ * draws inside it, so any window that is bigger than its visible content
+ * shows the leftover area as a flat blurred slab.
+ *
+ *   dock      NOT here. Its window is a full-width strip so the bar has
+ *             headroom for the hover lift and labels; with acrylic it
+ *             rendered as a hard-edged band across the screen with the
+ *             dock floating inside it.
+ *   toast     NOT here. The window wraps a stack of separate cards, so the
+ *             gaps between them blurred as rectangles.
+ *   launcher  NOT here. Its window is the whole screen, so acrylic would
+ *             blur everything behind Start rather than the Start card, on
+ *             a code path (legacy Windows 10 acrylic) that is slow at that
+ *             size.
+ *
+ * Those three use the surface's own tint, which is designed to carry it
+ * alone (see `data-material='none'` in os.css).
  */
 const SURFACE_MATERIAL: Record<string, MaterialKind> = {
   menubar: 'mica',
-  taskbar: 'acrylic',
+  // Fit to its content by FlyoutWindow's resize observer, so it qualifies.
   'taskbar-popup': 'acrylic',
-  launcher: 'acrylic',
-  toast: 'acrylic',
 }
 
 /** Shell windows with square corners: full-width bars must not round. */

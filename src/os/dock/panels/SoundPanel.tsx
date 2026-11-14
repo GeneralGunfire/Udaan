@@ -186,7 +186,15 @@ function OutputMeter({ active, level }: { active: boolean; level: number }) {
 
 /* ------------------------------------------------------------------ */
 
-/** Volume, sound modes, and the speaker keep-awake. */
+/**
+ * Volume, sound modes, and the speaker keep-awake.
+ *
+ * Sections fade and slide in; they never animate their height. This panel
+ * lives in an OS window that FlyoutWindow resizes to fit its content over
+ * IPC, so an animated height means a window resize on every frame — an
+ * async round trip each (size, monitor, position, set rect) with the
+ * compositor re-blurring behind it. That is what made these popups judder.
+ */
 export function SoundPanel() {
   const [v, setV] = useState<VolumeState | null>(null)
   const [curve, setCurve] = useState<Curve | null>(null)
@@ -356,11 +364,10 @@ export function SoundPanel() {
           {preset === 'custom' ? (
             <motion.div
               key="custom"
-              initial={reduced ? false : { opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={reduced ? undefined : { opacity: 0, height: 0 }}
-              transition={{ duration: dur.normal, ease: ease.decelerate }}
-              className="overflow-hidden"
+              initial={reduced ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? undefined : { opacity: 0 }}
+              transition={{ duration: dur.fast, ease: ease.decelerate }}
             >
               <div className="mt-3 flex flex-col gap-2.5" data-no-wheel>
                 <EqRow label="Bass" value={custom.bass} onChange={(x) => void changeCustom({ bass: x })} />
@@ -374,11 +381,10 @@ export function SoundPanel() {
           ) : preset !== 'flat' ? (
             <motion.div
               key="strength"
-              initial={reduced ? false : { opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={reduced ? undefined : { opacity: 0, height: 0 }}
-              transition={{ duration: dur.normal, ease: ease.decelerate }}
-              className="overflow-hidden"
+              initial={reduced ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? undefined : { opacity: 0 }}
+              transition={{ duration: dur.fast, ease: ease.decelerate }}
             >
               <div className="mt-3" data-no-wheel>
                 <label className="flex items-center gap-3 text-[12px] text-[var(--os-text-dim)]">
@@ -413,11 +419,10 @@ export function SoundPanel() {
         <AnimatePresence initial={false}>
           {awake && (
             <motion.div
-              initial={reduced ? false : { opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={reduced ? undefined : { opacity: 0, height: 0 }}
-              transition={{ duration: dur.normal, ease: ease.decelerate }}
-              className="overflow-hidden"
+              initial={reduced ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? undefined : { opacity: 0 }}
+              transition={{ duration: dur.fast, ease: ease.decelerate }}
             >
               <div className="mt-3 flex flex-col gap-2.5">
                 <Segmented

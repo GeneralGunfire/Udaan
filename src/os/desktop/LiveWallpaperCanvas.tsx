@@ -113,12 +113,15 @@ export const LiveWallpaperCanvas = memo(function LiveWallpaperCanvas({
     })
 
     /* ---- sizing: render below native, let the compositor scale ---- */
-    const SCALE = 0.7
+    // Starts low and only ever steps DOWN. A wallpaper is a defocused
+    // backdrop, so resolution is the cheapest thing to give up, and a GPU
+    // that cannot keep up gets a softer picture instead of a stuttering one.
+    let scale = def.scale ?? 0.5
     let width = 0
     let height = 0
     const resize = () => {
-      const w = Math.max(1, Math.round(window.innerWidth * SCALE))
-      const h = Math.max(1, Math.round(window.innerHeight * SCALE))
+      const w = Math.max(1, Math.round(window.innerWidth * scale))
+      const h = Math.max(1, Math.round(window.innerHeight * scale))
       if (w === width && h === height) return
       width = w
       height = h
@@ -142,6 +145,11 @@ export const LiveWallpaperCanvas = memo(function LiveWallpaperCanvas({
     const FRAME_MS = 1000 / 30
     let raf = 0
     let lastDraw = 0
+    // Adaptive quality: when draws land further apart than the 30fps target,
+    // the GPU or compositor is saturated, so drop the resolution a notch.
+    let prevDraw = 0
+    let gapSum = 0
+    let gapCount = 0
     let daylightValue = daylight()
     const start = performance.now()
 
@@ -153,9 +161,25 @@ export const LiveWallpaperCanvas = memo(function LiveWallpaperCanvas({
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame)
-      if (pausedRef.current || document.hidden) return
+      if (pausedRef.current || document.hidden) {
+        // Resuming after a pause must not count the pause as a slow frame.
+        prevDraw = 0
+        return
+      }
       if (now - lastDraw < FRAME_MS) return
       lastDraw = now
+      if (prevDraw) {
+        gapSum += now - prevDraw
+        if (++gapCount === 45) {
+          if (gapSum / gapCount > 42 && scale > 0.25) {
+            scale = Math.max(0.25, scale * 0.75)
+            resize()
+          }
+          gapSum = 0
+          gapCount = 0
+        }
+      }
+      prevDraw = now
 
       const p = pointer.current
       // ~8% per frame: slow enough to read as the scene responding, not

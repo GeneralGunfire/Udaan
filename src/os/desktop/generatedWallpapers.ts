@@ -39,13 +39,24 @@ export interface GeneratedWallpaper {
   base: [string, string]
   /** Up to four ribbon colours, front to back. */
   ribbons: string[]
-  /** Overall look: `flow` = bent ribbons, `aurora` = soft vertical curtains. */
-  style: 'flow' | 'aurora'
+  /**
+   * The kind of scene, not just the palette.
+   *   flow     bent ribbons of light
+   *   aurora   soft vertical curtains
+   *   dunes    layered dunes under a low sun
+   *   peaks    misty mountain ranges receding into haze
+   *   mesh     smooth pools of colour blending together
+   *   contour  a topographic map's contour lines
+   */
+  style: 'flow' | 'aurora' | 'dunes' | 'mesh' | 'contour' | 'peaks'
   /** Seeds the noise so each wallpaper has its own distinct shape. */
   seed: number
   /** True for wallpapers meant to sit under light-mode chrome. */
   light?: boolean
 }
+
+/** Index the shader switches on. */
+const STYLE_INDEX: Record<GeneratedWallpaper['style'], number> = { flow: 0, aurora: 1, dunes: 2, mesh: 3, contour: 4, peaks: 5 }
 
 export const GENERATED_WALLPAPERS: GeneratedWallpaper[] = [
   {
@@ -113,6 +124,74 @@ export const GENERATED_WALLPAPERS: GeneratedWallpaper[] = [
     ribbons: ['#0e8fa8', '#14b8a0', '#2d6ea8', '#4fd4c0'],
     style: 'aurora',
     seed: 5.6,
+  },
+  {
+    id: 'gen:dunes',
+    label: 'Dunes',
+    base: ['#2b1b4a', '#ffb56b'],
+    ribbons: ['#c8697b', '#92486f', '#5e3366', '#2e1d4a'],
+    style: 'dunes',
+    seed: 2.1,
+  },
+  {
+    id: 'gen:sahara',
+    label: 'Sahara',
+    base: ['#8fc4ea', '#ffe3b4'],
+    ribbons: ['#f0c48e', '#e0a56c', '#c98857', '#a86b42'],
+    style: 'dunes',
+    seed: 5.3,
+    light: true,
+  },
+  {
+    id: 'gen:peaks',
+    label: 'Peaks',
+    base: ['#1b2a4a', '#a9c0dc'],
+    ribbons: ['#7f96b9', '#5a7199', '#3b5079', '#202f52'],
+    style: 'peaks',
+    seed: 3.7,
+  },
+  {
+    id: 'gen:alpine',
+    label: 'Alpine',
+    base: ['#f3b9c6', '#fde9d0'],
+    ribbons: ['#d79bb0', '#b17a9c', '#865f8c', '#5a4478'],
+    style: 'peaks',
+    seed: 8.2,
+    light: true,
+  },
+  {
+    id: 'gen:mesh',
+    label: 'Mesh',
+    base: ['#101030', '#201040'],
+    ribbons: ['#ff4d8d', '#7a5cff', '#22d3ee', '#ffb84d'],
+    style: 'mesh',
+    seed: 1.4,
+  },
+  {
+    id: 'gen:candy',
+    label: 'Candy',
+    base: ['#fff1f7', '#eaf4ff'],
+    ribbons: ['#ff9ec4', '#9ec5ff', '#b3f0d2', '#ffd9a0'],
+    style: 'mesh',
+    seed: 6.6,
+    light: true,
+  },
+  {
+    id: 'gen:contour',
+    label: 'Contour',
+    base: ['#04141a', '#062a33'],
+    ribbons: ['#0f6f7a', '#37d6c4', '#1b8f96', '#9af3e6'],
+    style: 'contour',
+    seed: 4.9,
+  },
+  {
+    id: 'gen:topo',
+    label: 'Topo',
+    base: ['#f4efe4', '#e6dfcf'],
+    ribbons: ['#d7c9a8', '#8a6f4d', '#bfae8a', '#5b4630'],
+    style: 'contour',
+    seed: 9.8,
+    light: true,
   },
 ]
 
@@ -199,6 +278,21 @@ float fbm(vec2 p) {
   return sum;
 }
 
+// --- layered ridgelines for the dunes and peaks scenes -------------------
+// Layer 0 is the farthest and highest on the screen; layer 3 is nearest.
+float ridge(float x, float fi, bool peaks, float seed) {
+  float base = 0.60 - fi * 0.135;
+  if (peaks) {
+    // Mountains: noise for the silhouette, plus a folded sine for sharp crests.
+    float n = fbm(vec2(x * 2.4 + fi * 7.3 + seed, fi * 3.1));
+    return base + (n - 0.5) * 0.30 - abs(sin(x * 5.0 + fi * 2.0 + seed)) * 0.04;
+  }
+  // Dunes: smooth overlapping waves with a trace of noise so they are not regular.
+  return base + 0.075 * sin(x * (2.0 + fi * 0.8) + seed + fi * 1.9)
+              + 0.030 * sin(x * (5.5 + fi) + seed * 2.0 + fi)
+              + 0.012 * (fbm(vec2(x * 6.0 + fi * 4.0, fi)) - 0.5);
+}
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uResolution;
   // Correct for aspect so ribbons are not stretched on wide displays.
@@ -226,7 +320,7 @@ void main() {
     col = mix(col, uRibbon2, b2 * 0.62);
     col = mix(col, uRibbon1, b1 * 0.70);
     col = mix(col, uRibbon0, b0 * 0.78);
-  } else {
+  } else if (uStyle == 1) {
     // AURORA: soft vertical curtains, brightest low in the frame and
     // fading upward, the way real aurora does.
     float curtain = fbm(vec2(p.x * 2.2, p.y * 0.7 + q.y * 1.5));
@@ -237,6 +331,57 @@ void main() {
     col = mix(col, uRibbon2, c2 * 0.5);
     col = mix(col, uRibbon1, c1 * 0.55);
     col = mix(col, uRibbon0, c0 * 0.6);
+  } else if (uStyle == 2 || uStyle == 5) {
+    // DUNES / PEAKS: four ridgelines under a low sun, each fading into the
+    // sky with distance (aerial perspective), lit on the side facing the sun.
+    bool peaks = (uStyle == 5);
+    vec3 sky = mix(uBase1, uBase0, smoothstep(0.0, 0.75, uv.y));
+    col = sky;
+    vec2 sunPos = vec2(0.70 + 0.05 * sin(uSeed), 0.66);
+    float sun = exp(-length((uv - sunPos) * vec2(1.0, 1.5)) * 4.2);
+    col += mix(uBase1, vec3(1.0), 0.45) * sun * 0.55;
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      float h = ridge(uv.x, fi, peaks, uSeed);
+      // Which way the surface faces: negative slope descends toward the sun.
+      float slope = (ridge(uv.x + 0.006, fi, peaks, uSeed) - h) / 0.006;
+      float mask = smoothstep(h + 0.0035, h - 0.0035, uv.y);
+      vec3 layer = i == 0 ? uRibbon0 : (i == 1 ? uRibbon1 : (i == 2 ? uRibbon2 : uRibbon3));
+      layer *= 0.72 + clamp(0.5 - slope * 0.9, 0.0, 1.0) * 0.5;
+      // Far layers dissolve into the sky; mist is heavier among mountains.
+      layer = mix(layer, sky, (1.0 - fi / 3.0) * (peaks ? 0.42 : 0.30));
+      // Darker below the crest, so each layer has volume rather than being a cutout.
+      layer = mix(layer, layer * 0.78, clamp((h - uv.y) * 5.0, 0.0, 1.0));
+      col = mix(col, layer, mask);
+    }
+  } else if (uStyle == 3) {
+    // MESH: four pools of colour blended by distance, over a gently warped
+    // plane so the result is not a plain radial pattern.
+    vec2 q = uv + 0.07 * vec2(fbm(uv * 2.2 + uSeed) - 0.5, fbm(uv * 2.2 + uSeed + 7.0) - 0.5);
+    float aspect = uResolution.x / uResolution.y;
+    vec3 acc = vec3(0.0);
+    float wsum = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      vec2 c = clamp(vec2(0.5) + 0.36 * vec2(cos(uSeed * 1.7 + fi * 1.9 + 0.6), sin(uSeed * 1.3 + fi * 2.3)), 0.08, 0.92);
+      float d = distance(q * vec2(aspect, 1.0), c * vec2(aspect, 1.0));
+      float w = exp(-d * d * 5.5);
+      vec3 colr = i == 0 ? uRibbon0 : (i == 1 ? uRibbon1 : (i == 2 ? uRibbon2 : uRibbon3));
+      acc += colr * w;
+      wsum += w;
+    }
+    col = mix(col, acc / max(wsum, 1e-4), smoothstep(0.0, 0.5, wsum) * 0.95);
+  } else if (uStyle == 4) {
+    // CONTOUR: a height field read as a topographic map. Every line is the
+    // same width on screen however steep the terrain, because the width comes
+    // from the field's own screen-space derivative (fwidth).
+    float h = fbm(p * 1.25) * 0.8 + 0.2 * fbm(p * 3.1 + 5.0);
+    col = mix(col, mix(uRibbon0, uRibbon2, smoothstep(0.25, 0.75, h)), 0.45 + 0.35 * h);
+    float level = h * 16.0;
+    float minor = 1.0 - smoothstep(0.0, fwidth(level) * 1.1, abs(fract(level + 0.5) - 0.5));
+    float major = 1.0 - smoothstep(0.0, fwidth(level * 0.25) * 1.5, abs(fract(level * 0.25 + 0.5) - 0.5));
+    col = mix(col, uRibbon1, minor * 0.32);
+    col = mix(col, uRibbon3, major * 0.55);
   }
 
   // --- lighting: one source, upper left ---
@@ -314,7 +459,7 @@ async function paint(def: GeneratedWallpaper, width: number, height: number): Pr
   gl.uniform3fv(u('uRibbon2'), ribbons[2])
   gl.uniform3fv(u('uRibbon3'), ribbons[3])
   gl.uniform1f(u('uSeed'), def.seed)
-  gl.uniform1i(u('uStyle'), def.style === 'aurora' ? 1 : 0)
+  gl.uniform1i(u('uStyle'), STYLE_INDEX[def.style])
 
   gl.viewport(0, 0, width, height)
   gl.drawArrays(gl.TRIANGLES, 0, 3)
@@ -327,6 +472,12 @@ async function paint(def: GeneratedWallpaper, width: number, height: number): Pr
   gl.deleteShader(fs)
 
   const blob = await canvas.convertToBlob({ type: 'image/png' })
+  // Give the context back now. An OffscreenCanvas keeps its WebGL context
+  // alive until it is garbage collected, and browsers cap live contexts at
+  // about sixteen — past that the oldest is silently dropped. The wallpaper
+  // pickers render a dozen-plus thumbnails in a row, so without this the
+  // later ones came out black or the live wallpaper lost its own context.
+  gl.getExtension('WEBGL_lose_context')?.loseContext()
   return URL.createObjectURL(blob)
 }
 

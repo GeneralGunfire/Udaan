@@ -1,5 +1,6 @@
 import { StrictMode, lazy, Suspense, type ComponentType, type ReactNode } from 'react'
 import { MotionRoot } from './os/kernel/MotionRoot'
+import { installDoubleCtrl } from './os/kernel/doubleCtrl'
 import { createRoot } from 'react-dom/client'
 import './styles/theme.css'
 import { ErrorBoundary } from './app/ErrorBoundary'
@@ -43,6 +44,10 @@ const AppWindow = lazy(() => import('./os/app-window/AppWindow').then((m) => ({ 
 
 // Transparent OS windows must not paint the page's opaque background.
 if (kind && kind !== 'app') document.documentElement.setAttribute('data-taskbar-window', '')
+// The switcher's double-tap Ctrl must work while a Udaan window itself has
+// focus (the desktop, every app), where the system-wide hook has not been
+// reliable. See os/kernel/doubleCtrl.
+if (!kind || kind === 'app') installDoubleCtrl()
 // Every shell surface (not app content) is unselectable, like a real OS.
 if (kind !== 'app') document.documentElement.setAttribute('data-shell', '')
 

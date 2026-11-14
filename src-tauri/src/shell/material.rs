@@ -261,10 +261,16 @@ pub fn apply(hwnd: isize, material: Material, tint: u32, dark: bool) -> Applied 
   let b = tint & 0xff;
   let abgr = (a << 24) | (b << 16) | (g << 8) | r;
 
-  // Mica has no legacy equivalent; plain blur-behind is the closest match
-  // and is much cheaper than acrylic for a surface that is always on screen.
-  let want_plain_blur = matches!(material, Material::Mica | Material::MicaAlt);
-  let blurred = apply_legacy_acrylic(hwnd, abgr, want_plain_blur);
+  // Always plain blur-behind on this path, never legacy acrylic.
+  //
+  // This path only runs on Windows 10 and early Windows 11, and legacy
+  // acrylic (ACCENT_ENABLE_ACRYLICBLURBEHIND) is the expensive part of it:
+  // it re-samples and re-blurs the backdrop with a noise layer every time
+  // the window repaints, which on an integrated GPU makes anything that
+  // animates inside the window stutter. Plain blur-behind is a fraction of
+  // the cost and reads as the same material at flyout sizes. Real acrylic is
+  // left to the modern DWM path above, where it is cheap.
+  let blurred = apply_legacy_acrylic(hwnd, abgr, true);
   Applied { blurred, modern: false }
 }
 

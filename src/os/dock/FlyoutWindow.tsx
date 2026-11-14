@@ -147,10 +147,15 @@ export function FlyoutWindow() {
   useEffect(() => {
     const el = contentRef.current
     if (!kind || !el || placement === 'sheet-right') return
-    let frame = 0
+    // Debounced, not per-frame: resizing an OS window is an async IPC chain
+    // (size, monitor, position, set rect) with the compositor re-blurring
+    // behind it, so following content that is mid-animation would resize the
+    // window sixty times a second. Waiting for the size to hold still for a
+    // few frames makes it one resize, after the content has settled.
+    let timer: ReturnType<typeof setTimeout> | undefined
     const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(async () => {
+      clearTimeout(timer)
+      timer = setTimeout(async () => {
         const win = getCurrentWindow()
         const scale = pxScale()
         const height = Math.min(MAX_HEIGHT, el.scrollHeight) + 2
@@ -166,11 +171,11 @@ export function FlyoutWindow() {
         const pos = await win.outerPosition()
         const y = anchor.current.placement === 'above' ? pos.y + size.height - h : pos.y
         await invoke('shell_set_window_rect', { x: pos.x, y, w, h })
-      })
+      }, 70)
     })
     ro.observe(el)
     return () => {
-      cancelAnimationFrame(frame)
+      clearTimeout(timer)
       ro.disconnect()
     }
   }, [kind, placement])

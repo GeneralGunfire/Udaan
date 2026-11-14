@@ -2,13 +2,13 @@ import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { emit } from '@tauri-apps/api/event'
 import { AnimatePresence, motion } from 'framer-motion'
-import { contentEnter } from '@/os/motion/systemMotion'
+import { contentEnter, springs } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 import { cn } from '@/shared/lib/cn'
 import { useTheme } from '@/shared/hooks/useTheme'
 import { useWallpaper } from '@/shared/hooks/useWallpaper'
-import { WALLPAPERS, getWallpaper } from '@/app/wallpapers'
-import { GENERATED_WALLPAPERS } from '@/os/desktop/generatedWallpapers'
+import { getWallpaper } from '@/app/wallpapers'
+import { WallpaperGallery } from '@/os/ui/WallpaperGallery'
 import { GeneratedThumb, SOLID_COLOURS } from '@/os/ui/WallpaperThumb'
 import { TrashIcon, CheckIcon } from '@/shared/icons'
 import { ShellSafetyPanel } from '@/shared/components/ShellSafetyPanel'
@@ -127,39 +127,7 @@ function Personalization() {
 
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Background</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {GENERATED_WALLPAPERS.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              onClick={() => setWallpaperId(w.id)}
-              className={cn(
-                'relative aspect-[16/10] overflow-hidden rounded-[var(--os-radius-control)] border-2 transition-colors',
-                wallpaperId === w.id ? 'border-[var(--color-accent)]' : 'border-transparent hover:border-[var(--border-strong)]',
-              )}
-              title={w.label}
-            >
-              <GeneratedThumb id={w.id} />
-              <span className="absolute bottom-1.5 left-2 text-[11px] font-medium text-[var(--color-text-primary)] drop-shadow">{w.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {WALLPAPERS.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              onClick={() => setWallpaperId(w.id)}
-              className={cn(
-                'relative aspect-[16/10] overflow-hidden rounded-[var(--os-radius-control)] border-2 transition-colors',
-                wallpaperId === w.id ? 'border-[var(--color-accent)]' : 'border-transparent hover:border-[var(--border-strong)]',
-              )}
-              title={w.label}
-            >
-              <img src={w.src} alt={w.label} className="h-full w-full object-cover" />
-            </button>
-          ))}
-        </div>
+        <WallpaperGallery value={wallpaperId} onChange={setWallpaperId} columns={3} />
         <Row title="Choose a photo" description="Use any picture on this PC as your desktop background.">
           <button type="button" onClick={() => void browse()} className="rounded-[var(--os-radius-control)] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
             Browse photos
@@ -603,10 +571,23 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
                   aria-current={active ? 'page' : undefined}
                   onClick={() => pick(id)}
                   className={cn(
-                    'flex h-9 items-center gap-2.5 rounded-[var(--os-radius-control)] px-2 text-left text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/60',
-                    active ? 'bg-[var(--color-accent)] font-medium text-[var(--color-accent-contrast)]' : 'text-[var(--color-text-primary)] hover:bg-(--os-hover)',
+                    'relative isolate flex h-9 items-center gap-2.5 rounded-(--os-radius-control) px-2 text-left text-[13px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-accent/60',
+                    active ? 'font-medium text-(--color-accent-contrast)' : 'text-(--color-text-primary) hover:bg-(--os-hover)',
                   )}
                 >
+                  {/* The selection slides between items instead of cutting.
+                      A shared layoutId means Framer moves one element
+                      rather than cross-fading two, which is what makes the
+                      list read as a single control with a position. */}
+                  {active && (
+                    <motion.span
+                      layoutId={reduced ? undefined : 'settings-nav-selection'}
+                      aria-hidden
+                      className="absolute inset-0 -z-10 rounded-(--os-radius-control) bg-accent"
+                      style={{ boxShadow: 'var(--os-edge), var(--os-shadow-sm)' }}
+                      transition={springs.standard}
+                    />
+                  )}
                   <IconTile icon={icon} />
                   <span className="truncate">{label}</span>
                 </button>

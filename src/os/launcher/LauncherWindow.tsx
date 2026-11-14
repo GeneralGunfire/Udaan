@@ -72,6 +72,8 @@ export function LauncherWindow() {
     }
   }, [])
 
+  const lastSwitcherRequest = useRef(0)
+
   const present = useCallback(async (next: Exclude<Mode, 'idle'>) => {
     // Nothing but unlocking takes the place of the lock screen.
     if (modeRef.current === 'lock' && next !== 'lock') return
@@ -170,6 +172,13 @@ export function LauncherWindow() {
           setExpose({ title: 'All windows', handles: null })
           void present('expose')
         } else if (id === 'switcher-ctrl') {
+          // The system-wide hook and the in-window detector (os/kernel/
+          // doubleCtrl) can both report the same double-tap. Take the first
+          // and ignore any other that follows within the time it takes a
+          // person to tap again, or they would open and then close it.
+          const at = performance.now()
+          if (at - lastSwitcherRequest.current < 700) return
+          lastSwitcherRequest.current = at
           // Double-tap Ctrl: open the switcher from anywhere, and again to close it.
           if (modeRef.current === 'switcher') return dismiss()
           if (modeRef.current !== 'idle' && modeRef.current !== 'launchpad') return

@@ -32,7 +32,7 @@ import {
   ExplorerIcon,
   TerminalIcon,
 } from '@/shared/icons'
-import { inTauri, onHotkey, openApp, shell } from '@/os/kernel/shell'
+import { inTauri, onHotkey, openApp, shell, useShell } from '@/os/kernel/shell'
 import { applyStartupPrefs } from '@/os/kernel/session'
 import { usePref } from '@/os/kernel/prefs'
 import { dockZone } from '@/os/dock/geometry'
@@ -79,6 +79,12 @@ export function Desktop() {
   const viewport = useViewport()
   const [dockAutoHide] = usePref('dock.autoHide')
   const dockZonePx = dockAutoHide ? 12 : dockZone()
+  // A live wallpaper only earns its GPU time while it can be seen. Stop it
+  // when a full-screen window is up, or any visible window is maximized
+  // (which covers the desktop below the menu bar). Selecting a primitive
+  // from the store, not the window list, so this does not re-render on every
+  // title change.
+  const wallpaperCovered = useShell((s) => s.fullscreen || s.windows.some((w) => w.isMaximized && !w.isMinimized))
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [pendingRenamePath, setPendingRenamePath] = useState<string | null>(null)
@@ -276,7 +282,7 @@ export function Desktop() {
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden" onKeyDown={onKeyDown}>
-      <Wallpaper />
+      <Wallpaper animated covered={wallpaperCovered} />
       <ContextMenu
         onOpenChange={(open) => {
           if (open) shell.clipboardGetFiles().then((c) => setClipboardHasFiles(c.paths.length > 0), () => setClipboardHasFiles(false))

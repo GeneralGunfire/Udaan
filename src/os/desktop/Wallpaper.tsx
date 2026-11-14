@@ -21,7 +21,21 @@ import { LiveWallpaperCanvas } from './LiveWallpaperCanvas'
  * black before its wallpaper appears looks broken in a way the wallpaper
  * itself can never make up for.
  */
-export const Wallpaper = memo(function Wallpaper({ dim = 0, covered = false }: { dim?: number; covered?: boolean }) {
+export const Wallpaper = memo(function Wallpaper({
+  dim = 0,
+  covered = false,
+  animated = false,
+}: {
+  dim?: number
+  /** Something opaque is on top of the whole desktop: stop animating. */
+  covered?: boolean
+  /**
+   * Run the live shader. Off by default, so only a surface that asks for it
+   * pays for a GL context and a 30fps loop. The lock screen, screensaver and
+   * window switcher all draw this component too; they show the static frame.
+   */
+  animated?: boolean
+}) {
   const { wallpaperId } = useWallpaper()
   const live = useMemo(() => (isLive(wallpaperId) ? liveWallpaper(wallpaperId) : null), [wallpaperId])
   // A live wallpaper shows its own fallback scene beneath the canvas.
@@ -73,7 +87,7 @@ export const Wallpaper = memo(function Wallpaper({ dim = 0, covered = false }: {
           className="absolute inset-0 h-full w-full select-none object-cover"
         />
       )}
-      {live && !liveFailed && (
+      {live && animated && !liveFailed && (
         // Fades in over the static fallback once the first frames land, so
         // there is never a visible swap between the two.
         <motion.div

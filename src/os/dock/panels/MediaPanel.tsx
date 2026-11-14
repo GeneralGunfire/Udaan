@@ -1,7 +1,11 @@
+import { AnimatePresence, motion } from 'framer-motion'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { openApp } from '@/os/kernel/shell'
 import { formatClock, useNowPlaying } from './useNowPlaying'
+import { Slider } from '@/os/ui/controls'
+import { springs } from '@/os/motion/systemMotion'
+import { prefersReducedMotion } from '@/shared/lib/motion'
 
 export interface NowPlaying {
   title: string
@@ -47,22 +51,39 @@ const PATHS = {
 }
 
 function Control({ label, path, onClick, disabled, big }: { label: string; path: string; onClick: () => void; disabled?: boolean; big?: boolean }) {
+  const reduced = prefersReducedMotion()
   return (
-    <button
+    <motion.button
       type="button"
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
+      whileHover={reduced || disabled ? undefined : { scale: big ? 1.07 : 1.1 }}
+      whileTap={reduced || disabled ? undefined : { scale: 0.9 }}
+      transition={springs.snap}
       className={
         big
-          ? 'flex h-12 w-12 items-center justify-center rounded-full bg-(--os-text) text-[var(--surface-base)] transition-transform hover:scale-105 active:scale-95'
-          : 'flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover) active:scale-95 disabled:opacity-30'
+          ? 'flex h-12 w-12 items-center justify-center rounded-full bg-(--os-text) text-(--surface-base) shadow-(--os-shadow-md)'
+          : 'flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-(--os-hover) disabled:opacity-30'
       }
     >
-      <svg viewBox="0 0 24 24" width={big ? 22 : 18} height={big ? 22 : 18} fill="currentColor">
-        <path d={path} />
-      </svg>
-    </button>
+      {/* The glyph crossfades between play and pause rather than swapping. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.svg
+          key={path}
+          viewBox="0 0 24 24"
+          width={big ? 22 : 18}
+          height={big ? 22 : 18}
+          fill="currentColor"
+          initial={reduced ? false : { opacity: 0, scale: 0.6, rotate: -20 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          exit={reduced ? undefined : { opacity: 0, scale: 0.6, rotate: 20 }}
+          transition={{ duration: 0.12 }}
+        >
+          <path d={path} />
+        </motion.svg>
+      </AnimatePresence>
+    </motion.button>
   )
 }
 
@@ -79,9 +100,27 @@ export function Artwork({ m, size, radius = 12 }: { m: NowPlaying; size: number;
   )
 }
 
+/** Four bars that dance while playing and rest flat when paused. */
+function Bars({ playing }: { playing: boolean }) {
+  return (
+    <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+      {[0, 1, 2, 3].map((i) => (
+        <motion.span
+          key={i}
+          className="w-[2.5px] origin-bottom rounded-full bg-accent"
+          style={{ height: 12 }}
+          animate={playing ? { scaleY: [0.25, 1, 0.45, 0.85, 0.25] } : { scaleY: 0.25 }}
+          transition={playing ? { duration: 1 + i * 0.13, repeat: Infinity, ease: 'easeInOut', delay: i * 0.09 } : { duration: 0.25 }}
+        />
+      ))}
+    </span>
+  )
+}
+
 /** Now Playing for whatever app is playing media, anywhere on the system. */
 export function MediaPanel() {
   const { media: m, loaded, positionMs, pin } = useNowPlaying(1000)
+  const reduced = prefersReducedMotion()
 
   if (loaded && !m) {
     return (
@@ -94,37 +133,61 @@ export function MediaPanel() {
   if (!m) return <div className="h-40" />
 
   const hasTimeline = m.durationMs != null && positionMs != null
-  const pct = hasTimeline ? (positionMs! / m.durationMs!) * 100 : 0
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="relative isolate flex flex-col gap-4 overflow-hidden p-4">
+      {/* The album art, enlarged and blurred behind everything, so the panel
+          takes on the colour of what is playing. Static, so it costs nothing
+          after the first paint. */}
+      {m.thumbnail && (
+        <motion.img
+          key={m.thumbnail}
+          src={m.thumbnail}
+          alt=""
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.38 }}
+          transition={{ duration: 0.6 }}
+          className="pointer-events-none absolute -inset-10 -z-10 h-[140%] w-[140%] max-w-none object-cover"
+          style={{ filter: 'blur(36px) saturate(1.5)' }}
+        />
+      )}
+
       <div className="flex w-full items-center gap-3.5">
-        <Artwork m={m} size={72} />
+        {/* Artwork swells while playing and settles back when paused. */}
+        <motion.div animate={{ scale: m.playing ? 1 : 0.92, opacity: m.playing ? 1 : 0.85 }} transition={reduced ? { duration: 0 } : springs.settle}>
+          <Artwork m={m} size={72} />
+        </motion.div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold" title={m.title}>
-            {m.title}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={m.title + m.artist} initial={reduced ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -5 }} transition={{ duration: 0.16 }}>
+              <p className="truncate text-[15px] font-semibold" title={m.title}>
+                {m.title}
+              </p>
+              <p className="truncate text-[13px] text-(--os-text-dim)">{m.artist || m.album || 'Unknown artist'}</p>
+            </motion.div>
+          </AnimatePresence>
+          <p className="mt-0.5 flex items-center gap-2 truncate text-[11.5px] text-(--os-text-dim) opacity-80">
+            <Bars playing={m.playing} />
+            {sourceName(m.source)}
           </p>
-          <p className="truncate text-[13px] text-(--os-text-dim)">{m.artist || m.album || 'Unknown artist'}</p>
-          <p className="truncate text-[11.5px] text-(--os-text-dim) opacity-75">{sourceName(m.source)}</p>
         </div>
       </div>
 
       {hasTimeline && (
         <div className="flex items-center gap-2.5">
           <span className="w-9 text-right text-[11.5px] tabular-nums text-(--os-text-dim)">{formatClock(positionMs!)}</span>
-          <input
-            type="range"
+          <Slider
+            className="flex-1"
             min={0}
             max={m.durationMs!}
             step={1000}
             value={positionMs!}
             disabled={!m.canSeek}
             aria-label="Seek"
-            onChange={(e) => pin(Number(e.target.value))}
-            onPointerUp={(e) => void seekMedia(Number((e.target as HTMLInputElement).value))}
+            onChange={(v) => pin(v)}
+            onCommit={(v) => void seekMedia(v)}
             onKeyUp={(e) => void seekMedia(Number((e.target as HTMLInputElement).value))}
-            className="os-slider flex-1"
-            style={{ ['--fill' as string]: `${pct}%` }}
           />
           <span className="w-9 text-[11.5px] tabular-nums text-(--os-text-dim)">{formatClock(m.durationMs!)}</span>
         </div>
@@ -136,10 +199,11 @@ export function MediaPanel() {
         <Control label="Next" path={PATHS.next} disabled={!m.canNext} onClick={() => void mediaCommand('next')} />
       </div>
 
-      <button
+      <motion.button
         type="button"
         onClick={openLiveDj}
-        className="flex items-center justify-center gap-2 rounded-[10px] bg-(--os-hover) py-2 text-[13px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
+        whileTap={reduced ? undefined : { scale: 0.98 }}
+        className="flex items-center justify-center gap-2 rounded-[10px] bg-(--os-hover) py-2 text-[13px] font-medium transition-colors hover:bg-(--os-active)"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="8.5" />
@@ -147,7 +211,7 @@ export function MediaPanel() {
           <path d="M12 3.5v3M20.5 12h-3" />
         </svg>
         Mix this live in the DJ board
-      </button>
+      </motion.button>
     </div>
   )
 }
