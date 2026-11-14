@@ -291,6 +291,9 @@ struct Saved {
   history: Vec<String>,
   #[serde(default)]
   last_change_ms: i64,
+  /// How individual pictures are placed on the screen (by wallpaper id).
+  #[serde(default)]
+  fits: HashMap<String, wallpapers::FitSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -555,6 +558,7 @@ pub struct Library {
   pub current: Option<String>,
   pub rotation: Rotation,
   pub folders: Vec<String>,
+  pub fits: HashMap<String, wallpapers::FitSpec>,
 }
 
 /// The library, its packs, and the current rotation settings.
@@ -572,7 +576,8 @@ pub fn wallpaper_library() -> Result<Library, String> {
     unplaced,
     current: g.current,
     rotation: g.rotation.unwrap_or_default(),
-    folders: if g.folders.is_empty() { default_folders() } else { g.folders },
+    folders: if g.folders.is_empty() { default_folders() } else { g.folders.clone() },
+    fits: g.fits.clone(),
   })
 }
 
@@ -636,6 +641,56 @@ pub fn wallpaper_set(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command(async)]
 pub fn wallpaper_step(app: AppHandle, forward: bool) -> Result<Option<String>, String> {
   Ok(advance(&app, service()?, forward))
+}
+
+/// The picture for this screen: placed per its saved fit (or automatically), at exactly
+/// `width` x `height` pixels. Returns the file to draw.
+#[tauri::command(async)]
+pub fn wallpaper_render(path: String, width: u32, height: u32) -> Result<String, String> {
+  let s = service()?;
+  let spec = s.saved.lock().map_err(|e| e.to_string())?.fits.get(&format!("file:{path}")).copied().unwrap_or_default();
+  let cache = wallpapers::cache_path().ok_or("no cache folder")?;
+  wallpapers::render(&cache, Path::new(&path), width.max(16), height.max(16), &spec).map(|p| p.to_string_lossy().to_string())
+}
+
+/// Sets (or clears, with `None`) how one picture is placed, and refreshes the desktop if it is showing.
+#[tauri::command(async)]
+pub fn wallpaper_fit_set(app: AppHandle, id: String, spec: Option<wallpapers::FitSpec>) -> Result<(), String> {
+  let s = service()?;
+  let current = {
+    let mut g = s.saved.lock().map_err(|e| e.to_string())?;
+    match spec {
+      Some(sp) => {
+        g.fits.insert(id.clone(), sp);
+      }
+      None => {
+        g.fits.remove(&id);
+      }
+    }
+    g.current.clone()
+  };
+  save(s);
+  if current.as_deref() == Some(id.as_str()) {
+    let _ = app.emit("wallpaper://changed", &id);
+  }
+  Ok(())
+}
+
+/// Renders every picture for this screen ahead of time, so changing wallpaper is instant.
+#[tauri::command(async)]
+pub fn wallpaper_prerender(width: u32, height: u32) -> Result<usize, String> {
+  let s = service()?;
+  let items = library(s);
+  let fits = s.saved.lock().map_err(|e| e.to_string())?.fits.clone();
+  let cache = wallpapers::cache_path().ok_or("no cache folder")?;
+  let mut n = 0;
+  for it in items {
+    let spec = fits.get(&it.info.id).copied().unwrap_or_default();
+    if wallpapers::render(&cache, Path::new(&it.info.path), width.max(16), height.max(16), &spec).is_ok() {
+      n += 1;
+    }
+  }
+  Ok(n)
 }
 
 /// The wallpaper the engine considers current.

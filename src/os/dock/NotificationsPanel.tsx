@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { BellIcon, WindowCloseIcon } from '@/shared/icons'
+import { BellIcon } from '@/shared/icons'
 import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification, onNotificationsChanged, type Notification } from '@/integrations/notifications/client'
 import { launchApp } from '@/integrations/installed-apps/client'
 import { usePref } from '@/os/kernel/prefs'
 import { isAppId } from '@/os/kernel/registry'
 import { openApp } from '@/os/kernel/shell'
 import { NotificationIcon, notificationSource, windowsExtra } from '@/os/ui/NotificationIcon'
+import { Button } from '@/os/ui/controls'
+import { cn } from '@/shared/lib/cn'
 
 function ago(iso: string): string {
   const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
@@ -16,7 +17,7 @@ function ago(iso: string): string {
   return h < 24 ? `${h}h` : `${Math.round(h / 24)}d`
 }
 
-/** Notification Centre: grouped by app, newest first, click to open, × to clear. */
+/** Notification Centre: grouped by app, newest first. Click opens the sender, the cross clears it. */
 export function NotificationsPanel() {
   const [items, setItems] = useState<Notification[] | null>(null)
   const [dnd, setDnd] = usePref('notifications.dnd')
@@ -42,87 +43,70 @@ export function NotificationsPanel() {
   const open = (n: Notification) => {
     void markNotificationRead(n.id)
     const extra = windowsExtra(n)
-    if (extra?.launch) {
-      void launchApp(extra.launch)
-      return
-    }
-    // A notification from one of Udaan's own apps opens that app —
-    // previously only Windows app launches were handled, so clicking e.g.
-    // a Scholar study reminder marked it read and did nothing else, which
-    // reads as a dead control.
-    if (isAppId(n.sourceApp)) void openApp(n.sourceApp)
+    if (extra?.launch) void launchApp(extra.launch)
+    else if (isAppId(n.sourceApp)) void openApp(n.sourceApp)
   }
   const clearAll = () => void Promise.all((items ?? []).map((n) => dismissNotification(n.id))).then(reload)
 
   return (
-    <div className="flex max-h-[600px] flex-col text-(--os-text)">
-      <header className="flex items-center gap-2 px-4 pb-2 pt-3.5">
-        <h2 className="flex-1 text-[15px] font-semibold">Notifications</h2>
-        <button
-          type="button"
-          onClick={() => void setDnd(!dnd)}
-          className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${dnd ? 'bg-[#bf5af2] text-white' : 'bg-(--os-hover) text-(--os-text-dim) hover:bg-[var(--surface-hover)]'}`}
-        >
+    <div className="flex h-full max-h-[600px] flex-col">
+      <header className="flex items-center gap-2 px-4 pb-2 pt-4">
+        <h2 className="flex-1 text-[16px] font-semibold">Notifications</h2>
+        <Button size="sm" variant={dnd ? 'primary' : 'tinted'} aria-pressed={!!dnd} onClick={() => void setDnd(!dnd)}>
           {dnd ? 'Do not disturb: on' : 'Do not disturb'}
-        </button>
+        </Button>
         {!!items?.length && (
-          <button type="button" onClick={clearAll} className="rounded-full bg-(--os-hover) px-2.5 py-1 text-[11.5px] font-medium text-(--os-text-dim) hover:bg-[var(--surface-hover)]">
+          <Button size="sm" variant="tinted" onClick={clearAll}>
             Clear all
-          </button>
+          </Button>
         )}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <div className="u-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {items === null ? null : items.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-(--os-hover) text-(--os-text-dim)">
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-(--u-wash-on) text-(--u-ink-2)">
               <BellIcon width={20} height={20} />
             </span>
-            <p className="text-[13.5px] text-(--os-text-dim)">You're all caught up</p>
+            <p className="text-[13.5px] text-(--u-ink-3)">You're all caught up</p>
           </div>
         ) : (
           groups.map(([source, list]) => (
             <section key={source} className="mt-2">
-              <p className="flex items-center gap-2 px-1 pb-1.5 text-[12px] font-semibold text-(--os-text-dim)">
+              <p className="flex items-center gap-2 px-1 pb-1.5 text-[12px] font-semibold text-(--u-ink-2)">
                 <NotificationIcon n={list[0]} size={20} />
                 {notificationSource(list[0])}
               </p>
-              <AnimatePresence initial={false}>
-                {list.map((n) => {
-                  const extra = windowsExtra(n)
-                  return (
-                    <motion.div
-                      key={n.id}
-                      layout
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: 40, transition: { duration: 0.15 } }}
-                      onClick={() => open(n)}
-                      className={`group relative mb-1.5 flex cursor-default gap-3 rounded-[12px] border border-[var(--border-hairline)] p-3 transition-colors hover:bg-(--os-hover) ${n.readAt ? 'bg-transparent' : 'bg-(--os-hover)'}`}
-                    >
-                      {extra?.image && <img src={extra.image} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2 pr-5">
-                          <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{n.title}</p>
-                          <span className="shrink-0 text-[11px] tabular-nums text-(--os-text-dim)">{ago(n.createdAt)}</span>
-                        </div>
-                        {n.body && <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-[12.5px] leading-snug text-(--os-text-dim)">{n.body}</p>}
+              {list.map((n) => {
+                const extra = windowsExtra(n)
+                return (
+                  <div key={n.id} role="button" tabIndex={0} onClick={() => open(n)} onKeyDown={(e) => e.key === 'Enter' && open(n)} className={cn('u-surface--card group relative mb-1.5 flex gap-3 p-3 hover:brightness-110', n.readAt && 'opacity-80')}>
+                    {extra?.image && <img src={extra.image} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />}
+                    <div className="min-w-0 flex-1 pr-5">
+                      <div className="flex items-baseline gap-2">
+                        <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{n.title}</p>
+                        <span className="shrink-0 text-[11px] tabular-nums text-(--u-ink-3)">{ago(n.createdAt)}</span>
                       </div>
-                      <button
-                        type="button"
-                        aria-label="Clear"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void dismissNotification(n.id).then(reload)
-                        }}
-                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-(--os-hover) opacity-0 transition-opacity hover:bg-[var(--surface-hover)] group-hover:opacity-100"
-                      >
-                        <WindowCloseIcon width={9} height={9} />
-                      </button>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
+                      {n.body && <p className="mt-0.5 line-clamp-3 whitespace-pre-line text-[12.5px] leading-snug text-(--u-ink-2)">{n.body}</p>}
+                    </div>
+                    <Button
+                      icon
+                      size="sm"
+                      pill
+                      aria-label="Clear"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void dismissNotification(n.id).then(reload)
+                      }}
+                      className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+                      </svg>
+                    </Button>
+                  </div>
+                )
+              })}
             </section>
           ))
         )}

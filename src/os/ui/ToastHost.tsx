@@ -15,7 +15,7 @@ export function ToastHost({ bottomOffset }: { bottomOffset: number }) {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0, transition: { duration: dur.normal, ease: curve.decelerate } }}
             exit={{ opacity: 0, x: 40, transition: { duration: dur.fast, ease: curve.accelerate } }}
-            className="os-acrylic pointer-events-auto rounded-[var(--os-radius-overlay)] px-4 py-3"
+            className="u-surface pointer-events-auto rounded-[18px] px-4 py-3"
             onClick={() => dismissToast(t.id)}
           >
             <p className={t.tone === 'error' ? 'text-[13px] font-semibold text-[var(--color-danger)]' : 'text-[13px] font-semibold text-(--os-text)'}>

@@ -173,6 +173,9 @@ fn policy_for(label: &str) -> Policy {
     // collapsed card and sized its window wrong (popups took ~1 s to settle instead of
     // ~250 ms). It is also a tiny window, so quieting it saves almost nothing.
     "taskbar-popup" => Policy::Never,
+    // The desktop is never hidden: a hidden webview repaints blank when shown again, which made the
+    // wallpaper vanish whenever a window moved over it. It is a static picture and costs nothing idle.
+    "main" => Policy::Never,
     "launcher" | "edgelight" => Policy::FromStart,
     _ => Policy::AfterFirstShow,
   }

@@ -15,7 +15,7 @@ export type FlyoutPlacement = 'above' | 'below' | 'sheet-right' | 'point'
 /** The menu bar's own button-triggered panels — excludes 'context-menu',
  * which is opened ad hoc (dock icons, widgets) rather than from a
  * persistent menu-bar button with its own ref. */
-export type PanelKind = 'notifications-panel' | 'calendar' | 'layouts' | 'network' | 'sound' | 'media' | 'edgelight'
+export type PanelKind = 'notifications-panel' | 'calendar' | 'layouts' | 'network' | 'sound' | 'media'
 
 export type FlyoutKind = PanelKind | 'context-menu'
 

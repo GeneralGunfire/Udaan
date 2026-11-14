@@ -32,7 +32,7 @@ export function Tips({ onClose }: { onClose: () => void }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-        className="w-[560px] overflow-hidden rounded-[18px] border border-[var(--os-acrylic-border)] bg-[var(--os-acrylic)] text-(--os-text) shadow-[0_30px_80px_rgb(0_0_0/0.5)]"
+        className="w-[560px] overflow-hidden rounded-[18px] u-surface"
       >
         <div className="flex h-44 items-center justify-center bg-gradient-to-br from-[#23324d] to-[#191a1f] text-[64px]">
           <AnimatePresence mode="wait">

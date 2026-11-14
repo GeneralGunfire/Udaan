@@ -107,10 +107,18 @@ export function Desktop() {
     // permanently costing memory for apps that go unused this session —
     // deliberately NOT the whole pinned list, since this machine is low
     // on RAM (see memory: udaan-runs-release-build).
+    // Render every wallpaper for this exact screen in the background so changing it is instant.
+    const pre = setTimeout(() => {
+      const dpr = window.devicePixelRatio || 1
+      void invoke('wallpaper_prerender', { width: Math.round(window.screen.width * dpr), height: Math.round(window.screen.height * dpr) }).catch(() => {})
+    }, 6000)
     const t = setTimeout(() => {
       void invoke('shell_prewarm_apps', { appIds: ['settings', 'file-explorer'] }).catch((err) => console.error('[shell] prewarm failed', err))
     }, 4000)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      clearTimeout(pre)
+    }
   }, [])
 
   // A freshly created folder/document enters rename mode once it shows up

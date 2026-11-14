@@ -211,7 +211,7 @@ function Viewer({ photo, onClose, onPrev, onNext, onDeleted }: { photo: Photo; o
                   <span className="flex justify-between">
                     {k === 'saturate' ? 'Saturation' : k} <span className="tabular-nums">{adjust[k]}%</span>
                   </span>
-                  <input type="range" min={20} max={200} value={adjust[k]} onChange={(e) => setAdjust((a) => ({ ...a, [k]: Number(e.target.value) }))} className="os-slider mt-1 w-full" />
+                  <input type="range" min={20} max={200} value={adjust[k]} onChange={(e) => setAdjust((a) => ({ ...a, [k]: Number(e.target.value) }))} className="u-range mt-1 w-full" />
                 </label>
               ))}
               <button type="button" onClick={() => setAdjust({ brightness: 100, contrast: 100, saturate: 100 })} className="text-[12.5px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]">

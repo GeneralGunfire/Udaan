@@ -36,7 +36,7 @@ export function SnapLayouts({ onDone, onMaximize }: { onDone: () => void; onMaxi
   return (
     <motion.div
       {...flyoutMotion}
-      className="os-acrylic absolute left-2 top-11 z-50 w-[292px] rounded-[var(--os-radius-overlay)] p-2.5"
+      className="u-surface absolute left-2 top-11 z-50 w-[292px] rounded-[18px] p-2.5"
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="grid grid-cols-3 gap-2.5">

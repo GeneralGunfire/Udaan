@@ -642,7 +642,7 @@ function MediaCentre({ np, volume, muted, onVolume, onMute }: { np: NowPlaying |
           {muted ? <path fill="none" d="M15.5 9.5l5 5M20.5 9.5l-5 5" /> : <path fill="none" d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11" />}
         </svg>
       </MediaButton>
-      {volume !== null && <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : volume} onChange={(e) => onVolume(Number(e.target.value))} aria-label="Volume" className="os-slider mr-1.5 w-20" />}
+      {volume !== null && <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : volume} onChange={(e) => onVolume(Number(e.target.value))} aria-label="Volume" className="u-range mr-1.5 w-20" />}
     </div>
   )
 }

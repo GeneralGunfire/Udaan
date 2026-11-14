@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { WallpaperContext } from '@/shared/hooks/useWallpaper'
-import { DEFAULT_WALLPAPER_ID, isValidWallpaperId } from './wallpapers'
+import { isValidWallpaperId } from './wallpapers'
 
 const STORAGE_KEY = 'udaan-wallpaper'
 
@@ -12,48 +13,64 @@ function readStored(): string {
   } catch {
     // localStorage can throw in a locked-down webview context.
   }
-  return DEFAULT_WALLPAPER_ID
+  return ''
 }
 
+const remember = (id: string) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, id)
+  } catch {
+    // Best-effort persistence only.
+  }
+}
+
+const inTauri = () => '__TAURI_INTERNALS__' in window
+
 /**
- * All Udaan windows share one WebView2 profile, so localStorage is shared
- * and its `storage` event keeps the desktop, launcher and Settings app in
- * sync when any of them changes the wallpaper.
+ * Every window shows the same wallpaper. The ENGINE owns which one is current (it rotates them,
+ * remembers them across restarts) and announces `wallpaper://changed`; this follows it. A solid
+ * colour is the one choice the engine does not track, so that stays local.
  */
 export function WallpaperProvider({ children }: PropsWithChildren) {
   const [wallpaperId, setWallpaperIdState] = useState<string>(readStored)
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) setWallpaperIdState(readStored())
-    }
+    const onStorage = (e: StorageEvent) => e.key === STORAGE_KEY && setWallpaperIdState(readStored())
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // The engine changes the wallpaper by itself (rotation, packs, next/previous). Follow it, and keep
-  // the stored copy in step so a window opened later starts from the right one.
   useEffect(() => {
-    if (!('__TAURI_INTERNALS__' in window)) return
+    if (!inTauri()) return
+    // Start from what the engine says is current; with nothing chosen yet, take the first picture.
+    void invoke<string | null>('wallpaper_current').then(async (id) => {
+      if (id && isValidWallpaperId(id)) {
+        if (!readStored().startsWith('color:')) {
+          setWallpaperIdState(id)
+          remember(id)
+        }
+        return
+      }
+      if (readStored()) return
+      const lib = await invoke<{ items: { id: string }[] }>('wallpaper_library').catch(() => null)
+      const first = lib?.items[0]?.id
+      if (first) void invoke('wallpaper_set', { id: first })
+    }, () => {})
     const un = listen<string>('wallpaper://changed', (e) => {
       if (!isValidWallpaperId(e.payload)) return
       setWallpaperIdState(e.payload)
-      try {
-        localStorage.setItem(STORAGE_KEY, e.payload)
-      } catch {
-        // Best-effort persistence only.
-      }
+      remember(e.payload)
     })
     return () => void un.then((fn) => fn())
   }, [])
 
   const setWallpaperId = useCallback((id: string) => {
-    setWallpaperIdState(id)
-    try {
-      localStorage.setItem(STORAGE_KEY, id)
-    } catch {
-      // Best-effort persistence only.
+    if (id.startsWith('file:') && inTauri()) {
+      void invoke('wallpaper_set', { id }).catch(() => {})
+      return
     }
+    setWallpaperIdState(id)
+    remember(id)
   }, [])
 
   return <WallpaperContext.Provider value={{ wallpaperId, setWallpaperId }}>{children}</WallpaperContext.Provider>

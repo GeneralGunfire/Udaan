@@ -108,7 +108,7 @@ export async function addWidget(kind: WidgetKind) {
 export function Tile({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`os-widget-material os-sheen h-full w-full overflow-hidden rounded-(--os-radius-widget) p-4 text-(--os-text) ${className}`}
+      className={`u-surface u-surface--card h-full w-full overflow-hidden rounded-[18px] p-4 text-(--os-text) ${className}`}
     >
       {children}
     </div>

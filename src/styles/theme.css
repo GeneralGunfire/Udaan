@@ -3,6 +3,7 @@
 @import './logo-font.css';
 @import './tokens.css';
 @import './os.css';
+@import '../ui/ui.css';
 
 /* Map design tokens into Tailwind v4's theme so utilities like
    bg-glass, text-accent-work, rounded-panel, font-display are generated. */

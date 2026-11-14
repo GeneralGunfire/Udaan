@@ -338,7 +338,7 @@ export function Viewer3DApp({ initialPath }: { onClose: () => void; initialPath?
         {dropping && <div className="pointer-events-none absolute inset-3 rounded-[12px] border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-accent)]/10" />}
 
         {info && (
-          <div className="os-acrylic absolute right-3 top-3 w-60 rounded-[12px] p-3 text-[12px]">
+          <div className="u-surface absolute right-3 top-3 w-60 rounded-[12px] p-3 text-[12px]">
             <p className="mb-2 truncate text-[13px] font-semibold">{info.name}</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-(--os-text-dim)">
               <dt>Size</dt>

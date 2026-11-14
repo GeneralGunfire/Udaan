@@ -1,16 +1,12 @@
 import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { emit } from '@tauri-apps/api/event'
 import { AnimatePresence, motion } from 'framer-motion'
 import { contentEnter, springs } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 import { cn } from '@/shared/lib/cn'
+import { WallpaperBrowser } from '@/os/wallpaper/WallpaperBrowser'
 import { useTheme } from '@/shared/hooks/useTheme'
-import { useWallpaper } from '@/shared/hooks/useWallpaper'
-import { getWallpaper } from '@/app/wallpapers'
-import { WallpaperGallery } from '@/os/ui/WallpaperGallery'
-import { GeneratedThumb, SOLID_COLOURS } from '@/os/ui/WallpaperThumb'
-import { TrashIcon, CheckIcon } from '@/shared/icons'
+import { TrashIcon } from '@/shared/icons'
 import { ShellSafetyPanel } from '@/shared/components/ShellSafetyPanel'
 import { setWindowWatcherEnabled } from '@/integrations/window-watcher/client'
 import { usePref, type BoolPrefKey, type CornerAction, type CORNER_KEYS } from '@/os/kernel/prefs'
@@ -110,61 +106,13 @@ function PrefToggleRow({ title, description, pref, onApply }: { title: string; d
 
 function Personalization() {
   const { theme, toggleTheme } = useTheme()
-  const { wallpaperId, setWallpaperId } = useWallpaper()
-  const current = getWallpaper(wallpaperId)
-
-  async function browse() {
-    const picked = await openDialog({ multiple: false, filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'] }] })
-    if (typeof picked === 'string') setWallpaperId(`file:${picked}`)
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="relative aspect-[16/9] w-full max-w-[520px] overflow-hidden rounded-[var(--os-radius-overlay)] border border-[var(--border-hairline)]" style={{ background: current.color }}>
-        {current.generated ? <GeneratedThumb id={current.id} width={520} height={293} /> : current.src && <img src={current.src} alt="" className="h-full w-full object-cover" />}
-      </div>
-
+      <WallpaperBrowser />
       <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Background</h3>
-        <WallpaperGallery value={wallpaperId} onChange={setWallpaperId} columns={3} />
-        <Row title="Choose a photo" description="Use any picture on this PC as your desktop background.">
-          <button type="button" onClick={() => void browse()} className="rounded-[var(--os-radius-control)] bg-(--os-hover) px-3 py-1.5 text-[12px] font-medium hover:bg-[var(--surface-hover)]">
-            Browse photos
-          </button>
-        </Row>
-        <Row title="Solid colour">
-          <div className="flex gap-1.5">
-            {SOLID_COLOURS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={c}
-                onClick={() => setWallpaperId(`color:${c}`)}
-                className={cn('flex h-6 w-6 items-center justify-center rounded-full border', wallpaperId === `color:${c}` ? 'border-[var(--color-text-primary)]' : 'border-[var(--border-hairline)]')}
-                style={{ background: c }}
-              >
-                {wallpaperId === `color:${c}` && <CheckIcon className="h-3 w-3 text-[var(--color-text-primary)]" />}
-              </button>
-            ))}
-          </div>
-        </Row>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">Colours</h3>
+        <h3 className="text-[13px] font-semibold">Colours</h3>
         <Row title="Mode" description="Applies to the dock, menus, and every Udaan app.">
-          <div className="flex rounded-[var(--os-radius-control)] bg-(--os-hover) p-0.5">
-            {(['light', 'dark'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => theme !== t && toggleTheme()}
-                className={cn('rounded-[5px] px-3 py-1 text-[12px] capitalize', theme === t ? 'bg-[var(--surface-hover)] font-medium' : 'text-[var(--color-text-secondary)]')}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          <Segmented value={theme} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} onChange={(t) => t !== theme && toggleTheme()} />
         </Row>
       </section>
     </div>

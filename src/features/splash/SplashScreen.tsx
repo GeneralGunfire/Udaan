@@ -1,7 +1,6 @@
 import { useEffect, useState, type PropsWithChildren } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { DEFAULT_WALLPAPER_ID, getWallpaper, isValidWallpaperId } from '@/app/wallpapers'
-import { resolveWallpaperUrl } from '@/os/desktop/generatedWallpapers'
+import { DEFAULT_WALLPAPER_ID, fittedWallpaperSrc, isValidWallpaperId } from '@/app/wallpapers'
 import { UdaanMark as SharedMark } from '@/os/ui/icons/UdaanMark'
 import { BootCanvas } from './BootCanvas'
 import { activateShell, showDock } from '@/os/kernel/session'
@@ -43,7 +42,7 @@ function currentWallpaperId(): string {
 /** Resolves once the wallpaper is ready to paint and fonts have loaded — the app's own paint-readiness. */
 function waitForAppPaintReady(): Promise<void> {
   const id = currentWallpaperId()
-  const imageReady = resolveWallpaperUrl(id, getWallpaper(id).src)
+  const imageReady = fittedWallpaperSrc(id)
     .then(async (url) => {
       if (!url) return
       const img = new Image()

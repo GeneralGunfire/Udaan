@@ -1,7 +1,8 @@
 import { FocusPill } from './FocusPill'
 import { usePref } from '@/os/kernel/prefs'
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, type HTMLMotionProps } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import type { ButtonHTMLAttributes } from 'react'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
 import { useImmersive } from '@/os/kernel/useImmersive'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -18,10 +19,9 @@ import { useShellMenu, type ShellMenuItemDef } from '@/os/ui/useShellMenu'
 import { useLatest } from '@/os/ui/useLatest'
 import { Artwork, mediaCommand, openLiveDj } from '@/os/dock/panels/MediaPanel'
 import { useNowPlaying } from '@/os/dock/panels/useNowPlaying'
-import { loadEdgeConfig, onEdgeConfig } from '@/features/edge-light/config'
 import type { PanelKind, ShowFlyoutPayload } from '@/os/dock/taskbarPopupTypes'
 import { playSound } from '@/os/sound/sounds'
-import { badgePop, springs, valueChange } from '@/os/motion/systemMotion'
+import { badgePop } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 
 export const MENU_BAR_HEIGHT = 34
@@ -140,25 +140,16 @@ function SoundIcon({ level, muted }: { level: number; muted: boolean }) {
  * behave identically: the same hover wash, the same press compression, the
  * same lit state when their panel is open. Inline classNames drifted before.
  */
-const StatusButton = forwardRef<HTMLButtonElement, HTMLMotionProps<'button'> & { active?: boolean }>(
-  function StatusButton({ active, className, children, ...rest }, ref) {
-    return (
-      <motion.button
-        ref={ref}
-        type="button"
-        className={cn(
-          'flex h-[26px] items-center rounded-[7px] px-2 text-[13px] leading-none text-[var(--os-text)]',
-          'transition-colors duration-150 hover:bg-[var(--os-hover)]',
-          active && 'bg-[var(--os-active)]',
-          className,
-        )}
-        {...rest}
-      >
-        {children}
-      </motion.button>
-    )
-  },
-)
+const StatusButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }>(function StatusButton(
+  { active, className, children, ...rest },
+  ref,
+) {
+  return (
+    <button ref={ref} type="button" data-on={active || undefined} className={cn('u-btn u-btn--ghost h-[26px] px-2 text-[13px] text-(--u-ink) hover:text-(--u-ink)', className)} {...rest}>
+      {children}
+    </button>
+  )
+})
 
 export function MenuBarWindow() {
   const windows = useShell((s) => s.windows)
@@ -180,8 +171,6 @@ export function MenuBarWindow() {
   const network = usePolled<NetworkStatus>('shell_network_status', 10000)
   const volume = usePolled<{ level: number; muted: boolean }>('shell_volume', 3000)
   const { media, positionMs } = useNowPlaying(2000, 500)
-  const [edgeOn, setEdgeOn] = useState(() => loadEdgeConfig().enabled)
-  useEffect(() => onEdgeConfig((c) => setEdgeOn(c.enabled)), [])
   const [unread, setUnread] = useState(0)
   const reduced = prefersReducedMotion()
   const openShellMenu = useShellMenu()
@@ -198,7 +187,6 @@ export function MenuBarWindow() {
     network: useRef<HTMLButtonElement>(null),
     sound: useRef<HTMLButtonElement>(null),
     media: useRef<HTMLButtonElement>(null),
-    edgelight: useRef<HTMLButtonElement>(null),
   }
 
   useEffect(() => subscribeShell(), [])
@@ -357,32 +345,24 @@ export function MenuBarWindow() {
 
   const date = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
   const time = now.toLocaleTimeString(undefined, { hour: clock24 ? '2-digit' : 'numeric', minute: '2-digit', second: showSeconds ? '2-digit' : undefined, hour12: !clock24 })
-  const tap = reduced ? undefined : { scale: 0.94 }
 
   return (
     <div
-      // The material class provides the real blurred glass; see os.css.
-      className="os-menubar-material os-sheen relative flex h-screen w-screen select-none items-center justify-between px-2 text-[var(--os-text)]"
+      // Real compositor blur sits under this window (it is exactly the bar); see ui.css.
+      className="u-menubar relative flex h-screen w-screen select-none items-center justify-between px-2"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* ── Left: Udaan menu and the focused app's menus ─────────────── */}
       <div className="flex min-w-0 items-center gap-0.5">
-        <StatusButton aria-label="Udaan menu" onClick={(e) => openMenu(e, udaanMenuItems())} className="px-2.5" whileTap={tap} transition={springs.snap}>
+        <StatusButton aria-label="Udaan menu" onClick={(e) => openMenu(e, udaanMenuItems())} className="px-2.5">
           <StartGlyph size={16} />
         </StatusButton>
-        {/* The app name animates when focus moves between apps, so the bar
-            visibly tracks what you are working in rather than silently
-            swapping a word. */}
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div key={appName} {...(reduced ? {} : valueChange)} className="shrink-0">
-            <StatusButton onClick={(e) => openMenu(e, appMenuItems())} className="font-semibold" whileTap={tap} transition={springs.snap}>
-              {appName}
-            </StatusButton>
-          </motion.div>
-        </AnimatePresence>
-        <StatusButton onClick={(e) => openMenu(e, windowMenuItems())} whileTap={tap} transition={springs.snap}>Window</StatusButton>
-        <StatusButton onClick={(e) => openMenu(e, goMenuItems())} whileTap={tap} transition={springs.snap}>Go</StatusButton>
-        <StatusButton onClick={(e) => openMenu(e, helpMenuItems())} whileTap={tap} transition={springs.snap}>Help</StatusButton>
+        <StatusButton onClick={(e) => openMenu(e, appMenuItems())} className="font-semibold">
+          {appName}
+        </StatusButton>
+        <StatusButton onClick={(e) => openMenu(e, windowMenuItems())}>Window</StatusButton>
+        <StatusButton onClick={(e) => openMenu(e, goMenuItems())}>Go</StatusButton>
+        <StatusButton onClick={(e) => openMenu(e, helpMenuItems())}>Help</StatusButton>
       </div>
 
       {focusEnabled && <FocusPill />}
@@ -390,15 +370,13 @@ export function MenuBarWindow() {
       {/* ── Right: status items ──────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-0.5">
         {media && (
-          <div className="relative mr-1 flex h-[26px] items-center overflow-hidden rounded-[8px] bg-[var(--os-hover)] pl-1 pr-0.5">
+          <div className="relative mr-1 flex h-[26px] items-center overflow-hidden rounded-[8px] bg-(--u-wash-hover) pl-1 pr-0.5">
             <StatusButton
               ref={refs.media}
               onClick={() => toggle('media')}
               title={media.artist ? `${media.title} — ${media.artist}` : media.title}
               active={panel === 'media'}
               className="max-w-[300px] gap-2 px-1.5"
-              whileTap={tap}
-              transition={springs.snap}
             >
               {media.thumbnail ? (
                 <Artwork m={media} size={18} radius={4} />
@@ -411,21 +389,21 @@ export function MenuBarWindow() {
               )}
               <span className="truncate">
                 <span className="font-medium">{media.title}</span>
-                {media.artist && <span className="text-[var(--os-text-dim)]"> · {media.artist}</span>}
+                {media.artist && <span className="text-(--u-ink-3)"> · {media.artist}</span>}
               </span>
             </StatusButton>
-            <StatusButton aria-label={media.playing ? 'Pause' : 'Play'} onClick={() => void mediaCommand('play-pause')} className="w-[24px] justify-center px-0" whileTap={tap} transition={springs.snap}>
+            <StatusButton aria-label={media.playing ? 'Pause' : 'Play'} onClick={() => void mediaCommand('play-pause')} className="w-[24px] justify-center px-0">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
                 <path d={media.playing ? 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z' : 'M8 5.5v13l11-6.5z'} />
               </svg>
             </StatusButton>
-            <StatusButton aria-label="Next" disabled={!media.canNext} onClick={() => void mediaCommand('next')} className="w-[24px] justify-center px-0 disabled:opacity-30" whileTap={tap} transition={springs.snap}>
+            <StatusButton aria-label="Next" disabled={!media.canNext} onClick={() => void mediaCommand('next')} className="w-[24px] justify-center px-0 disabled:opacity-30">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
                 <path d="M16 5h2v14h-2zM4 5v14l11-7z" />
               </svg>
             </StatusButton>
-            <span className="mx-0.5 h-3.5 w-px bg-[var(--os-separator)]" aria-hidden />
-            <StatusButton aria-label="Open DJ board" title="Mix what's playing in the DJ board" onClick={openLiveDj} className="gap-1 px-1.5 text-[12px] font-semibold" whileTap={tap} transition={springs.snap}>
+            <span className="mx-0.5 h-3.5 w-px bg-(--u-edge)" aria-hidden />
+            <StatusButton aria-label="Open DJ board" title="Mix what's playing in the DJ board" onClick={openLiveDj} className="gap-1 px-1.5 text-[12px] font-semibold">
               <svg viewBox="0 0 24 24" width="14" height="14" {...ICON} aria-hidden>
                 <circle cx="12" cy="12" r="8.5" />
                 <circle cx="12" cy="12" r="2.2" />
@@ -434,9 +412,9 @@ export function MenuBarWindow() {
               DJ
             </StatusButton>
             {media.durationMs != null && positionMs != null && (
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-[var(--os-separator)]" aria-hidden>
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-(--u-edge)" aria-hidden>
                 <motion.span
-                  className="block h-full bg-[var(--color-accent)]"
+                  className="block h-full bg-(--u-accent)"
                   animate={{ width: `${Math.min(100, (positionMs / media.durationMs) * 100)}%` }}
                   transition={{ duration: 0.5, ease: 'linear' }}
                 />
@@ -452,21 +430,14 @@ export function MenuBarWindow() {
           </span>
         )}
 
-        <StatusButton ref={refs.edgelight} aria-label="Edge light" title="Edge light" onClick={() => toggle('edgelight')} active={panel === 'edgelight'} className={cn('px-1.5', edgeOn && 'text-[var(--color-accent)]')} whileTap={tap} transition={springs.snap}>
-          <svg viewBox="0 0 24 24" width="17" height="17" {...ICON} aria-hidden>
-            <rect x="3" y="5" width="18" height="14" rx="3" />
-            <path d="M7 15v-2M10 15V9M13 15v-4M16 15v-3" />
-          </svg>
-        </StatusButton>
-
-        <StatusButton ref={refs.layouts} aria-label="Arrange windows" title="Arrange windows" onClick={() => toggle('layouts')} active={panel === 'layouts'} className="px-1.5" whileTap={tap} transition={springs.snap}>
+        <StatusButton ref={refs.layouts} aria-label="Arrange windows" title="Arrange windows" onClick={() => toggle('layouts')} active={panel === 'layouts'} className="px-1.5">
           <svg viewBox="0 0 24 24" width="17" height="17" {...ICON} aria-hidden>
             <rect x="3" y="4" width="18" height="16" rx="2.5" />
             <path d="M12 4v16M3 12h9" />
           </svg>
         </StatusButton>
 
-        <StatusButton ref={refs.network} aria-label="Network" title={network?.connected === false ? 'Offline' : network?.kind === 'wifi' ? `Wi-Fi${network.signal != null ? ` ${network.signal}%` : ''}` : 'Network'} onClick={() => toggle('network')} active={panel === 'network'} className="px-1.5" whileTap={tap} transition={springs.snap}>
+        <StatusButton ref={refs.network} aria-label="Network" title={network?.connected === false ? 'Offline' : network?.kind === 'wifi' ? `Wi-Fi${network.signal != null ? ` ${network.signal}%` : ''}` : 'Network'} onClick={() => toggle('network')} active={panel === 'network'} className="px-1.5">
           <NetworkIcon s={network} />
         </StatusButton>
 
@@ -477,8 +448,6 @@ export function MenuBarWindow() {
           onClick={() => toggle('sound')}
           active={panel === 'sound'}
           className="px-1.5"
-          whileTap={tap}
-          transition={springs.snap}
           onWheel={(e) => {
             const level = Math.min(1, Math.max(0, Math.round(((volume?.level ?? 0) - Math.sign(e.deltaY) * 0.04) * 100) / 100))
             void invoke('shell_set_volume', { level, muted: false })
@@ -490,7 +459,7 @@ export function MenuBarWindow() {
           <SoundIcon level={volume?.level ?? 1} muted={!!volume?.muted} />
         </StatusButton>
 
-        <StatusButton aria-label="DJ board" title="DJ board — mix and shape what's playing" onClick={openLiveDj} className="px-1.5" whileTap={tap} transition={springs.snap}>
+        <StatusButton aria-label="DJ board" title="DJ board — mix and shape what's playing" onClick={openLiveDj} className="px-1.5">
           <svg viewBox="0 0 24 24" width="17" height="17" {...ICON} aria-hidden>
             <circle cx="12" cy="12" r="8.5" />
             <circle cx="12" cy="12" r="2.2" />
@@ -498,7 +467,7 @@ export function MenuBarWindow() {
           </svg>
         </StatusButton>
 
-        <StatusButton ref={refs['notifications-panel']} aria-label={unread ? `${unread} notifications` : 'Notifications'} onClick={() => toggle('notifications-panel')} active={panel === 'notifications-panel'} className="relative px-1.5" whileTap={tap} transition={springs.snap}>
+        <StatusButton ref={refs['notifications-panel']} aria-label={unread ? `${unread} notifications` : 'Notifications'} onClick={() => toggle('notifications-panel')} active={panel === 'notifications-panel'} className="relative px-1.5">
           <svg viewBox="0 0 24 24" width="17" height="17" {...ICON} aria-hidden>
             <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
             <path d="M10 20.5a2 2 0 0 0 4 0" />
@@ -509,7 +478,7 @@ export function MenuBarWindow() {
             {unread > 0 && (
               <motion.span
                 {...(reduced ? {} : badgePop)}
-                className="absolute -right-0.5 -top-0.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[var(--color-accent)] px-[3px] text-[9px] font-bold leading-none text-[var(--color-accent-contrast)]"
+                className="absolute -right-0.5 -top-0.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-(--u-accent) px-[3px] text-[9px] font-bold leading-none text-white"
               >
                 {unread > 9 ? '9+' : unread}
               </motion.span>
@@ -517,7 +486,7 @@ export function MenuBarWindow() {
           </AnimatePresence>
         </StatusButton>
 
-        <StatusButton ref={refs.calendar} aria-label={`${date} ${time}`} onClick={() => toggle('calendar')} active={panel === 'calendar'} className="gap-2.5 font-medium tabular-nums" whileTap={tap} transition={springs.snap}>
+        <StatusButton ref={refs.calendar} aria-label={`${date} ${time}`} onClick={() => toggle('calendar')} active={panel === 'calendar'} className="gap-2.5 font-medium tabular-nums">
           <span>{date}</span>
           <span>{time}</span>
         </StatusButton>

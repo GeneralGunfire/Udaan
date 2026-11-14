@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
-use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn, GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
   SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, WA_INACTIVE, WM_ACTIVATE, WM_NCDESTROY,
@@ -102,6 +102,9 @@ const MARGIN: i32 = 8;
 struct Open {
   anchor: Rect,
   placement: Placement,
+  /// Corner radius in logical px; 0 = square. The window is cut to this shape so the
+  /// compositor's blur follows the card's corners instead of filling a rectangle.
+  radius: i32,
 }
 
 static OPEN: Mutex<Option<HashMap<isize, Open>>> = Mutex::new(None);
@@ -143,9 +146,18 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
   DefSubclassProc(hwnd, msg, wp, lp)
 }
 
-fn apply(hwnd: HWND, r: Rect) {
+fn apply(hwnd: HWND, r: Rect, radius: i32) {
   unsafe {
     let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), r.left, r.top, r.width(), r.height(), SWP_NOACTIVATE);
+    if radius > 0 {
+      let dpi = windows::Win32::UI::HiDpi::GetDpiForWindow(hwnd).max(96) as i32;
+      let d = (radius * dpi / 96) * 2;
+      // The system owns the region after this call.
+      let rgn = CreateRoundRectRgn(0, 0, r.width() + 1, r.height() + 1, d, d);
+      let _ = SetWindowRgn(hwnd, Some(rgn), true);
+    } else {
+      let _ = SetWindowRgn(hwnd, None, true);
+    }
   }
 }
 
@@ -160,18 +172,19 @@ pub fn engine_popup_open(
   height: i32,
   placement: Placement,
   focus: Option<bool>,
+  radius: Option<i32>,
 ) -> Result<(Rect, Placement), String> {
   let _ = APP.set(app);
   let hwnd = window.hwnd().map_err(|e| e.to_string())?;
   let work = work_area_at((anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2);
   let (rect, used) = place(anchor, (width, height), placement, work, GAP, MARGIN);
   let key = hwnd.0 as isize;
-  let first = with_open(|o| o.insert(key, Open { anchor, placement }).is_none());
+  let first = with_open(|o| o.insert(key, Open { anchor, placement, radius: radius.unwrap_or(0) }).is_none());
   unsafe {
     // Idempotent: attaching twice only replaces the same subclass.
     let _ = SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0);
   }
-  apply(hwnd, rect);
+  apply(hwnd, rect, radius.unwrap_or(0));
   if first {
     window.show().map_err(|e| e.to_string())?;
   }
@@ -186,12 +199,12 @@ pub fn engine_popup_open(
 #[tauri::command]
 pub fn engine_popup_resize(window: tauri::WebviewWindow, width: i32, height: i32) -> Result<Option<Rect>, String> {
   let hwnd = window.hwnd().map_err(|e| e.to_string())?;
-  let Some((anchor, placement)) = with_open(|o| o.get(&(hwnd.0 as isize)).map(|s| (s.anchor, s.placement))) else {
+  let Some((anchor, placement, radius)) = with_open(|o| o.get(&(hwnd.0 as isize)).map(|s| (s.anchor, s.placement, s.radius))) else {
     return Ok(None);
   };
   let work = work_area_at((anchor.left + anchor.right) / 2, (anchor.top + anchor.bottom) / 2);
   let (rect, _) = place(anchor, (width, height), placement, work, GAP, MARGIN);
-  apply(hwnd, rect);
+  apply(hwnd, rect, radius);
   Ok(Some(rect))
 }
 

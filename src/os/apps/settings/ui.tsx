@@ -158,7 +158,7 @@ export function SearchField({ value, onChange, placeholder = 'Search' }: { value
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="os-field w-full [&::-webkit-search-cancel-button]:hidden"
+        className="u-field w-full [&::-webkit-search-cancel-button]:hidden"
         // Inline, not a Tailwind pl-8: .os-field sets its own padding in an
         // unlayered stylesheet, which beats utility classes, so pl-8 was
         // silently ignored and the placeholder rendered under the icon.

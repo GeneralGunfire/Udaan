@@ -1,92 +1,81 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { pxScale } from '@/os/kernel/uiScale'
-import { AnimatePresence, motion } from 'framer-motion'
-import { emit } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
+import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window'
-import { listNotifications, markNotificationRead, onNotificationsChanged, type Notification } from '@/integrations/notifications/client'
-import { getPref, usePref } from '@/os/kernel/prefs'
-import { shell } from '@/os/kernel/shell'
-import { NotificationIcon, notificationSource, windowsExtra } from '@/os/ui/NotificationIcon'
-import { WindowCloseIcon } from '@/shared/icons'
-import { curve, dur, springs } from '@/os/motion/systemMotion'
-import { elevation } from '@/os/design/scale'
+import { listNotifications, markNotificationRead, type Notification } from '@/integrations/notifications/client'
 import { launchApp } from '@/integrations/installed-apps/client'
+import { shell } from '@/os/kernel/shell'
+import { pxScale } from '@/os/kernel/uiScale'
+import { NotificationIcon, notificationSource, windowsExtra } from '@/os/ui/NotificationIcon'
 import { playSound } from '@/os/sound/sounds'
+import { Button } from '@/os/ui/controls'
 
 export { windowsExtra }
 
+/** One banner as the engine reports it (`notify://banners`). */
+interface Banner {
+  id: string
+  kind: string
+  title: string
+  body: string
+  sourceApp: string
+  actionLabel: string | null
+  urgency: string
+}
+
 const WIDTH = 364
 const MENU_BAR = 34
-const GAP = 10
 const EDGE = 16
-const DEFAULT_VISIBLE_MS = 6000
-const MAX = 3
 
 /**
- * Toast banners for new notifications, bottom-right above the dock (like
- * Windows toasts). The window is sized to exactly the visible stack and
- * never takes focus, so it can't steal clicks or keystrokes.
+ * Notification banners: a renderer, nothing more.
+ *
+ * The ENGINE decides everything: whether a notification shows at all (Do
+ * Not Disturb, muted apps, repeats, bursts), how long it stays, and when it
+ * leaves. This window shows the stack it is told about (`notify://banners`),
+ * reports what the user did (click, dismiss), sizes itself to the stack,
+ * and never takes focus.
  */
 export function ToastWindow() {
-  const [toasts, setToasts] = useState<Notification[]>([])
-  const seen = useRef<Set<string> | null>(null)
+  const [banners, setBanners] = useState<Banner[]>([])
+  // The stored notification for each banner: carries the sender's picture and click target.
+  const [full, setFull] = useState<Record<string, Notification>>({})
   const stackRef = useRef<HTMLDivElement>(null)
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
-  const visibleMs = useRef(DEFAULT_VISIBLE_MS)
-  const [previews] = usePref('notifications.previews')
+  const known = useRef(new Set<string>())
 
-  const remove = useCallback((id: string) => {
-    clearTimeout(timers.current.get(id))
-    timers.current.delete(id)
-    setToasts((t) => t.filter((x) => x.id !== id))
+  useEffect(() => {
+    const apply = (list: Banner[]) => {
+      const fresh = list.filter((b) => !known.current.has(b.id))
+      list.forEach((b) => known.current.add(b.id))
+      if (fresh.length) {
+        playSound('notify')
+        void listNotifications(false, 20).then((all) => setFull((f) => ({ ...f, ...Object.fromEntries(all.map((n) => [n.id, n])) })), () => {})
+      }
+      setBanners(list)
+    }
+    void invoke<Banner[]>('notify_banners').then(apply, () => {})
+    const un = listen<Banner[]>('notify://banners', (e) => apply(e.payload))
+    return () => void un.then((fn) => fn())
   }, [])
 
-  const schedule = useCallback(
-    (id: string) => {
-      clearTimeout(timers.current.get(id))
-      timers.current.set(id, setTimeout(() => remove(id), visibleMs.current))
-    },
-    [remove],
-  )
+  const dismiss = useCallback((id: string) => void invoke('notify_dismiss_banner', { id }).catch(() => {}), [])
 
-  // Remember what already exists at start-up: only notifications that
-  // arrive while Udaan is running pop up.
-  useEffect(() => {
-    void listNotifications(false, 100).then((all) => (seen.current = new Set(all.map((n) => n.id))), () => (seen.current = new Set()))
-    const un = onNotificationsChanged(async () => {
-      if (!seen.current) return
-      const latest = await listNotifications(true, 10).catch(() => [] as Notification[])
-      let fresh = latest.filter((n) => !seen.current!.has(n.id))
-      for (const n of latest) seen.current.add(n.id)
-      // Apps the user silenced still reach Notification Center; they just don't pop up.
-      let muted: string[] = []
-      try {
-        muted = JSON.parse(await getPref('notifications.muted')) as string[]
-      } catch {
-        /* a bad value means nothing is muted */
-      }
-      fresh = fresh.filter((n) => !muted.includes(notificationSource(n)))
-      visibleMs.current = Math.max(2, (await getPref('notifications.duration')) || 6) * 1000
-      if (!fresh.length || (await getPref('notifications.dnd'))) return
-      setToasts((t) => [...fresh.reverse(), ...t].slice(0, MAX))
-      playSound('notify')
-      fresh.forEach((n) => schedule(n.id))
-    })
-    const timersMap = timers.current
-    return () => {
-      void un.then((fn) => fn())
-      timersMap.forEach(clearTimeout)
-    }
-  }, [schedule])
+  const open = (b: Banner) => {
+    dismiss(b.id)
+    void markNotificationRead(b.id).catch(() => {})
+    const extra = full[b.id] ? windowsExtra(full[b.id]) : null
+    if (extra?.launch) void launchApp(extra.launch)
+    else void emit('dock:open-notifications')
+  }
 
-  // Fit the OS window to the stack, anchored bottom-right of the work area.
+  // Fit the OS window to the stack, top-right under the menu bar.
   useEffect(() => {
     const win = getCurrentWindow()
-    if (!toasts.length) {
+    if (!banners.length) {
       const t = setTimeout(() => {
         void win.hide()
         void shell.setMemoryLow(true)
-      }, 220)
+      }, 200)
       return () => clearTimeout(t)
     }
     const frame = requestAnimationFrame(async () => {
@@ -97,7 +86,6 @@ export function ToastWindow() {
         const w = Math.round((WIDTH + 8) * scale)
         const h = Math.round(height * scale)
         await win.setSize(new PhysicalSize(w, h))
-        // Top-right, just under the menu bar, like macOS banners.
         await win.setPosition(new PhysicalPosition(work.right - w - Math.round(EDGE * scale), work.top + Math.round((MENU_BAR + 8) * scale)))
         void shell.setMemoryLow(false)
         await win.show()
@@ -106,88 +94,52 @@ export function ToastWindow() {
       }
     })
     return () => cancelAnimationFrame(frame)
-  }, [toasts])
+  }, [banners])
 
   return (
-    <div ref={stackRef} className="flex flex-col gap-[10px] p-1" style={{ width: WIDTH + 8 }}>
-      <AnimatePresence initial={false}>
-        {toasts.map((n) => {
-          const extra = windowsExtra(n)
-          return (
-            <motion.div
-              key={n.id}
-              layout
-              // Banners drop in from above the screen edge, which is where
-              // they physically come from, and leave to the right.
-              initial={{ opacity: 0, y: -32, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: springs.flyout }}
-              exit={{ opacity: 0, x: 56, scale: 0.97, transition: { duration: dur.fast, ease: curve.accelerate } }}
-              // Swipe right to dismiss, as on a phone. Constrained to one
-              // axis so a slightly diagonal flick still reads as a dismissal
-              // rather than dragging the banner around.
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={{ left: 0.02, right: 0.9 }}
-              dragSnapToOrigin
-              onDragStart={() => clearTimeout(timers.current.get(n.id))}
-              onDragEnd={(_, info) => {
-                // Either far enough or fast enough: requiring distance alone
-                // makes a quick flick feel like it was ignored.
-                if (info.offset.x > WIDTH * 0.35 || info.velocity.x > 500) remove(n.id)
-                else schedule(n.id)
-              }}
-              onMouseEnter={() => clearTimeout(timers.current.get(n.id))}
-              onMouseLeave={() => schedule(n.id)}
-              onClick={() => {
-                remove(n.id)
-                void markNotificationRead(n.id)
-                if (extra?.launch) void launchApp(extra.launch)
-                else void emit('dock:open-notifications')
-              }}
-              whileHover={{ scale: 1.012 }}
-              whileTap={{ scale: 0.992 }}
-              className="os-panel-material os-sheen group relative cursor-default overflow-hidden rounded-[20px] text-(--os-text)"
-              style={{ width: WIDTH, marginTop: GAP / 2, boxShadow: `${elevation(4)}, var(--os-edge)` }}
-            >
-              <div className="flex gap-3 px-4 py-3.5">
-                {/* The sender's picture when there is one, with the app as a badge; otherwise just the app. */}
-                <div className="relative h-10 w-10 shrink-0">
-                  {extra?.image ? (
-                    <>
-                      <img src={extra.image} alt="" className="h-10 w-10 rounded-full object-cover" />
-                      <span className="absolute -bottom-1 -right-1 rounded-[7px] shadow-[0_1px_3px_rgb(0_0_0/0.45)]">
-                        <NotificationIcon n={n} size={20} />
-                      </span>
-                    </>
-                  ) : (
-                    <NotificationIcon n={n} size={40} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 pr-5">
-                  <div className="flex items-baseline gap-2">
-                    <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-5">{n.title}</p>
-                    <span className="shrink-0 text-[11px] text-(--os-text-dim)">now</span>
-                  </div>
-                  <p className="truncate text-[11.5px] font-medium uppercase tracking-wide text-(--os-text-dim)">{notificationSource(n)}</p>
-                  {n.body && previews && <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-[18px] text-(--os-text)/85">{n.body}</p>}
-                </div>
+    <div ref={stackRef} className="flex flex-col gap-2.5 p-1" style={{ width: WIDTH + 8 }}>
+      {banners.map((b) => {
+        const n: Notification = full[b.id] ?? { id: b.id, kind: b.kind, title: b.title, body: b.body, sourceApp: b.sourceApp, createdAt: new Date().toISOString(), readAt: null, actionLabel: b.actionLabel, actionPayload: null }
+        const extra = windowsExtra(n)
+        return (
+          <div key={b.id} role="alert" onClick={() => open(b)} className="u-surface u-banner group" style={{ width: WIDTH }}>
+            <div className="flex gap-3 px-4 py-3.5">
+              <div className="relative h-10 w-10 shrink-0">
+                {extra?.image ? (
+                  <>
+                    <img src={extra.image} alt="" className="h-10 w-10 rounded-full object-cover" />
+                    <span className="absolute -bottom-1 -right-1 rounded-[7px] shadow-[0_1px_3px_rgb(0_0_0/0.45)]">
+                      <NotificationIcon n={n} size={20} />
+                    </span>
+                  </>
+                ) : (
+                  <NotificationIcon n={n} size={40} />
+                )}
               </div>
-              <motion.div className="absolute bottom-0 left-0 h-[2px] bg-[var(--color-accent)]/70" initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: visibleMs.current / 1000, ease: 'linear' }} />
-              <button
-                type="button"
-                aria-label="Dismiss"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  remove(n.id)
-                }}
-                className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-(--os-hover) opacity-0 transition-opacity hover:bg-(--os-active) group-hover:opacity-100"
-              >
-                <WindowCloseIcon width={11} height={11} />
-              </button>
-            </motion.div>
-          )
-        })}
-      </AnimatePresence>
+              <div className="min-w-0 flex-1 pr-6">
+                <p className="truncate text-[14px] font-semibold leading-5">{b.title}</p>
+                <p className="u-label truncate">{notificationSource(n)}</p>
+                {b.body && <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-[18px] text-(--u-ink-2)">{b.body}</p>}
+              </div>
+            </div>
+            <Button
+              icon
+              size="sm"
+              pill
+              aria-label="Dismiss"
+              onClick={(e) => {
+                e.stopPropagation()
+                dismiss(b.id)
+              }}
+              className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+              </svg>
+            </Button>
+          </div>
+        )
+      })}
     </div>
   )
 }

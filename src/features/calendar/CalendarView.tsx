@@ -212,7 +212,7 @@ export function CalendarView() {
       className="text-text-primary relative flex h-full min-h-0 w-full overflow-hidden"
       style={{ background: 'var(--surface-base)' }}
     >
-      {wallpaper.src && !wallpaper.generated && (
+      {wallpaper.src && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.16]"
@@ -227,7 +227,7 @@ export function CalendarView() {
       )}
       {/* A soft top-down light wash over the blurred wallpaper so content
           still reads as sitting on --surface-base, not on a photo. */}
-      {wallpaper.src && !wallpaper.generated && (
+      {wallpaper.src && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -246,8 +246,8 @@ export function CalendarView() {
         className="relative z-10 flex w-[296px] shrink-0 flex-col gap-7 overflow-y-auto px-6 pb-6 pt-6"
         style={{
           borderRight: '1px solid color-mix(in srgb, var(--border-hairline) 70%, transparent)',
-          background: wallpaper.src && !wallpaper.generated ? 'color-mix(in srgb, var(--surface-base) 55%, transparent)' : undefined,
-          backdropFilter: wallpaper.src && !wallpaper.generated ? 'blur(24px)' : undefined,
+          background: wallpaper.src ? 'color-mix(in srgb, var(--surface-base) 55%, transparent)' : undefined,
+          backdropFilter: wallpaper.src ? 'blur(24px)' : undefined,
         }}
       >
         <button

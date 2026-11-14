@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { useEffect, useMemo, useState } from 'react'
 import { APP_DEFS, type AppId } from '@/os/kernel/registry'
 import { groupKeyOf, shell, subscribeShell, useShell, type ShellWindow } from '@/os/kernel/shell'
@@ -38,6 +39,9 @@ export function useDockItems() {
   const [icons, setIcons] = useState<Record<string, string | null>>({})
   const [resolved, setResolved] = useState<Record<string, string | null>>({})
   const [winIcons, setWinIcons] = useState<Record<number, string | null>>({})
+  // Store/packaged apps (Claude, WhatsApp...) hide their executable, so reading its icon fails. Windows'
+  // own app list has their real icons; match by name and use those.
+  const [storeIcons, setStoreIcons] = useState<Record<string, string>>({})
 
   // Last resort for programs whose executable can't be read (elevated
   // apps): the window's own icon, fetched once per window.
@@ -95,6 +99,38 @@ export function useDockItems() {
     })
   }, [exePaths, icons])
 
+  const wanted = useMemo(() => {
+    const out = new Set<string>()
+    for (const p of pins) if (p.kind === 'exe' && p.name) out.add(p.name.toLowerCase())
+    for (const w of windows) if (!w.appId && w.processName) out.add(baseName(w.processName).replace(/\.exe$/i, '').toLowerCase())
+    return [...out].sort().join('|')
+  }, [pins, windows])
+
+  useEffect(() => {
+    if (!wanted) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const apps = await invoke<{ name: string; id: string }[]>('shell_installed_apps')
+        const names = wanted.split('|')
+        const hits = new Map<string, string>() // lower-case name -> app id
+        for (const n of names) {
+          const a = apps.find((x) => x.name.toLowerCase() === n) ?? apps.find((x) => x.name.toLowerCase().startsWith(n) && n.length >= 3)
+          if (a) hits.set(n, a.id)
+        }
+        if (!hits.size) return
+        const got = await invoke<Record<string, string | null>>('shell_installed_app_icons', { ids: [...hits.values()] })
+        if (cancelled) return
+        setStoreIcons(Object.fromEntries([...hits].flatMap(([n, id]) => (got[id] ? [[n, got[id]!]] : []))))
+      } catch {
+        /* keep the monogram */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wanted])
+
   return useMemo(() => {
     const groups = new Map<string, ShellWindow[]>()
     for (const w of windows) {
@@ -117,7 +153,7 @@ export function useDockItems() {
       // mark is not that product's mark, and it reads as wrong beside the
       // real icons Windows supplies for everything else. Where no icon can
       // be read, the dock draws a neutral monogram tile instead.
-      const iconUrl = appId ? null : ((exePath && icons[exePath]) || (ws[0] && winIcons[ws[0].handle]) || null)
+      const iconUrl = appId ? null : ((exePath && icons[exePath]) || (ws[0] && winIcons[ws[0].handle]) || storeIcons[name.toLowerCase()] || null)
       return {
         key,
         name,
@@ -136,5 +172,5 @@ export function useDockItems() {
     const pinned = pins.map((p) => make(p.key, true, p))
     const running = order.filter((k) => groups.has(k) && !pinnedKeys.has(k)).map((k) => make(k, false))
     return { pins, items: [...pinned, ...running], pinnedCount: pinned.length }
-  }, [pins, windows, foreground, names, icons, order, resolved, winIcons])
+  }, [pins, windows, foreground, names, icons, order, resolved, winIcons, storeIcons])
 }

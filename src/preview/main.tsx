@@ -4,7 +4,6 @@ import { emit } from '@tauri-apps/api/event'
 import '../styles/theme.css'
 import { ThemeProvider } from '../app/ThemeProvider'
 import { SoundPanel } from '@/os/dock/panels/SoundPanel'
-import { EdgeLightPanel } from '@/os/dock/panels/EdgeLightPanel'
 import { EdgeLightWindow } from '@/os/edgelight/EdgeLightWindow'
 import { PreviewAudio, type EqRequest } from './eq'
 
@@ -131,7 +130,7 @@ function Page() {
         </div>
 
         <div className="flex flex-wrap items-start gap-6">
-          <div className="os-acrylic w-[340px] rounded-[var(--os-radius-overlay)]">{tab === 'sound' ? <SoundPanel /> : <EdgeLightPanel />}</div>
+          <div className="u-surface w-[340px]"><SoundPanel /></div>
           <aside className="min-w-[240px] flex-1">
             <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--os-menu-text-dim)]">What the panel sent</p>
             <ul className="flex flex-col gap-1 text-[12.5px]">

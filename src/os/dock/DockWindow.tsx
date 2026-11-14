@@ -10,16 +10,17 @@ import { prefersReducedMotion } from '@/shared/lib/motion'
 import { launchApp, launchAppByExeName } from '@/integrations/installed-apps/client'
 import { openSystemUtility } from '@/integrations/quick-settings/client'
 import { groupKeyOf, onHotkey, openApp, shell, useShell, type ShellWindow } from '@/os/kernel/shell'
-import { usePref } from '@/os/kernel/prefs'
+import { getPref, setPref, usePref } from '@/os/kernel/prefs'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { useShellMenu, type ShellMenuItemDef } from '@/os/ui/useShellMenu'
 import { StartTile, TrashGlyph } from '@/os/ui/icons/SystemGlyphs'
 import { useLatest } from '@/os/ui/useLatest'
-import { launchBounce, minimizeNudge, restoreNudge, focusPop, curve, dur, springs } from '@/os/motion/systemMotion'
+import { launchBounce, minimizeNudge, restoreNudge, focusPop, curve, dur } from '@/os/motion/systemMotion'
 import { playSound } from '@/os/sound/sounds'
 import { dockMetrics } from './geometry'
 import { isPermanent, savePins, togglePin } from './pins'
 import { toPin, useDockItems, type DockItem } from './useDockItems'
+import { GlassSlice } from '@/ui/GlassSlice'
 
 const METRICS = dockMetrics()
 const LAUNCH_TIMEOUT_MS = 8000
@@ -81,8 +82,13 @@ function itemMenuItems(item: DockItem): ShellMenuItemDef[] {
 
 const dockMenuItems: ShellMenuItemDef[] = [
   { label: 'Show desktop', onSelect: () => void shell.toggleDesktop() },
-  { label: 'Dock settings', onSelect: () => void openApp('settings', { section: 'dock' }) },
+  { label: 'Lock screen', onSelect: () => void emit('launcher:lock') },
   { label: undefined },
+  { label: 'Change wallpaper…', onSelect: () => void emit('launcher:wallpaper') },
+  { label: 'Next wallpaper', onSelect: () => void invoke('wallpaper_step', { forward: true }) },
+  { label: undefined },
+  { label: 'Auto-hide the dock', onSelect: () => void getPref('dock.autoHide').then((v) => setPref('dock.autoHide', !v)) },
+  { label: 'Dock settings', onSelect: () => void openApp('settings', { section: 'dock' }) },
   { label: 'Task Manager', onSelect: () => void openSystemUtility('taskManager') },
 ]
 
@@ -168,48 +174,21 @@ function DockIcon({
         void shell.focus(nextWindow(item.windows, useShell.getState().foreground, step).handle)
       }}
       style={{ width: METRICS.slot, height: METRICS.slot, transform: dragOffset ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined, zIndex: dragOffset ? 2 : undefined }}
-      className="group relative flex shrink-0 items-end justify-center rounded-[14px] pb-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/40"
+      className="u-dock__item"
     >
-      <DockLabel text={item.name} count={count} />
+      <DockLabel text={item.name} sub={count === 1 ? item.windows[0].title : undefined} count={count} />
       {/* The icon stack. Icons keep a fixed size: no magnification. */}
       <motion.span
         animate={controls}
-        className="relative flex origin-bottom transition-transform duration-150 ease-out group-active:scale-[0.9]"
+        className="u-dock__glyph relative flex"
         style={{ width: METRICS.iconSize, height: METRICS.iconSize }}
       >
         <DockGlyph item={item} />
-        {/* Reflection: a flipped, faded copy of the icon on the dock floor.
-            Masked to fade out with distance, as a real reflection does. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-0 top-full w-full opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          style={{
-            height: METRICS.iconSize * 0.5,
-            transform: 'scaleY(-1)',
-            transformOrigin: 'top',
-            maskImage: 'linear-gradient(to top, transparent 15%, rgb(0 0 0 / 0.28))',
-            WebkitMaskImage: 'linear-gradient(to top, transparent 15%, rgb(0 0 0 / 0.28))',
-          }}
-        >
-          <DockGlyph item={item} />
-        </span>
       </motion.span>
 
       {/* Running indicator. One pill that widens with the window count reads
           faster than counting dots, and it animates between states. */}
-      {count > 0 && (
-        <motion.span
-          className="absolute bottom-[1px] left-1/2 h-[3px] rounded-full"
-          initial={false}
-          animate={{
-            width: count > 1 ? 4 + Math.min(count, 4) * 4 : 4,
-            backgroundColor: item.focused ? 'var(--color-accent)' : 'var(--os-text-dim)',
-            opacity: item.allMinimized ? 0.45 : 1,
-          }}
-          style={{ x: '-50%' }}
-          transition={springs.indicator}
-        />
-      )}
+      {count > 0 && <span className="u-dock__dot" style={{ width: count > 1 ? 4 + Math.min(count, 4) * 4 : 4, opacity: item.allMinimized ? 0.45 : 1 }} />}
     </button>
   )
 }
@@ -222,19 +201,13 @@ function DockIcon({
  * rather than letting it read as a free-floating tooltip. The window count
  * rides along, so a glance answers "how many of these are open".
  */
-function DockLabel({ text, count }: { text: string; count: number }) {
+function DockLabel({ text, count, sub }: { text: string; count: number; sub?: string }) {
+  const shown = sub && sub !== text && sub.length > 0 ? (sub.length > 46 ? `${sub.slice(0, 45)}…` : sub) : ''
   return (
-    <span className="os-dock-label pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 translate-y-1 scale-95 whitespace-nowrap opacity-0 transition-[opacity,transform] delay-0 duration-150 group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-hover:delay-[350ms]">
-      <span className="os-panel-material relative flex items-center gap-1.5 rounded-[8px] px-2.5 py-1 text-[12px] font-medium text-[var(--os-text)]">
-        {text}
-        {count > 1 && <span className="text-[var(--os-text-dim)] tabular-nums">· {count}</span>}
-        {/* Notch, rotated 45° and clipped by the chip above it. */}
-        <span
-          aria-hidden
-          className="absolute left-1/2 top-full h-[7px] w-[7px] -translate-x-1/2 -translate-y-[4px] rotate-45 rounded-[1.5px]"
-          style={{ background: 'var(--os-panel-solid)', borderRight: '1px solid var(--os-border)', borderBottom: '1px solid var(--os-border)' }}
-        />
-      </span>
+    <span className="u-dock__label">
+      {text}
+      {shown && <span className="block max-w-[260px] truncate text-[11px] font-normal text-(--u-ink-3)">{shown}</span>}
+      {count > 1 && <span className="tabular-nums text-(--u-ink-3)"> · {count}</span>}
     </span>
   )
 }
@@ -561,23 +534,23 @@ export function DockWindow() {
           e.preventDefault()
           openMenu(e, dockMenuItems)
         }}
-        className={cn('os-dock-material os-sheen relative flex items-center', suppressLabels && 'dock-suppress-labels')}
+        className={cn('u-dock', suppressLabels && 'dock-suppress-labels')}
         style={{
           height: METRICS.barHeight,
           gap: METRICS.gap,
           padding: `0 ${METRICS.pad + 4}px`,
-          borderRadius: 'var(--os-radius-dock)',
         }}
       >
+        <GlassSlice edge="bottom" parentRef={barRef} />
         <button
           type="button"
           aria-label="Start"
           onClick={() => void emit('launcher:toggle')}
-          className="group relative flex shrink-0 items-end justify-center rounded-[14px] pb-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/40"
+          className="u-dock__item"
           style={{ width: METRICS.slot, height: METRICS.slot }}
         >
           <DockLabel text="Start" count={0} />
-          <span className="relative origin-bottom transition-transform duration-150 ease-out group-hover:scale-[1.12] group-active:scale-[0.92]">
+          <span className="u-dock__glyph relative">
             <StartTile size={METRICS.iconSize} />
           </span>
         </button>
@@ -609,11 +582,11 @@ export function DockWindow() {
               },
             ])
           }}
-          className="group relative flex shrink-0 items-end justify-center rounded-[14px] pb-[6px] outline-none"
+          className="u-dock__item"
           style={{ width: METRICS.slot, height: METRICS.slot }}
         >
           <DockLabel text={binCount ? `Recycle Bin · ${binCount}` : 'Recycle Bin'} count={0} />
-          <span className="relative origin-bottom transition-transform duration-150 ease-out group-hover:scale-[1.12] group-active:scale-[0.92]">
+          <span className="u-dock__glyph relative">
             <TrashGlyph size={METRICS.iconSize} full={binCount > 0} />
           </span>
         </button>
@@ -625,7 +598,7 @@ export function DockWindow() {
 }
 
 function Divider() {
-  return <span className="mx-1.5 h-7 w-px shrink-0 bg-[var(--os-separator)]" aria-hidden />
+  return <span className="u-dock__sep" aria-hidden />
 }
 
 /** Time only, like a watch face on the dock; the date is in the tooltip and the menu bar. */
@@ -643,11 +616,11 @@ function DockClock() {
     <button
       type="button"
       onClick={() => void emit('launcher:toggle')}
-      className="group relative flex shrink-0 flex-col items-center justify-center rounded-[12px] px-2.5 leading-tight text-[var(--os-text)] transition-colors duration-150 hover:bg-[var(--os-hover)] active:bg-[var(--os-active)]"
+      className="u-btn flex-col gap-0 px-2.5 leading-tight"
       style={{ height: METRICS.slot }}
     >
       <span className="text-[14px] font-semibold tabular-nums tracking-tight">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-      <span className="text-[11px] text-[var(--os-text-dim)]">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+      <span className="text-[11px] text-(--u-ink-3)">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
     </button>
   )
 }

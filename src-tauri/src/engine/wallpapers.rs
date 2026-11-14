@@ -12,13 +12,13 @@
 //! will be built on.
 
 use image::imageops::FilterType;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 /// Cached copies kept on disk; the least recently written are deleted beyond this.
-const CACHE_LIMIT: usize = 40;
+const CACHE_LIMIT: usize = 120;
 const EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "bmp"];
 
 #[derive(Debug, Clone, Serialize)]
@@ -79,6 +79,169 @@ pub fn fit_in(cache: &Path, src: &Path, max_w: u32, max_h: u32, quality: u8) -> 
   std::fs::rename(&tmp, &out).map_err(|e| e.to_string())?;
   prune(cache);
   Ok(out)
+}
+
+// ---------------------------------------------------------------------------------------
+// Rendering a picture for one specific screen
+// ---------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FitMode {
+  /// Fill the screen exactly, cropping what does not fit around a focal point.
+  #[default]
+  Fill,
+  /// Show the whole picture; the rest of the screen is its own blurred colours.
+  Fit,
+}
+
+/// How one picture is placed on the screen. Everything is optional: with nothing set, the
+/// picture fills the screen around the part of it that matters most (see [`auto_focus`]).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FitSpec {
+  #[serde(default)]
+  pub mode: FitMode,
+  /// Focal point as a fraction of the picture (0..1). `None` = decided automatically.
+  #[serde(default)]
+  pub fx: Option<f32>,
+  #[serde(default)]
+  pub fy: Option<f32>,
+  /// Extra zoom into the focal point, 1.0 to 4.0.
+  #[serde(default = "one")]
+  pub zoom: f32,
+}
+
+fn one() -> f32 {
+  1.0
+}
+
+impl Default for FitSpec {
+  fn default() -> Self {
+    FitSpec { mode: FitMode::Fill, fx: None, fy: None, zoom: 1.0 }
+  }
+}
+
+/// Where the eye goes in a picture: the centre of its detail (edges and contrast), blended with
+/// the middle so a bright corner can't drag the crop off. Returns fractions 0..1.
+pub fn auto_focus(img: &image::RgbImage) -> (f32, f32) {
+  let (w, h) = img.dimensions();
+  if w < 4 || h < 4 {
+    return (0.5, 0.5);
+  }
+  let tw = 96u32;
+  let th = ((tw as f64 * h as f64 / w as f64).round() as u32).max(4);
+  let small = image::imageops::thumbnail(img, tw, th);
+  let gray = image::imageops::grayscale(&small);
+  let (mut sum, mut sx, mut sy) = (0.0f64, 0.0f64, 0.0f64);
+  for y in 1..th - 1 {
+    for x in 1..tw - 1 {
+      let g = |dx: i32, dy: i32| gray.get_pixel((x as i32 + dx) as u32, (y as i32 + dy) as u32)[0] as f64;
+      let mag = (g(1, 0) - g(-1, 0)).abs() + (g(0, 1) - g(0, -1)).abs();
+      sum += mag;
+      sx += mag * x as f64;
+      sy += mag * y as f64;
+    }
+  }
+  if sum < 1.0 {
+    return (0.5, 0.5);
+  }
+  let cx = (sx / sum) / tw as f64;
+  let cy = (sy / sum) / th as f64;
+  (((cx + 0.5) / 2.0) as f32, ((cy + 0.5) / 2.0) as f32)
+}
+
+/// The rectangle of the source to keep so it matches the target's shape, centred on the focal
+/// point and never leaving the picture. Pure, so it is tested.
+pub fn crop_rect(sw: u32, sh: u32, tw: u32, th: u32, fx: f32, fy: f32, zoom: f32) -> (u32, u32, u32, u32) {
+  let ta = tw as f64 / th.max(1) as f64;
+  let sa = sw as f64 / sh.max(1) as f64;
+  let (mut cw, mut ch) = if sa > ta { (sh as f64 * ta, sh as f64) } else { (sw as f64, sw as f64 / ta) };
+  let z = (zoom as f64).clamp(1.0, 4.0);
+  cw /= z;
+  ch /= z;
+  let cw = cw.round().clamp(1.0, sw as f64);
+  let ch = ch.round().clamp(1.0, sh as f64);
+  let x = (fx.clamp(0.0, 1.0) as f64 * sw as f64 - cw / 2.0).clamp(0.0, sw as f64 - cw);
+  let y = (fy.clamp(0.0, 1.0) as f64 * sh as f64 - ch / 2.0).clamp(0.0, sh as f64 - ch);
+  (x.round() as u32, y.round() as u32, cw as u32, ch as u32)
+}
+
+fn render_fill(img: &image::RgbImage, w: u32, h: u32, spec: &FitSpec) -> image::RgbImage {
+  let (sw, sh) = img.dimensions();
+  let (afx, afy) = if spec.fx.is_none() || spec.fy.is_none() { auto_focus(img) } else { (0.5, 0.5) };
+  let (fx, fy) = (spec.fx.unwrap_or(afx), spec.fy.unwrap_or(afy));
+  let (x, y, cw, ch) = crop_rect(sw, sh, w, h, fx, fy, spec.zoom);
+  let cropped = image::imageops::crop_imm(img, x, y, cw, ch).to_image();
+  // Lanczos keeps fine detail whether the picture is scaled down or (for a small source) up.
+  let mut out = image::imageops::resize(&cropped, w, h, FilterType::Lanczos3);
+  if cw as f64 / w as f64 > 1.25 {
+    // Scaling down softens; a light sharpen brings the edges back.
+    out = image::imageops::unsharpen(&out, 0.6, 2);
+  }
+  out
+}
+
+fn render_fit(img: &image::RgbImage, w: u32, h: u32) -> image::RgbImage {
+  let (sw, sh) = img.dimensions();
+  let (bw, bh) = ((w / 8).max(8), (h / 8).max(8));
+  // Backdrop: the picture's own colours, filled and heavily blurred.
+  let small = render_fill(&image::imageops::thumbnail(img, bw, bh), bw, bh, &FitSpec::default());
+  let blurred = image::imageops::blur(&small, 8.0);
+  let mut canvas = image::imageops::resize(&blurred, w, h, FilterType::Triangle);
+  let s = (w as f64 / sw as f64).min(h as f64 / sh as f64);
+  let (nw, nh) = (((sw as f64 * s).round() as u32).clamp(1, w), ((sh as f64 * s).round() as u32).clamp(1, h));
+  let fitted = image::imageops::resize(img, nw, nh, FilterType::Lanczos3);
+  image::imageops::overlay(&mut canvas, &fitted, ((w - nw) / 2) as i64, ((h - nh) / 2) as i64);
+  canvas
+}
+
+fn render_key(src: &Path, w: u32, h: u32, spec: &FitSpec) -> String {
+  let meta = std::fs::metadata(src).ok();
+  let mtime = meta.as_ref().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+  let mut h2 = DefaultHasher::new();
+  (
+    src.to_string_lossy().to_lowercase(),
+    meta.map(|m| m.len()).unwrap_or(0),
+    mtime,
+    w,
+    h,
+    spec.mode as u8,
+    spec.fx.map(|v| (v * 1000.0) as i32),
+    spec.fy.map(|v| (v * 1000.0) as i32),
+    (spec.zoom * 100.0) as i32,
+    "r2",
+  )
+    .hash(&mut h2);
+  format!("r{:016x}", h2.finish())
+}
+
+/// The picture made for exactly this screen: cropped to its shape around the point that matters,
+/// resampled with Lanczos, sharpened a touch, saved as a high-quality JPEG. Cached. The result
+/// is the same size as the screen, so nothing in the shell ever scales it again.
+pub fn render(cache: &Path, src: &Path, w: u32, h: u32, spec: &FitSpec) -> Result<PathBuf, String> {
+  let out = cache.join(format!("{}.jpg", render_key(src, w, h, spec)));
+  if out.is_file() {
+    return Ok(out);
+  }
+  let img = image::open(src).map_err(|e| format!("cannot decode {}: {e}", src.display()))?.to_rgb8();
+  let canvas = match spec.mode {
+    FitMode::Fill => render_fill(&img, w, h, spec),
+    FitMode::Fit => render_fit(&img, w, h),
+  };
+  let tmp = out.with_extension("tmp");
+  {
+    let file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+    let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(std::io::BufWriter::new(file), 95);
+    enc.encode_image(&canvas).map_err(|e| e.to_string())?;
+  }
+  std::fs::rename(&tmp, &out).map_err(|e| e.to_string())?;
+  prune(cache);
+  Ok(out)
+}
+
+pub fn cache_path() -> Option<PathBuf> {
+  cache_dir()
 }
 
 /// Keeps the cache to [`CACHE_LIMIT`] files, oldest deleted first.
@@ -177,6 +340,34 @@ mod tests {
     // second call is a cache hit: same path, no rewrite
     let again = fit_in(&cache, &src, 200, 100, 85).unwrap();
     assert_eq!(again, out);
+  }
+
+  #[test]
+  fn crop_matches_the_target_shape_and_stays_inside() {
+    // 21:9 source onto 16:9: full height, narrower width.
+    let (x, y, w, h) = crop_rect(2560, 1080, 1920, 1080, 0.5, 0.5, 1.0);
+    assert_eq!((y, h), (0, 1080));
+    assert_eq!(w, 1920);
+    assert_eq!(x, 320);
+    // a focal point at the far right cannot push the crop outside the picture
+    let (x, _, w, _) = crop_rect(2560, 1080, 1920, 1080, 1.0, 0.5, 1.0);
+    assert_eq!(x + w, 2560);
+    // zoom keeps the shape
+    let (_, _, w, h) = crop_rect(3840, 2160, 1920, 1080, 0.5, 0.5, 2.0);
+    assert_eq!((w, h), (1920, 1080));
+  }
+
+  #[test]
+  fn render_produces_exactly_the_screen_size() {
+    let dir = temp_dir("render");
+    let src = dir.join("wide.png");
+    make_png(&src, 700, 300);
+    let cache = dir.join("cache");
+    std::fs::create_dir_all(&cache).unwrap();
+    for spec in [FitSpec::default(), FitSpec { mode: FitMode::Fit, ..FitSpec::default() }] {
+      let out = render(&cache, &src, 320, 180, &spec).unwrap();
+      assert_eq!(image::image_dimensions(&out).unwrap(), (320, 180));
+    }
   }
 
   #[test]

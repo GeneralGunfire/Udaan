@@ -7,7 +7,7 @@ export const ContextMenu = CM.Root
 export const ContextMenuTrigger = CM.Trigger
 
 const panel =
-  'os-acrylic z-[60] min-w-[220px] rounded-[var(--os-radius-overlay)] p-1 text-[13px] text-(--os-text) outline-none ' +
+  'u-surface z-[60] min-w-[220px] rounded-[18px] p-1 text-[13px] text-(--os-text) outline-none ' +
   'data-[state=open]:animate-[os-menu-in_140ms_cubic-bezier(0,0,0,1)]'
 
 const item =

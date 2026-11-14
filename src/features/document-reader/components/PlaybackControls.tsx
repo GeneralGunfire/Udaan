@@ -57,7 +57,7 @@ export function PlaybackControls(p: PlaybackControlsProps) {
           value={p.sentenceIndex}
           onChange={(e) => p.onSeek(Number(e.target.value))}
           aria-label="Position in document"
-          className="os-slider flex-1"
+          className="u-range flex-1"
           style={{ ['--pct' as string]: `${pct}%` }}
         />
         <span className="w-12 text-right">{p.sentenceCount}</span>
@@ -111,7 +111,7 @@ export function PlaybackControls(p: PlaybackControlsProps) {
           <Select value={p.voiceId} onChange={p.onVoiceChange} size="sm" options={p.voices.map((v) => ({ value: v.id, label: v.label }))} />
           <label className="flex items-center gap-2 text-white/55" title="Volume">
             <Icon d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4Z" size={16} />
-            <input type="range" min={0} max={1} step={0.05} value={p.volume} onChange={(e) => p.onVolumeChange(Number(e.target.value))} aria-label="Volume" className="os-slider w-20" />
+            <input type="range" min={0} max={1} step={0.05} value={p.volume} onChange={(e) => p.onVolumeChange(Number(e.target.value))} aria-label="Volume" className="u-range w-20" />
           </label>
         </div>
       </div>
