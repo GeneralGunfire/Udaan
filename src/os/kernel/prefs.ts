@@ -40,7 +40,6 @@ export interface Prefs {
   /** Show the motivation video pill in the menu bar. */
   'focus.enabled': boolean
   /** Icons in the dock swell under the pointer. */
-  'dock.magnify': boolean
   /** Menu bar clock: 24-hour time, and seconds. */
   'menubar.clock24': boolean
   'menubar.seconds': boolean
@@ -80,7 +79,6 @@ export const PREF_DEFAULTS: Prefs = {
   'corners.br': 'show-desktop',
   'focus.paused': false,
   'focus.enabled': true,
-  'dock.magnify': true,
   'menubar.clock24': false,
   'menubar.seconds': false,
   'notifications.previews': true,

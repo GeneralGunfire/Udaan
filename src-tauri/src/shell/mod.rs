@@ -149,18 +149,28 @@ pub fn start(app: AppHandle) {
   }
   win::start_hook_thread();
 
-  std::thread::Builder::new()
-    .name("udaan-shell-worker".into())
-    .spawn(move || worker(app, rx))
-    .expect("spawn shell worker");
+  // Supervised: this worker feeds the dock and every window list. A panic here used to
+  // kill window tracking for the rest of the session; now it is recorded and restarted
+  // (the receiver lives in the closure, so queued messages survive the restart).
+  crate::engine::supervisor::spawn("shell-worker", crate::engine::supervisor::Restart::OnPanic, move || {
+    worker(&app, &rx)
+  })
+  .expect("spawn shell worker");
 }
 
-fn worker(app: AppHandle, rx: mpsc::Receiver<Msg>) {
+fn worker(app: &AppHandle, rx: &mpsc::Receiver<Msg>) {
   const RECONCILE: Duration = Duration::from_secs(3);
-  publish(&app);
+  publish(app);
   loop {
     let mut slow_only = true;
-    match rx.recv_timeout(RECONCILE) {
+    // Sleep until a real window event. The 3 s wake-up exists only to keep Explorer's
+    // taskbar hidden after it restarts, so it is needed only while we hide it.
+    let first = if SHELL_CHROME_HIDDEN.load(Ordering::Relaxed) {
+      rx.recv_timeout(RECONCILE)
+    } else {
+      rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected)
+    };
+    match first {
       Ok(Msg::Hotkey(id)) => {
         let _ = app.emit("shell://hotkey", HotkeyEvent { id: id.to_string() });
         continue;
@@ -175,6 +185,8 @@ fn worker(app: AppHandle, rx: mpsc::Receiver<Msg>) {
       }
       Err(mpsc::RecvTimeoutError::Disconnected) => return,
     }
+    // Own window shown/hidden events arrive here too, but they never change the snapshot
+    // (shell chrome is excluded from it), so settle the desktop's visibility every pass.
     // Coalesce bursts: a window opening fires CREATE, SHOW, NAMECHANGE and
     // FOREGROUND within a few ms. Moves/resizes only need to settle.
     let window = if slow_only { Duration::from_millis(250) } else { Duration::from_millis(16) };
@@ -188,12 +200,14 @@ fn worker(app: AppHandle, rx: mpsc::Receiver<Msg>) {
         Err(_) => break,
       }
     }
-    publish(&app);
+    publish(app);
   }
 }
 
 fn publish(app: &AppHandle) {
   let snap = build_snapshot(app);
+  // The engine decides from the real window state which webviews may render.
+  crate::engine::governor::reconcile(app, &snap);
   let windows_changed = {
     let mut prev = last().lock().unwrap();
     if *prev == snap {
@@ -216,6 +230,12 @@ fn publish(app: &AppHandle) {
 }
 
 const SHELL_LISTENERS: &[&str] = &["main", "taskbar", "launcher", "menubar"];
+
+/// Browser flags for EVERY webview. WebView2 refuses windows that share a profile but
+/// differ in flags, so tauri.conf.json carries this exact same string for the static
+/// windows. `--renderer-process-limit` makes extra windows reuse an existing renderer
+/// instead of each spawning its own (60-100 MB apiece).
+pub const WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -379,6 +399,12 @@ pub fn shell_toggle_desktop(app: AppHandle) -> Result<bool, String> {
 pub fn shell_set_explorer_chrome_hidden(hidden: bool) {
   SHELL_CHROME_HIDDEN.store(hidden, Ordering::Relaxed);
   win::set_explorer_chrome_visible(!hidden);
+  // Whatever happens to us from here on, Explorer's taskbar comes back.
+  if hidden {
+    crate::engine::guard::register("explorer-chrome", || win::set_explorer_chrome_visible(true));
+  } else {
+    crate::engine::guard::cancel("explorer-chrome");
+  }
 }
 
 pub fn restore_on_exit() {
@@ -391,6 +417,11 @@ pub fn restore_on_exit() {
 #[tauri::command]
 pub fn shell_set_keyboard_hook(enabled: bool) {
   win::set_keyboard_hook(enabled);
+  if enabled {
+    crate::engine::guard::register("keyboard-hook", || win::set_keyboard_hook(false));
+  } else {
+    crate::engine::guard::cancel("keyboard-hook");
+  }
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -537,6 +568,7 @@ pub async fn shell_open_app(app: AppHandle, req: OpenAppRequest) -> Result<(), S
     .inner_size(req.width, req.height)
     .min_inner_size(req.min_width, req.min_height)
     .decorations(false)
+    .additional_browser_args(WEBVIEW_ARGS)
     .shadow(true)
     .visible(false)
     .skip_taskbar(true)
@@ -546,6 +578,7 @@ pub async fn shell_open_app(app: AppHandle, req: OpenAppRequest) -> Result<(), S
     _ => builder.center(),
   };
   let window = builder.build().map_err(|e| format!("could not open {}: {e}", req.app_id))?;
+  crate::engine::governor::attach(&window);
   crate::webview_permissions::allow_media_capture(&window);
   if let Ok(h) = hwnd_of(&window) {
     win::round_corners(h);
@@ -576,6 +609,7 @@ pub async fn shell_prewarm_apps(app: AppHandle, app_ids: Vec<String>) -> Result<
       .title(&app_id)
       .inner_size(1024.0, 700.0)
       .decorations(false)
+      .additional_browser_args(WEBVIEW_ARGS)
       .shadow(true)
       .visible(false)
       .skip_taskbar(true)
@@ -583,6 +617,7 @@ pub async fn shell_prewarm_apps(app: AppHandle, app_ids: Vec<String>) -> Result<
       .center()
       .build()
     {
+      crate::engine::governor::attach_prewarmed(&window);
       crate::webview_permissions::allow_media_capture(&window);
       if let Ok(h) = hwnd_of(&window) {
         win::round_corners(h);

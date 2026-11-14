@@ -6,6 +6,7 @@ import { getTaskbarPref, setTaskbarPref } from '@/integrations/taskbar-prefs/cli
 import { inTauri, onDirChanged, shell } from '@/os/kernel/shell'
 import { useQuickstarts, type Quickstart } from '@/os/kernel/quickstarts'
 import type { Cell, IconSize, SortBy } from './layout'
+import { usePoll } from '@/os/kernel/poll'
 
 export interface DesktopItem extends FileEntry {
   id: string
@@ -104,10 +105,7 @@ export function useDesktopItems() {
     if (info) setBinFull(info.itemCount > 0)
   }, [])
 
-  useEffect(() => {
-    const t = setInterval(() => void refreshBin(), 10_000)
-    return () => clearInterval(t)
-  }, [refreshBin])
+  usePoll(() => void refreshBin(), 10_000)
 
   const reload = useCallback(async (dirList: string[]) => {
     const lists = await Promise.all(dirList.map((d) => listDir(d).catch(() => [] as FileEntry[])))

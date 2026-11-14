@@ -12,6 +12,7 @@ mod client_tracker;
 mod daily_brief;
 mod db;
 mod document_reader;
+mod engine;
 mod file_explorer;
 mod folder_watcher;
 mod general_chat;
@@ -109,6 +110,7 @@ pub fn run() {
         .build(),
     )
     .invoke_handler(tauri::generate_handler![
+      engine::engine_health,
       focus_video::focus_video_port,
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,
@@ -460,6 +462,7 @@ pub fn run() {
     ])
     .setup(|app| {
       eprintln!("[udaan] setup() entered");
+      engine::install(app.handle());
       focus_video::start();
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -504,6 +507,9 @@ pub fn run() {
       let daily_brief_state = daily_brief::init(app.handle()).map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
       app.manage(daily_brief_state);
       app.manage(claude_usage::ClaudeUsageState::default());
+
+      // All state is registered: only now may the shell's pages start loading.
+      engine::create_windows(app.handle());
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);
@@ -590,6 +596,8 @@ pub fn run() {
           }
         }
         shell::restore_on_exit();
+        // Anything still registered with the engine's guard: undo it.
+        engine::guard::run_all();
       }
     });
 }

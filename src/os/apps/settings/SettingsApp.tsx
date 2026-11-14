@@ -72,7 +72,6 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Notification Center', section: 'notifications', keywords: 'alerts missed' },
   { title: 'Banner duration and previews', section: 'notifications', keywords: 'banner message preview seconds' },
   { title: 'Mute an app', section: 'notifications', keywords: 'silence allow notifications from' },
-  { title: 'Dock magnification', section: 'dock', keywords: 'zoom hover icons swell' },
   { title: '24-hour clock and seconds', section: 'dock', keywords: 'menu bar time format' },
   { title: 'Motivation video', section: 'dock', keywords: 'focus pill youtube menu bar' },
   { title: 'Windows key', section: 'keyboard', keywords: 'win shortcut launcher start' },
@@ -216,7 +215,6 @@ function DockSection() {
           onApply={(v) => (v ? activateShell(true) : deactivateShell())}
         />
         <PrefToggleRow title="Automatically hide the dock" description="The dock slides away and returns when you move the pointer to the bottom edge." pref="dock.autoHide" />
-        <PrefToggleRow title="Magnification" description="Icons swell smoothly as the pointer moves along the dock." pref="dock.magnify" />
       </Group>
       <Group title="Menu Bar">
         <PrefToggleRow title="24-hour clock" description="Show the time as 14:30 instead of 2:30 PM." pref="menubar.clock24" />

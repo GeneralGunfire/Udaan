@@ -1,3 +1,25 @@
+[workspace]
+members = [".", "shell-watchdog"]
+resolver = "2"
+
+# Udaan's autostart runs this release build directly on a low-RAM machine
+# (see memory: udaan-runs-release-build), so startup time and binary size
+# matter as much as steady-state throughput. `panic = "abort"` is
+# deliberately NOT set: src/shell/fs.rs relies on `catch_unwind` to recover
+# from a panic in the `trash` crate's COM-apartment init, which only works
+# with the default unwinding panic strategy — abort would turn a Recycle
+# Bin edge case into a full process crash instead of a clean error.
+#
+# `lto = "thin"` + `codegen-units = 1` were tried here and reverted: a
+# build with them crashed on launch with STATUS_ILLEGAL_INSTRUCTION
+# (0xc000001d) — either a genuine miscompilation surfaced by the more
+# aggressive optimization, or some other interaction specific to this
+# binary. Only `strip` (binary size, no codegen change) is kept; opt-level
+# 3 is Cargo's own release default, listed explicitly rather than implied.
+[profile.release]
+opt-level = 3
+strip = true
+
 [package]
 name = "app"
 version = "0.1.0"
@@ -14,6 +36,20 @@ rust-version = "1.77.2"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+# Compiles cpal's ASIO backend, which makes ASIO devices appear alongside
+# WASAPI ones in Studio's audio-device picker. OFF by default because it
+# is not a pure-Rust build: it requires the Steinberg ASIO SDK on disk,
+# LLVM/libclang installed, and an ASIO_DIR environment variable pointing
+# at the SDK. Enabling it without that toolchain fails the build, so it
+# stays an explicit opt-in (`cargo build --features studio-asio`) rather
+# than a default that breaks `cargo build` for everyone.
+#
+# Studio degrades honestly when this is off: the driver picker simply
+# does not offer ASIO, instead of showing an option that cannot work.
+studio-asio = ["cpal/asio"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
 
@@ -21,16 +57,82 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.11.3", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "sync", "time", "macros"] }
 sysinfo = "0.33"
 lopdf = "0.36"
+dirs = "5"
+opener = "0.7"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+base64 = "0.22"
+lofty = "0.21"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["native-tls", "json"] }
+mp3lame-encoder = "0.2"
+
+# --- Studio native audio engine -------------------------------------------
+# cpal drives the real-time output/input streams. Its ASIO backend is
+# deliberately NOT enabled by default: building it requires the Steinberg
+# ASIO SDK plus LLVM/libclang and an ASIO_DIR env var, which would turn a
+# plain `cargo build` into a multi-step manual setup for every developer.
+# It is exposed as the optional `studio-asio` feature below instead, so
+# WASAPI (shared and exclusive) works out of the box and ASIO is a
+# deliberate opt-in build.
+cpal = "0.18"
+# Decodes the instrument sample library (and any imported audio) into raw
+# PCM. Pure Rust, so it adds no native toolchain requirement.
+symphonia = { version = "0.6", features = ["mp3", "wav", "ogg", "vorbis", "flac", "isomp4", "aac"] }
+# Sample-rate conversion: sample files are whatever rate they were
+# authored at, while the output stream runs at the device's rate. Without
+# resampling every sample would play back detuned and at the wrong speed.
+rubato = "5.0"
+# WAV writing for stem/mixdown export.
+hound = "3.5"
+# Lock-free SPSC ring buffer for UI-thread -> audio-thread commands. The
+# audio callback must never block, so it can never take a Mutex; this is
+# the standard wait-free channel for that boundary.
+rtrb = "0.4"
+tauri-plugin-shell = "2.3.6"
+trash = "5"
+notify = "8"
+ort = { version = "2.0.0-rc.9", features = ["ndarray"] }
+midir = "0.11.1"
+midly = "0.5.3"
+flate2 = "1.1.10"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
+winreg = "0.55"
+wasapi = "0.17"
+rustfft = "6.4"
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Shell",
+  "Win32_UI_Accessibility",
+  "Win32_Graphics_Gdi",
+  "Win32_System_Threading",
+  "Win32_System_ProcessStatus",
+  "Win32_System_Power",
+  "Win32_System_SystemServices",
+  "Win32_UI_HiDpi",
+  "Win32_NetworkManagement_WiFi",
+  "Win32_Networking_WinSock",
+  "Win32_Graphics_Dwm",
+  "Win32_Storage_FileSystem",
+  "Win32_Security",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_LibraryLoader",
+  "Win32_Storage_Xps",
+] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging", "Win32_System_Com", "Win32_Storage_FileSystem", "Win32_UI_Shell_Common", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation", "Win32_Graphics_Gdi", "Win32_System_Com_StructuredStorage", "Win32_System_Power", "Win32_System_Shutdown", "Win32_System_WindowsProgramming", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Media_Control", "Foundation", "Storage_Streams", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock"] }
+clipboard-win = { version = "5", features = ["monitor"] }

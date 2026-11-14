@@ -97,32 +97,47 @@ pub fn start_clipboard_watch(app: AppHandle) {
     }
     *CLIP_FILE.lock().unwrap() = Some(file);
   }
+  // Event-driven: Windows posts a message when the clipboard changes and `Monitor::recv`
+  // blocks on it, so an idle clipboard costs no wake-ups (this used to poll every 600 ms
+  // for the life of the session). Polling remains only as a fallback if the monitor
+  // window cannot be created. Runs under the engine's supervisor.
   #[cfg(windows)]
-  std::thread::Builder::new()
-    .name("udaan-clipboard".into())
-    .spawn(move || {
-      let mut last = clipboard_win::raw::seq_num().map(|n| n.get()).unwrap_or(0);
-      loop {
-        std::thread::sleep(Duration::from_millis(600));
-        let seq = clipboard_win::raw::seq_num().map(|n| n.get()).unwrap_or(0);
-        if seq == last {
-          continue;
-        }
-        last = seq;
-        if *SUPPRESS_SEQ.lock().unwrap() == seq {
-          continue;
-        }
-        // The clipboard can be briefly locked by the app that just wrote it.
-        let item = (0..3).find_map(|_| {
-          let _clip = clipboard_win::Clipboard::new_attempts(10).ok()?;
-          read_clipboard(&app)
-        });
-        if let Some(item) = item {
-          push_clip(&app, item);
-        }
+  {
+    let mut last = clipboard_win::raw::seq_num().map(|n| n.get()).unwrap_or(0);
+    let mut on_change = move |app: &AppHandle| {
+      let seq = clipboard_win::raw::seq_num().map(|n| n.get()).unwrap_or(0);
+      if seq == last {
+        return;
       }
-    })
-    .ok();
+      last = seq;
+      if *SUPPRESS_SEQ.lock().unwrap() == seq {
+        return;
+      }
+      // The clipboard can be briefly locked by the app that just wrote it.
+      let item = (0..3).find_map(|_| {
+        let _clip = clipboard_win::Clipboard::new_attempts(10).ok()?;
+        read_clipboard(app)
+      });
+      if let Some(item) = item {
+        push_clip(app, item);
+      }
+    };
+    let _ = crate::engine::supervisor::spawn("clipboard", crate::engine::supervisor::Restart::OnPanic, move || {
+      match clipboard_win::Monitor::new() {
+        Ok(mut monitor) => loop {
+          match monitor.recv() {
+            Ok(true) => on_change(&app),
+            Ok(false) => return,
+            Err(_) => std::thread::sleep(Duration::from_secs(1)),
+          }
+        },
+        Err(_) => loop {
+          std::thread::sleep(Duration::from_millis(600));
+          on_change(&app);
+        },
+      }
+    });
+  }
 }
 
 #[tauri::command]

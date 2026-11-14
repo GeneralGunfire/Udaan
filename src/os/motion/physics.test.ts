@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { durationForDistance, durationStep, overshoot, settleTime, spring } from './physics'
-import { elevation, innerRadius, magnification, space, type, typeStep } from '../design/scale'
+import { elevation, innerRadius, space, type, typeStep } from '../design/scale'
 
 describe('spring', () => {
   it('is critically damped at ratio 1', () => {
@@ -63,11 +63,5 @@ describe('layout scale', () => {
   it('doubles shadow offset per elevation level', () => {
     expect(elevation(2)).toContain('0 4px 12px')
     expect(elevation(3)).toContain('0 8px 24px')
-  })
-
-  it('magnifies smoothly: peak under the pointer, none beyond reach', () => {
-    expect(magnification(0)).toBeCloseTo(1.6)
-    expect(magnification(2.5)).toBe(1)
-    expect(magnification(1)).toBeGreaterThan(magnification(2))
   })
 })

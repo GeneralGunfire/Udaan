@@ -4,6 +4,7 @@ import { weatherCodeToGlyph, weatherCodeToLabel } from '@/integrations/weather/w
 import { CATEGORY_COLOUR, useAgenda, useWeather } from '@/os/launcher/MyDay'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 import { getPref, setPref, usePref } from '@/os/kernel/prefs'
+import { usePoll } from '@/os/kernel/poll'
 import { batteryStatus, type BatteryStatus } from '@/integrations/quick-settings/client'
 import { listNotes, readNoteBody, saveNoteBody, type NoteMeta } from '@/integrations/notes/client'
 import { openApp } from '@/os/kernel/shell'
@@ -116,10 +117,7 @@ export function Tile({ children, className = '' }: { children: ReactNode; classN
 
 function useNow(everyMs: number) {
   const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), everyMs)
-    return () => clearInterval(t)
-  }, [everyMs])
+  usePoll(() => setNow(new Date()), everyMs)
   return now
 }
 
@@ -263,12 +261,7 @@ function Ring({ value, color, label }: { value: number; color: string; label: st
 
 function SystemWidget() {
   const [load, setLoad] = useState<Load | null>(null)
-  useEffect(() => {
-    const poll = () => void invoke<Load>('shell_system_load').then(setLoad, () => {})
-    poll()
-    const t = setInterval(poll, 3000)
-    return () => clearInterval(t)
-  }, [])
+  usePoll(() => void invoke<Load>('shell_system_load').then(setLoad, () => {}), 3000)
   return (
     <Tile className="flex flex-col !p-3.5">
       <p className="text-[11px] font-bold uppercase tracking-wide text-(--os-text-dim)">System</p>
@@ -282,12 +275,7 @@ function SystemWidget() {
 
 function NowPlayingWidget() {
   const [np, setNp] = useState<NowPlaying | null>(null)
-  useEffect(() => {
-    const poll = () => void invoke<NowPlaying | null>('shell_now_playing').then(setNp, () => {})
-    poll()
-    const t = setInterval(poll, 2000)
-    return () => clearInterval(t)
-  }, [])
+  usePoll(() => void invoke<NowPlaying | null>('shell_now_playing').then(setNp, () => {}), 2000)
   return (
     <Tile className="flex items-center gap-4">
       <span className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#fa2d48] to-[#a02bd6] shadow-lg">
@@ -347,12 +335,7 @@ function AgendaWidget() {
 
 function BatteryWidget() {
   const [bat, setBat] = useState<BatteryStatus | null>(null)
-  useEffect(() => {
-    const poll = () => void batteryStatus().then(setBat, () => {})
-    poll()
-    const t = setInterval(poll, 15_000)
-    return () => clearInterval(t)
-  }, [])
+  usePoll(() => void batteryStatus().then(setBat, () => {}), 15_000)
   const pct = bat?.percent ?? 0
   const low = pct <= 20 && !bat?.isCharging
   const color = low ? '#ff453a' : bat?.isCharging ? '#30d158' : 'rgb(255 255 255 / 0.92)'
@@ -382,16 +365,14 @@ function BatteryWidget() {
 
 function StorageWidget() {
   const [drive, setDrive] = useState<{ name: string; total: number; free: number } | null>(null)
-  useEffect(() => {
-    const poll = () =>
+  usePoll(
+    () =>
       void invoke<{ mount: string; name: string; total: number; free: number }[]>('storage_drives').then(
         (drives) => setDrive(drives.find((d) => d.mount.startsWith('C')) ?? drives[0] ?? null),
         () => {},
-      )
-    poll()
-    const t = setInterval(poll, 60_000)
-    return () => clearInterval(t)
-  }, [])
+      ),
+    60_000,
+  )
   const used = drive ? drive.total - drive.free : 0
   const pct = drive && drive.total > 0 ? Math.round((used / drive.total) * 100) : 0
   const fmt = (b: number) => `${(b / 1_000_000_000).toFixed(0)} GB`

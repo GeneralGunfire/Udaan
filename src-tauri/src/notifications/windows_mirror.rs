@@ -4,7 +4,7 @@
 //! The WinRT listener API needs a packaged app, so instead this reads the
 //! per-user notification database Windows itself keeps
 //! (%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db),
-//! read-only, polling for rows newer than the last one seen.
+//! read-only, for rows newer than the last one seen. Woken by file-change events.
 
 use base64::Engine;
 use rusqlite::{Connection, OpenFlags};
@@ -210,13 +210,33 @@ fn max_id(conn: &Connection) -> i64 {
   conn.query_row("SELECT COALESCE(MAX(Id), 0) FROM Notification", [], |r| r.get(0)).unwrap_or(0)
 }
 
+/// How long to wait with no change event before checking anyway. Only a safety net:
+/// the watcher below wakes the loop the moment Windows writes a notification.
+const SAFETY_POLL: Duration = Duration::from_secs(60);
+
 pub fn start(app: AppHandle) {
-  std::thread::Builder::new()
-    .name("udaan-windows-notifications".into())
-    .spawn(move || {
+  crate::engine::supervisor::spawn("windows-notifications", crate::engine::supervisor::Restart::OnPanic, move || {
+      // Wake on writes to the notification database's folder instead of reopening the
+      // database every two seconds for the life of the session. If the watcher cannot be
+      // created, fall back to the old short poll.
+      let (tx, rx) = std::sync::mpsc::channel::<()>();
+      let _watcher = db_path().and_then(|p| p.parent().map(|d| d.to_path_buf())).and_then(|dir| {
+        use notify::Watcher;
+        let mut w = notify::recommended_watcher(move |_res: notify::Result<notify::Event>| {
+          let _ = tx.send(());
+        })
+        .ok()?;
+        w.watch(&dir, notify::RecursiveMode::NonRecursive).ok()?;
+        Some(w)
+      });
+      let wait = if _watcher.is_some() { SAFETY_POLL } else { POLL };
       let mut last: Option<i64> = None;
       loop {
-        std::thread::sleep(POLL);
+        // Block until something changed (or the safety timeout), then let a burst of
+        // writes settle so one notification is one read.
+        let _ = rx.recv_timeout(wait);
+        std::thread::sleep(Duration::from_millis(150));
+        while rx.try_recv().is_ok() {}
         let Some(conn) = open() else { continue };
         // Only notifications that arrive while Udaan runs.
         let Some(seen) = last else {
@@ -278,8 +298,8 @@ pub fn start(app: AppHandle) {
           }
         }
       }
-    })
-    .expect("spawn windows notification mirror");
+  })
+  .expect("spawn windows notification mirror");
 }
 
 #[cfg(test)]

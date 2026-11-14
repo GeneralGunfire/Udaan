@@ -81,8 +81,6 @@ export const springs = {
   window: spring(0.42, 0.82),
   /** Flyouts, dropdowns, popovers: critically damped, no overshoot. */
   flyout: spring(0.3, 1),
-  /** Dock magnification on hover. Light mass so it tracks the pointer 1:1. */
-  magnify: spring(0.3, 0.7, 0.5),
   /** Playful emphasis: completed actions, launch bounce, success. */
   bounce: spring(0.4, 0.45),
   /** Active indicator pill (e.g. dot under focused dock icon). */

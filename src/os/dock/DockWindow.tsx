@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
 import { useImmersive } from '@/os/kernel/useImmersive'
-import { motion, useAnimationControls, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion'
+import { motion, useAnimationControls } from 'framer-motion'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
@@ -16,7 +16,6 @@ import { useShellMenu, type ShellMenuItemDef } from '@/os/ui/useShellMenu'
 import { StartTile, TrashGlyph } from '@/os/ui/icons/SystemGlyphs'
 import { useLatest } from '@/os/ui/useLatest'
 import { launchBounce, minimizeNudge, restoreNudge, focusPop, curve, dur, springs } from '@/os/motion/systemMotion'
-import { magnification } from '@/os/design/scale'
 import { playSound } from '@/os/sound/sounds'
 import { dockMetrics } from './geometry'
 import { isPermanent, savePins, togglePin } from './pins'
@@ -95,13 +94,9 @@ function DockIcon({
   dragOffset,
   onPointerDown,
   onOpenMenu,
-  mouseX,
-  magnify,
 }: {
   item: DockItem
   foreground: number
-  mouseX: MotionValue<number>
-  magnify: boolean
   dragOffset: { x: number; y: number } | null
   onPointerDown: (e: React.PointerEvent, item: DockItem, el: HTMLElement) => void
   onOpenMenu: (e: React.MouseEvent, items: ShellMenuItemDef[]) => void
@@ -112,14 +107,6 @@ function DockIcon({
   const [launching, setLaunching] = useState(false)
   const prevMin = useRef(item.allMinimized)
   const wheel = useRef(0)
-
-  // Magnification: how far the pointer is from this icon's centre, in slots, drives a smooth bump.
-  const distance = useTransform(mouseX, (x) => {
-    const r = ref.current?.getBoundingClientRect()
-    return r ? (x - (r.left + r.width / 2)) / METRICS.slot : Infinity
-  })
-  const bump = useTransform(distance, (d) => (magnify ? magnification(d, 1.45, 2) : 1))
-  const grow = useSpring(bump, { stiffness: springs.magnify.stiffness, damping: springs.magnify.damping, mass: springs.magnify.mass })
 
   const bouncing = launching && item.windows.length === 0
   useEffect(() => {
@@ -184,14 +171,11 @@ function DockIcon({
       className="group relative flex shrink-0 items-end justify-center rounded-[14px] pb-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]/40"
     >
       <DockLabel text={item.name} count={count} />
-      {/* The icon stack. `originY: 1` anchors magnification to the icon's
-          FEET, so growing pushes it up out of the dock rather than expanding
-          it through the bar's floor — the detail that makes macOS's
-          magnification look like the icons are rising to meet the pointer. */}
+      {/* The icon stack. Icons keep a fixed size: no magnification. */}
       <motion.span
         animate={controls}
         className="relative flex origin-bottom transition-transform duration-150 ease-out group-active:scale-[0.9]"
-        style={{ width: METRICS.iconSize, height: METRICS.iconSize, scale: grow, originY: 1 }}
+        style={{ width: METRICS.iconSize, height: METRICS.iconSize }}
       >
         <DockGlyph item={item} />
         {/* Reflection: a flipped, faded copy of the icon on the dock floor.
@@ -278,8 +262,6 @@ function DockGlyph({ item }: { item: DockItem }) {
 
 export function DockWindow() {
   const [autoHide] = usePref('dock.autoHide')
-  const [magnify] = usePref('dock.magnify')
-  const mouseX = useMotionValue(Infinity)
   const { items, pins, pinnedCount } = useDockItems()
   const foreground = useShell((s) => s.foreground)
   const immersive = useImmersive()
@@ -570,11 +552,7 @@ export function DockWindow() {
         transition={reduced ? { duration: dur.fade } : visible ? { type: 'spring', stiffness: 420, damping: 36 } : { duration: dur.normal, ease: curve.accelerate }}
         onPointerEnter={() => setIgnore(false)}
         onPointerDownCapture={() => setSuppressLabels(true)}
-        onPointerMove={(e) => mouseX.set(e.clientX)}
-        onPointerLeave={() => {
-          setSuppressLabels(false)
-          mouseX.set(Infinity)
-        }}
+        onPointerLeave={() => setSuppressLabels(false)}
         onContextMenu={(e) => {
           e.preventDefault()
           openMenu(e, dockMenuItems)
@@ -603,7 +581,7 @@ export function DockWindow() {
 
         {items.flatMap((item, i) => {
           const icon = (
-            <DockIcon key={item.key} item={item} foreground={foreground} dragOffset={drag?.key === item.key ? { x: drag.dx, y: drag.dy } : null} onPointerDown={onPointerDown} onOpenMenu={openMenu} mouseX={mouseX} magnify={magnify} />
+            <DockIcon key={item.key} item={item} foreground={foreground} dragOffset={drag?.key === item.key ? { x: drag.dx, y: drag.dy } : null} onPointerDown={onPointerDown} onOpenMenu={openMenu} />
           )
           return i === pinnedCount && pinnedCount > 0 ? [<Divider key="div-running" />, icon] : [icon]
         })}

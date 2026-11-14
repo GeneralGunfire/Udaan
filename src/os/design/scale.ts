@@ -61,14 +61,3 @@ export function elevation(level: 1 | 2 | 3 | 4 | 5): string {
 
 /** Minimum pointer target, from Fitts's law practice: 24px on dense desktop UI, 44px for touch. */
 export const TARGET = { desktop: 24, touch: 44 } as const
-
-/**
- * Dock magnification, as a smooth bump instead of a step. An icon at
- * distance `d` (in icon-widths) from the pointer scales by
- * 1 + (peak - 1)·cos²(π·d / (2·reach)) inside `reach`, and 1 outside.
- */
-export function magnification(distance: number, peak = 1.6, reach = 2.5): number {
-  const d = Math.abs(distance)
-  if (d >= reach) return 1
-  return 1 + (peak - 1) * Math.cos((Math.PI * d) / (2 * reach)) ** 2
-}

@@ -4,36 +4,40 @@
   "version": "0.1.0",
   "identifier": "dev.udaan.workstation",
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "node scripts/build-watchdog.mjs && pnpm dev",
+    "beforeBuildCommand": "node scripts/build-watchdog.mjs && pnpm build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
       {
-        "title": "Udaan",
+        "title": "Udaan Desktop",
         "width": 1440,
         "height": 900,
-        "minWidth": 1024,
-        "minHeight": 700,
-        "resizable": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
         "fullscreen": false,
         "transparent": false,
         "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
         "backgroundColor": "#0b0f16",
         "visible": false
       },
       {
         "label": "taskbar",
-        "title": "Udaan Taskbar",
+        "title": "Udaan Dock",
         "url": "index.html?window=taskbar",
-        "width": 960,
-        "height": 104,
+        "width": 1200,
+        "height": 120,
         "resizable": false,
         "fullscreen": false,
         "transparent": true,
         "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
@@ -49,6 +53,79 @@
         "fullscreen": false,
         "transparent": true,
         "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "launcher",
+        "title": "Udaan Launcher",
+        "url": "index.html?window=launcher",
+        "width": 1280,
+        "height": 800,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
+      },
+      {
+        "label": "toast",
+        "title": "Udaan Notifications",
+        "url": "index.html?window=toast",
+        "width": 380,
+        "height": 120,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "edgelight",
+        "title": "Udaan Edge Light",
+        "url": "index.html?window=edgelight",
+        "width": 800,
+        "height": 600,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "menubar",
+        "title": "Udaan Menu Bar",
+        "url": "index.html?window=menubar",
+        "width": 1280,
+        "height": 30,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=2",
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
@@ -57,10 +134,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost https://demotiles.maplibre.org; media-src 'self' data: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' http://localhost:20128 https://demotiles.maplibre.org https://api.open-meteo.com https://raw.githubusercontent.com https://tonejs.github.io asset: http://asset.localhost; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+      "csp": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: asset: http://asset.localhost; media-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:20128 https://api.open-meteo.com https://raw.githubusercontent.com https://tonejs.github.io asset: http://asset.localhost; frame-src http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -80,6 +159,10 @@
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"
-    }
-  }
+    },
+    "externalBin": [
+      "binaries/shell-watchdog"
+    ]
+  },
+  "mainBinaryName": "Udaan"
 }
