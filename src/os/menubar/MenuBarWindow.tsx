@@ -21,6 +21,7 @@ import { Artwork, mediaCommand, openLiveDj } from '@/os/dock/panels/MediaPanel'
 import { useNowPlaying } from '@/os/dock/panels/useNowPlaying'
 import type { PanelKind, ShowFlyoutPayload } from '@/os/dock/taskbarPopupTypes'
 import { playSound } from '@/os/sound/sounds'
+import { showPopup } from '@/os/dock/showPopup'
 import { badgePop } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 
@@ -261,7 +262,7 @@ export function MenuBarWindow() {
       }
       setPanel(which)
       playSound('tap')
-      void emit('taskbar-popup:show', payload)
+      showPopup(payload, () => setPanel(null))
     },
     // refs are stable objects
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { emit, listen } from '@tauri-apps/api/event'
+import { listen } from '@tauri-apps/api/event'
+import { showPopup } from '@/os/dock/showPopup'
 import type { FlyoutMenuItem } from '@/os/dock/taskbarPopupTypes'
 
 export interface ShellMenuItemDef {
@@ -50,7 +51,7 @@ export function useShellMenu() {
       return { label: it.label, danger: it.danger, disabled: it.disabled, id }
     })
     pending.current = map
-    void emit('taskbar-popup:show', { kind: 'context-menu', x, y, placement: opts?.up ? 'point-up' : 'point', items: payload })
+    showPopup({ kind: 'context-menu', x, y, placement: opts?.up ? 'point-up' : 'point', items: payload })
   }, [])
 
   return openMenu

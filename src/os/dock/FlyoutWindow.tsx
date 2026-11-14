@@ -149,6 +149,8 @@ export function FlyoutWindow() {
       await invoke('shell_set_window_rect', { x, y, w: finalW, h })
       void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
       await invoke('engine_popup_present')
+      // Tell whoever asked that the popup is really up (a request sent before this window finished loading is lost, so they retry until they hear this).
+      void emit('taskbar-popup:shown')
       // Any click outside the popup (the desktop included) closes it.
       void invoke('engine_popup_watch', { on: true }).catch(() => {})
     })()
