@@ -25,7 +25,6 @@ import { badgePop, springs, valueChange } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 
 export const MENU_BAR_HEIGHT = 34
-const TOPMOST_REASSERT_MS = 2000
 
 type Zone = { x: number; y: number; w: number; h: number }
 const snap = (handle: number, zone: Zone) => invoke('shell_snap_window', { handle, zone })
@@ -214,27 +213,26 @@ export function MenuBarWindow() {
       try {
         const m = await shell.reserveTopEdge(fullscreen ? 0 : h)
         if (cancelled) return
-        if (fullscreen) return void (await win.hide())
+        if (fullscreen) {
+          await invoke('engine_unpin')
+          return void (await win.hide())
+        }
         // Rust has already placed the window flush with the top edge.
         void m
         await win.show()
-        // Showing can nudge it; put it back once it's visible.
+        // Showing can nudge it; put it back once it's visible, then let the engine keep it
+        // there: it re-checks only on real window events, instead of this window polling.
         await invoke('shell_keep_at_top', { heightPx: h })
+        await invoke('engine_pin', { edge: 'top', heightPx: h })
       } catch (err) {
         console.error('[menubar] placement failed', err)
       }
     }
     void place()
     const offLayout = onLayoutChange(() => void place())
-    // Re-placing (not just re-raising) undoes anything that nudged the bar off the edge.
-    const t = setInterval(() => {
-      if (fullscreen) return
-      void invoke('shell_keep_at_top', { heightPx: Math.round(MENU_BAR_HEIGHT * pxScale()) }).catch(() => {})
-    }, TOPMOST_REASSERT_MS)
     return () => {
       cancelled = true
       offLayout()
-      clearInterval(t)
     }
   }, [fullscreen])
 

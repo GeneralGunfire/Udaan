@@ -111,6 +111,8 @@ pub fn run() {
     )
     .invoke_handler(tauri::generate_handler![
       engine::engine_health,
+      engine::pin::engine_pin,
+      engine::pin::engine_unpin,
       focus_video::focus_video_port,
       claude_code::claude_code_submit_task,
       claude_code::claude_code_list_tasks,

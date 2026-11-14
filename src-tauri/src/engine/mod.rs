@@ -10,14 +10,22 @@
 //!   recorded, and the service restarted with backoff; health is queryable.
 //! - [`guard`]: every change made to the OS registers its own undo. All undos run on
 //!   exit and on a main-thread panic, so the OS is never left altered.
+//! - [`desktop`]: the wallpaper/icons layer: always the bottom of the stack, fitted to the
+//!   primary monitor, and recovered when monitors, DPI or Explorer change.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
 //!   can see (hidden, minimised, or covered by a maximised window) stops compositing.
+//! - [`pin`]: keeps the dock and menu bar on their screen edge, event-driven instead of by timer.
+//! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
 //! - [`trace`]: a small crash-safe breadcrumb log, because a release build has no console.
 
+pub mod desktop;
 pub mod governor;
 pub mod guard;
+pub mod pin;
+pub mod resources;
 pub mod supervisor;
 pub mod trace;
+pub mod watchdog;
 
 use tauri::AppHandle;
 

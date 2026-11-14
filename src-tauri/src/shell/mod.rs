@@ -208,6 +208,7 @@ fn publish(app: &AppHandle) {
   let snap = build_snapshot(app);
   // The engine decides from the real window state which webviews may render.
   crate::engine::governor::reconcile(app, &snap);
+  crate::engine::pin::reassert(snap.fullscreen);
   let windows_changed = {
     let mut prev = last().lock().unwrap();
     if *prev == snap {
@@ -402,8 +403,24 @@ pub fn shell_set_explorer_chrome_hidden(hidden: bool) {
   // Whatever happens to us from here on, Explorer's taskbar comes back.
   if hidden {
     crate::engine::guard::register("explorer-chrome", || win::set_explorer_chrome_visible(true));
+    // The undo above can't run if we are killed outright; this separate process can.
+    crate::engine::watchdog::ensure_started();
   } else {
     crate::engine::guard::cancel("explorer-chrome");
+  }
+}
+
+/// The desktop layer saw a display, DPI or work-area change: tell every shell window so
+/// each re-places itself.
+pub(crate) fn notify_display_changed() {
+  send_hotkey("display-changed");
+}
+
+/// Explorer restarted (its taskbar was re-created). If we are hiding Explorer's chrome,
+/// hide the new one too.
+pub(crate) fn on_explorer_restarted() {
+  if SHELL_CHROME_HIDDEN.load(Ordering::Relaxed) {
+    win::set_explorer_chrome_visible(false);
   }
 }
 
@@ -448,6 +465,17 @@ pub fn shell_reserve_top_edge(window: tauri::WebviewWindow, thickness_px: i32) -
 /// from the webview lands it offset once AppBars have changed the work area.
 /// Keeps the CALLING window flush with the top of its monitor (menu bar),
 /// without touching its AppBar registration.
+/// Puts a pinned bar back on its edge (see `engine::pin`). No-op if it is already there.
+pub(crate) fn enforce_pin(hwnd: isize, top: bool, height_px: i32) -> Result<(), String> {
+  let (m, _) = win::monitor_rects(hwnd)?;
+  if top {
+    win::keep_rect(hwnd, m.left, m.top, m.right - m.left, height_px);
+  } else {
+    win::keep_rect(hwnd, m.left, m.bottom - height_px, m.right - m.left, height_px);
+  }
+  Ok(())
+}
+
 #[tauri::command]
 pub fn shell_keep_at_top(window: tauri::WebviewWindow, height_px: i32) -> Result<(), String> {
   let hwnd = hwnd_of(&window)?;
@@ -593,6 +621,17 @@ pub async fn shell_open_app(app: AppHandle, req: OpenAppRequest) -> Result<(), S
 /// user-triggered open is instant (WebView2 is already running).
 #[tauri::command]
 pub async fn shell_prewarm_apps(app: AppHandle, app_ids: Vec<String>) -> Result<(), String> {
+  // A pre-warmed window keeps a whole webview resident (about 85 MB each). On a PC without
+  // headroom that costs more in paging than it saves in open time, so skip it.
+  let cost = 90 * app_ids.len() as u64;
+  if !crate::engine::resources::can_spare(cost) {
+    crate::engine::trace::line(&format!(
+      "prewarm skipped: {} MB available, wanted {} MB plus reserve",
+      crate::engine::resources::available_mb(),
+      cost
+    ));
+    return Ok(());
+  }
   for app_id in app_ids {
     if app_id.is_empty()
       || !app_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
@@ -638,7 +677,7 @@ pub fn shell_take_app_args(window: tauri::WebviewWindow) -> Option<String> {
 /// its whole monitor. Called once from setup.
 pub fn install_desktop(window: &tauri::WebviewWindow) -> Result<(), String> {
   let hwnd = hwnd_of(window)?;
-  win::install_desktop(hwnd)?;
+  crate::engine::desktop::install(window)?;
   if session::claim_shell(hwnd) {
     log::info!("[shell] Udaan is the session shell; starting startup programs");
     std::thread::spawn(session::run_startup_programs);
@@ -920,88 +959,6 @@ mod win {
     }
   }
 
-  // --- Desktop layer ---------------------------------------------------
-
-  /// Where the desktop should sit: directly above Explorer's own desktop
-  /// windows if present (so it covers them), else the very bottom.
-  unsafe fn desktop_insert_after(me: HWND) -> Option<HWND> {
-    let mut h = GetTopWindow(std::ptr::null_mut());
-    while !h.is_null() {
-      if h != me && IsWindowVisible(h) != 0 && class_is(h, &["Progman", "WorkerW"]) {
-        let above = GetWindow(h, GW_HWNDPREV);
-        if above == me {
-          return None;
-        }
-        return Some(if above.is_null() { HWND_TOP } else { above });
-      }
-      h = GetWindow(h, GW_HWNDNEXT);
-    }
-    Some(HWND_BOTTOM)
-  }
-
-  unsafe extern "system" fn desktop_proc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-    _id: usize,
-    _data: usize,
-  ) -> LRESULT {
-    // A monitor was plugged in, removed, resized, or its scaling changed:
-    // refit the desktop and tell every shell window to re-place itself.
-    if msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || (msg == WM_SETTINGCHANGE && wparam as u32 == SPI_SETWORKAREA) {
-      if let Ok((m, _)) = monitor_rects(hwnd as isize) {
-        SetWindowPos(hwnd, HWND_BOTTOM, m.left, m.top, m.right - m.left, m.bottom - m.top, SWP_NOACTIVATE);
-      }
-      super::send_hotkey("display-changed");
-    }
-    // Monitor plugged/unplugged, resolution or scaling changed, work area moved:
-    // refit the desktop and tell every shell window to re-place itself.
-    if msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED || (msg == WM_SETTINGCHANGE && wparam == SPI_SETWORKAREA as usize) {
-      if let Ok((m, _)) = monitor_rects(hwnd as isize) {
-        SetWindowPos(hwnd, HWND_BOTTOM, m.left, m.top, m.right - m.left, m.bottom - m.top, SWP_NOACTIVATE);
-      }
-      super::send_hotkey("display-changed");
-    }
-    if msg == WM_WINDOWPOSCHANGING {
-      let wp = &mut *(lparam as *mut WINDOWPOS);
-      match desktop_insert_after(hwnd) {
-        Some(after) => {
-          wp.hwndInsertAfter = after;
-          wp.flags &= !SWP_NOZORDER;
-        }
-        None => wp.flags |= SWP_NOZORDER,
-      }
-    }
-    DefSubclassProc(hwnd, msg, wparam, lparam)
-  }
-
-  pub fn install_desktop(h: isize) -> Result<(), String> {
-    unsafe {
-      let hwnd = h as HWND;
-      let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-      // Tool-window style keeps the desktop out of Alt+Tab and Explorer's
-      // taskbar, the same as the real desktop.
-      SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW as isize) & !(WS_EX_APPWINDOW as isize));
-      if SetWindowSubclass(hwnd, Some(desktop_proc), 1, 0) == 0 {
-        return Err("SetWindowSubclass failed".into());
-      }
-      let (m, _) = monitor_rects(h)?;
-      SetWindowPos(
-        hwnd,
-        HWND_BOTTOM,
-        m.left,
-        m.top,
-        m.right - m.left,
-        m.bottom - m.top,
-        SWP_NOACTIVATE | SWP_FRAMECHANGED,
-      );
-    }
-    Ok(())
-  }
-
-  // --- AppBar ------------------------------------------------------------
-
   pub fn reserve_bottom_edge(h: isize, thickness: i32) -> Result<Rect, String> {
     reserve_edge(h, thickness, false)
   }
@@ -1027,7 +984,8 @@ mod win {
       let hwnd = h as HWND;
       let mut r: RECT = std::mem::zeroed();
       GetWindowRect(hwnd, &mut r);
-      if r.left == x && r.top == y && r.right - r.left == w && r.bottom - r.top == hgt {
+      let topmost = (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32) & WS_EX_TOPMOST != 0;
+      if topmost && r.left == x && r.top == y && r.right - r.left == w && r.bottom - r.top == hgt {
         return;
       }
       SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, hgt, SWP_NOACTIVATE);
@@ -1349,9 +1307,6 @@ mod win {
   pub fn set_explorer_chrome_visible(_: bool) {}
   pub fn set_keyboard_hook(_: bool) {}
   pub fn start_hook_thread() {}
-  pub fn install_desktop(_: isize) -> Result<(), String> {
-    Err("Windows only".into())
-  }
   pub fn reserve_bottom_edge(_: isize, _: i32) -> Result<Rect, String> {
     Err("Windows only".into())
   }

@@ -342,6 +342,9 @@ export function DockWindow() {
         geometry.current = { ...pos, scale }
         await win.show()
         await shell.placeAtBottom(h)
+        // From here the engine keeps the dock on its edge, event-driven: it re-checks
+        // only when a real window event arrives, instead of this window polling.
+        await invoke('engine_pin', { edge: 'bottom', heightPx: h })
       } catch (err) {
         console.error('[dock] placement failed', err)
       }
@@ -349,12 +352,7 @@ export function DockWindow() {
     void place()
     const un = getCurrentWindow().onScaleChanged(() => void place())
     const offLayout = onLayoutChange(() => void place())
-    const keep = setInterval(() => {
-      const g = geometry.current
-      if (g.scale) void shell.placeAtBottom(Math.round(METRICS.windowHeight * g.scale)).catch(() => {})
-    }, 2000)
     return () => {
-      clearInterval(keep)
       offLayout()
       cancelled = true
       void un.then((fn) => fn())
