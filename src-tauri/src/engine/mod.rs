@@ -25,6 +25,7 @@
 //! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
 //!   it back however the window ends.
 //! - [`wallpaper_packs`]: packs (cars, windows, abstract...) and automatic changing on a timer.
+//! - [`windowlist`]: listing real windows (Alt+Tab rules), their icons, and the Expose live thumbnails.
 //! - [`window_actions`]: focus, snap, minimise, show desktop and the other things done to windows.
 //! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
@@ -53,6 +54,7 @@ pub mod tracker;
 pub mod trace;
 pub mod wallpaper_packs;
 pub mod wallpapers;
+pub mod windowlist;
 pub mod window_actions;
 pub mod watchdog;
 

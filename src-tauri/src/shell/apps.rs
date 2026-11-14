@@ -103,7 +103,7 @@ mod imp {
         p[1] = un(g);
         p[2] = un(b);
       }
-      crate::taskbar::win::rgba_to_data_url(w as u32, h as u32, px)
+      crate::engine::windowlist::win::rgba_to_data_url(w as u32, h as u32, px)
     }
   }
 }

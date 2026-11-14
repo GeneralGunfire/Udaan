@@ -31,7 +31,6 @@ mod omni_find;
 mod studio;
 mod study;
 mod system_health;
-mod taskbar;
 mod taskbar_prefs;
 mod focus_video;
 mod news_image;
@@ -463,11 +462,11 @@ pub fn run() {
       study::study_add_message,
       study::study_list_messages,
       boot_optimize::boot_optimize_run,
-      taskbar::taskbar_list_windows,
-      taskbar::taskbar_register_thumbnail,
-      taskbar::taskbar_update_thumbnail,
-      taskbar::taskbar_unregister_thumbnail,
-      taskbar::taskbar_unregister_all_thumbnails,
+      engine::windowlist::taskbar_list_windows,
+      engine::windowlist::taskbar_register_thumbnail,
+      engine::windowlist::taskbar_update_thumbnail,
+      engine::windowlist::taskbar_unregister_thumbnail,
+      engine::windowlist::taskbar_unregister_all_thumbnails,
       taskbar_prefs::taskbar_prefs_list_pinned,
       taskbar_prefs::taskbar_prefs_set_pinned,
       taskbar_prefs::taskbar_prefs_get,
@@ -495,7 +494,7 @@ pub fn run() {
         )?;
       }
       engine::stores::manage(app.handle(), "claude_code", claude_code::init(app.handle()));
-      app.manage(taskbar::ThumbnailRegistry::default());
+      app.manage(engine::windowlist::ThumbnailRegistry::default());
       app.manage(omniroute::OmniRouteProcess::default());
       engine::stores::manage(app.handle(), "general_chat", general_chat::init(app.handle()));
       engine::stores::manage(app.handle(), "template_library", template_library::init(app.handle()));

@@ -41,7 +41,7 @@ pub fn invalidate(path: &str) {
 
 #[cfg(target_os = "windows")]
 mod imp {
-  use crate::taskbar::win::{hicon_to_rgba, rgba_to_data_url};
+  use crate::engine::windowlist::win::{hicon_to_rgba, rgba_to_data_url};
   use windows::core::HSTRING;
   use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
   use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};

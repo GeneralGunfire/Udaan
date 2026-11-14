@@ -143,7 +143,7 @@ fn build(app: &AppHandle) -> ShellSnapshot {
   let own_labels: HashMap<isize, String> =
     app.webview_windows().into_iter().filter_map(|(label, w)| w.hwnd().ok().map(|h| (h.0 as isize, label))).collect();
 
-  let windows = crate::taskbar::win::list_windows()
+  let windows = crate::engine::windowlist::win::list_windows()
     .into_iter()
     .filter_map(|w| {
       let app_id = if w.pid == own_pid {

@@ -295,7 +295,7 @@ pub fn shell_window_sizes(handles: Vec<isize>) -> HashMap<isize, (i32, i32)> {
 /// A window's own icon (WM_GETICON), for programs with no readable exe icon.
 #[tauri::command]
 pub async fn shell_window_icons(handles: Vec<isize>) -> HashMap<isize, Option<String>> {
-  tauri::async_runtime::spawn_blocking(move || handles.into_iter().map(|h| (h, crate::taskbar::win::cached_icon(h as _))).collect())
+  tauri::async_runtime::spawn_blocking(move || handles.into_iter().map(|h| (h, crate::engine::windowlist::win::cached_icon(h as _))).collect())
     .await
     .unwrap_or_default()
 }

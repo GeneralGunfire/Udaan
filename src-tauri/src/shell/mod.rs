@@ -128,7 +128,7 @@ mod tests {
 
   #[test]
   fn window_list_applies_alt_tab_rules() {
-    let list = crate::taskbar::win::list_windows();
+    let list = crate::engine::windowlist::win::list_windows();
     for w in &list {
       assert!(!w.title.is_empty());
       assert!(w.pid != 0);
