@@ -344,6 +344,8 @@ extern "system" fn dock_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     } else if wp.0 == dock::TIMER_SHRINK {
                         let _ = KillTimer(Some(hwnd), dock::TIMER_SHRINK);
                         d.shrink_if_hidden(&theme);
+                    } else if wp.0 == dock::TIMER_REGION {
+                        d.shrink_region();
                     }
                     true
                 }
@@ -493,6 +495,7 @@ fn main() -> Result<()> {
         win::register_class(dock::CLASS, Some(dock_proc));
         win::register_class(topbar::CLASS, Some(bar_proc));
         win::register_class(desktop::CLASS, Some(desktop_proc));
+        win::register_class(dock::PLATE_CLASS, Some(desktop_proc));
         win::register_class(w!("UdaanNextCore"), Some(core_proc));
 
         // Hidden top-level window (not message-only: those miss broadcasts such as

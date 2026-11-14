@@ -6,7 +6,7 @@ use windows::{
     core::{w, Result, BOOL, PCWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, RECT, WPARAM},
-        Graphics::Gdi::{CreateRoundRectRgn, EnumDisplayMonitors, SetWindowRgn, HDC, HMONITOR},
+        Graphics::Gdi::{CreateRectRgn, CreateRoundRectRgn, EnumDisplayMonitors, SetWindowRgn, HDC, HMONITOR},
         System::{
             LibraryLoader::{GetModuleHandleW, GetProcAddress},
             ProcessStatus::K32GetProcessMemoryInfo,
@@ -180,6 +180,15 @@ pub fn set_rounded_shape(hwnd: HWND, w: i32, h: i32, radius: i32) {
     unsafe {
         let d = (radius * 2).max(1);
         let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, d, d);
+        let _ = SetWindowRgn(hwnd, Some(rgn), true);
+    }
+}
+
+/// Restrict a window's hit-testable (and drawn) area to a rectangle in window coords.
+/// Used so a transparent overlay does not swallow clicks over empty headroom.
+pub fn set_rect_shape(hwnd: HWND, l: i32, t: i32, r: i32, b: i32) {
+    unsafe {
+        let rgn = CreateRectRgn(l, t, r, b);
         let _ = SetWindowRgn(hwnd, Some(rgn), true);
     }
 }

@@ -82,9 +82,12 @@ impl TopBar {
     }
 
     pub fn place(&self) {
-        let r = win::appbar_reserve(self.hwnd, Edge::Top, self.mon, self.height_px);
+        // Reserve the strip, but place the window from the monitor edge ourselves. The
+        // rect SETPOS hands back is shifted by stale registrations (e.g. a previous
+        // instance that was killed), which collapsed the bar to zero height at y=26.
+        win::appbar_reserve(self.hwnd, Edge::Top, self.mon, self.height_px);
         unsafe {
-            let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOACTIVATE);
+            let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), self.mon.left, self.mon.top, self.mon.right - self.mon.left, self.height_px, SWP_NOACTIVATE);
         }
     }
 

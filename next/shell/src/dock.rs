@@ -38,6 +38,8 @@ use windows_numerics::{Vector2, Vector3};
 pub const CLASS: windows::core::PCWSTR = w!("UdaanNextDock");
 pub const TIMER_HIDE: usize = 10;
 pub const TIMER_SHRINK: usize = 11;
+pub const TIMER_REGION: usize = 12;
+pub const PLATE_CLASS: windows::core::PCWSTR = w!("UdaanNextDockPlate");
 const TRIGGER_PX: i32 = 2;
 
 struct Item {
@@ -56,8 +58,11 @@ struct Item {
 struct Vis {
     e: Rc<Engine>,
     _target: DesktopWindowTarget,
-    /// Everything; slides as one for auto-hide.
+    _plate_target: DesktopWindowTarget,
+    /// Overlay content (icons, shadow, tag); slides as one for auto-hide.
     content: ContainerVisual,
+    /// Glass content inside the plate window; slides with `content`.
+    plate_content: ContainerVisual,
     items: Vec<Item>,
     tag: crate::gfx::Label,
     tag_bg: ContainerVisual,
@@ -78,7 +83,13 @@ struct Vis {
 }
 
 pub struct Dock {
+    /// The overlay: transparent, owns the AppBar, input, icons, shadow and name tag.
     pub hwnd: HWND,
+    /// The plate: a window EXACTLY the glass pill's size, carrying the accent blur, so
+    /// the blur can never spill into the headroom above the dock (the "blur band").
+    plate_hwnd: HWND,
+    geo: (i32, i32, i32, i32), // plate w, plate h, headroom, side room (device px)
+    region_full: bool,
     pub mon: RECT,
     pub autohide: bool,
     pub shown: bool,
@@ -107,13 +118,17 @@ fn side_room(t: &Theme, s: f32) -> f32 {
 impl Dock {
     pub fn create(e: &Rc<Engine>, mon: RECT, t: &Theme, apps: &[DockApp], want_autohide: bool, dark: bool, transparent: bool) -> Result<Dock> {
         let hwnd = win::create_window(CLASS, w!("Udaan dock"), WS_EX_TOPMOST | WS_EX_TOOLWINDOW, mon.left, mon.bottom - 10, 10, 10)?;
+        let plate_hwnd = win::create_window(PLATE_CLASS, w!("Udaan dock plate"), WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, mon.left, mon.bottom - 10, 10, 10)?;
         let autohide = win::appbar_register(hwnd, Edge::Bottom, want_autohide);
         if want_autohide && !autohide {
             println!("dock: autohide not granted on monitor ({},{}); docked instead", mon.left, mon.top);
         }
-        let mut d = Dock { hwnd, mon, autohide, shown: !autohide, vis: None, width_px: 10, height_px: 10 };
+        let mut d = Dock { hwnd, plate_hwnd, geo: (0, 0, 0, 0), region_full: false, mon, autohide, shown: !autohide, vis: None, width_px: 10, height_px: 10 };
         d.rebuild(e, t, apps, dark, transparent)?;
         unsafe {
+            if d.shown {
+                let _ = ShowWindow(plate_hwnd, SW_SHOWNA);
+            }
             let _ = ShowWindow(hwnd, SW_SHOWNA);
         }
         Ok(d)
@@ -127,14 +142,17 @@ impl Dock {
         let side = side_room(t, s);
         self.width_px = (pw + 2.0 * side) as i32;
         self.height_px = (ph + head) as i32;
+        self.geo = (pw as i32, ph as i32, head as i32, side as i32);
         self.place(t);
 
-        // Accent blur on the window; the composition rounded clip shapes it (measured:
-        // the clip IS respected on this machine). The headroom stays transparent.
+        // Accent blur goes on the PLATE window only (exactly the pill's size; the
+        // composition rounded clip shapes it). The overlay carries no blur at all.
         let blurred = transparent && t.material != "none";
-        win::set_material(self.hwnd, if blurred { win::Material::Blur } else { win::Material::None }, 0);
+        win::set_material(self.plate_hwnd, if blurred { win::Material::Blur } else { win::Material::None }, 0);
+        win::set_material(self.hwnd, win::Material::None, 0);
 
-        self.vis = Some(build(e, self.hwnd, t, apps, dark, blurred, self.shown, s, (pw, ph, head, side))?);
+        self.vis = Some(build(e, self.hwnd, self.plate_hwnd, t, apps, dark, blurred, self.shown, s, (pw, ph, head, side))?);
+        self.set_region(false);
         Ok(())
     }
 
@@ -149,22 +167,52 @@ impl Dock {
             let mon = self.mon;
             let s = win::scale(self.hwnd);
             let bottom_gap = (t.dock_bottom * s) as i32;
+            let (pw, ph, head, side) = self.geo;
             let x = mon.left + (mon.right - mon.left - self.width_px) / 2;
+            // Bottom edge of the usable area. When reserving, honour the strip the shell
+            // granted, but only if it is sane (stale registrations can skew it).
+            let mut bottom = mon.bottom;
             if self.autohide {
                 if self.shown {
-                    let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), x, mon.bottom - bottom_gap - self.height_px, self.width_px, self.height_px, SWP_NOACTIVATE);
+                    let y = bottom - bottom_gap - self.height_px;
+                    self.put(x, y, pw, ph, head, side);
                 } else {
+                    let _ = ShowWindow(self.plate_hwnd, SW_HIDE);
                     let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), mon.left, mon.bottom - TRIGGER_PX, mon.right - mon.left, TRIGGER_PX, SWP_NOACTIVATE);
                 }
-            } else {
-                let strip = if t.dock_reserve {
-                    win::appbar_reserve(self.hwnd, Edge::Bottom, mon, self.reserve_px(t))
-                } else {
-                    RECT { bottom: mon.bottom, ..mon }
-                };
-                let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), x, strip.bottom - bottom_gap - self.height_px, self.width_px, self.height_px, SWP_NOACTIVATE);
+                return;
             }
+            if t.dock_reserve {
+                let want = self.reserve_px(t);
+                let strip = win::appbar_reserve(self.hwnd, Edge::Bottom, mon, want);
+                if strip.bottom - strip.top == want {
+                    bottom = strip.bottom;
+                }
+            }
+            self.put(x, bottom - bottom_gap - self.height_px, pw, ph, head, side);
         }
+    }
+
+    /// Position both windows. Plate first, overlay second, so the overlay is above it.
+    unsafe fn put(&self, x: i32, y: i32, pw: i32, ph: i32, head: i32, side: i32) {
+        let _ = SetWindowPos(self.plate_hwnd, Some(HWND_TOPMOST), x + side, y + head, pw, ph, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), x, y, self.width_px, self.height_px, SWP_NOACTIVATE);
+    }
+
+    /// The overlay is transparent but would still swallow clicks over its empty
+    /// headroom. Keep its hit area to the pill, and widen it only while icons are
+    /// magnified above it.
+    fn set_region(&mut self, full: bool) {
+        if self.autohide && !self.shown {
+            return;
+        }
+        let (pw, ph, head, side) = self.geo;
+        if full {
+            win::clear_shape(self.hwnd);
+        } else {
+            win::set_rect_shape(self.hwnd, side, head, side + pw, head + ph);
+        }
+        self.region_full = full;
     }
 
     pub fn re_register(&self) {
@@ -180,6 +228,7 @@ impl Dock {
         self.vis = None;
         unsafe {
             let _ = DestroyWindow(self.hwnd);
+            let _ = DestroyWindow(self.plate_hwnd);
         }
     }
 
@@ -195,13 +244,28 @@ impl Dock {
         if show {
             self.place(t);
         }
+        if show {
+            self.set_region(false);
+        }
         if let Some(v) = &self.vis {
-            motion::offset_to(&v.e.compositor, &as_visual(&v.content), Vector3 { X: 0.0, Y: if show { 0.0 } else { v.win_h }, Z: 0.0 }, t.slide);
+            let y = if show { 0.0 } else { v.win_h };
+            motion::offset_to(&v.e.compositor, &as_visual(&v.content), Vector3 { X: 0.0, Y: y, Z: 0.0 }, t.slide);
+            motion::offset_to(&v.e.compositor, &as_visual(&v.plate_content), Vector3 { X: 0.0, Y: y, Z: 0.0 }, t.slide);
         }
         if !show {
             unsafe {
                 SetTimer(Some(self.hwnd), TIMER_SHRINK, (t.slide.period_ms * 1.3) as u32, None);
             }
+        }
+    }
+
+    pub fn shrink_region(&mut self) {
+        unsafe {
+            let _ = KillTimer(Some(self.hwnd), TIMER_REGION);
+        }
+        let waving = self.vis.as_ref().map(|v| v.waving).unwrap_or(false);
+        if !waving && self.region_full {
+            self.set_region(false);
         }
     }
 
@@ -243,6 +307,15 @@ impl Dock {
             }
         }
         v.update_wave(t, Some((x as f32, y as f32)));
+        let waving = v.waving;
+        if waving {
+            unsafe {
+                let _ = KillTimer(Some(self.hwnd), TIMER_REGION);
+            }
+            if !self.region_full {
+                self.set_region(true);
+            }
+        }
     }
 
     pub fn mouse_leave(&mut self, t: &Theme) {
@@ -250,6 +323,10 @@ impl Dock {
             v.tracking = false;
             v.pressed = None;
             v.update_wave(t, None);
+        }
+        // Shrink the hit area once the icons have settled back into the pill.
+        unsafe {
+            SetTimer(Some(self.hwnd), TIMER_REGION, 420, None);
         }
         if self.autohide && self.shown {
             unsafe {
@@ -391,6 +468,7 @@ impl Vis {
 fn build(
     e: &Rc<Engine>,
     hwnd: HWND,
+    plate_hwnd: HWND,
     t: &Theme,
     apps: &[DockApp],
     dark: bool,
@@ -412,20 +490,34 @@ fn build(
     let content = scene::container(e, Rect::new(0.0, if shown { 0.0 } else { win_h }, win_w, win_h))?;
     root.Children()?.InsertAtTop(&content)?;
 
+    // Plate window: glass only, exactly the pill's size.
+    let plate_target = unsafe { interop.CreateDesktopWindowTarget(plate_hwnd, true)? };
+    let plate_root = c.CreateContainerVisual()?;
+    plate_root.SetSize(Vector2 { X: pw, Y: ph })?;
+    plate_target.SetRoot(&plate_root)?;
+    let plate_content = scene::container(e, Rect::new(0.0, if shown { 0.0 } else { win_h }, pw, ph))?;
+    plate_root.Children()?.InsertAtTop(&plate_content)?;
     let plate = Rect::new(side, head, pw, ph);
     let panel = scene::glass(
         e,
         GlassSpec {
-            rect: plate,
+            rect: Rect::new(0.0, 0.0, pw, ph),
             radius: t.r_dock * s,
             pal,
             backdrop: if blurred { Backdrop::WindowBlur } else { Backdrop::Opaque },
-            shadow: Some(t.el_float),
+            shadow: None,
             border_px: t.border_px * s,
             highlight: true,
         },
     )?;
-    content.Children()?.InsertAtTop(&panel.root)?;
+    plate_content.Children()?.InsertAtTop(&panel.root)?;
+
+    // Shadow lives in the overlay, with the pill's own footprint cut out so it never
+    // paints over the glass beneath.
+    let (sh, pad) = scene::shadow_ex(e, pw, ph, t.r_dock * s, t.el_float, pal.shadow, true)?;
+    sh.visual.SetOffset(Vector3 { X: plate.x - pad, Y: plate.y - pad + t.el_float.offset_y, Z: 0.0 })?;
+    content.Children()?.InsertAtTop(&sh.visual)?;
+    std::mem::forget(sh);
 
     // The icon row lives ABOVE the glass, outside its clip, so magnified icons rise
     // out of the pill instead of being cut off by it.
@@ -516,17 +608,20 @@ fn build(
 
     // Entrance: the dock rises once and settles.
     if shown {
-        let cv = as_visual(&content);
-        cv.SetOffset(Vector3 { X: 0.0, Y: ph * 0.8, Z: 0.0 })?;
-        cv.SetOpacity(0.0)?;
-        motion::offset_to(&e.compositor, &cv, Vector3 { X: 0.0, Y: 0.0, Z: 0.0 }, t.enter);
-        motion::opacity_to(&e.compositor, &cv, 1.0, t.enter);
+        for cv in [as_visual(&content), as_visual(&plate_content)] {
+            cv.SetOffset(Vector3 { X: 0.0, Y: ph * 0.8, Z: 0.0 })?;
+            cv.SetOpacity(0.0)?;
+            motion::offset_to(&e.compositor, &cv, Vector3 { X: 0.0, Y: 0.0, Z: 0.0 }, t.enter);
+            motion::opacity_to(&e.compositor, &cv, 1.0, t.enter);
+        }
     }
 
     Ok(Vis {
         e: e.clone(),
         _target: target,
+        _plate_target: plate_target,
         content,
+        plate_content,
         items,
         tag,
         tag_bg,

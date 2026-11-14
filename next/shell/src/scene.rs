@@ -22,7 +22,7 @@ use windows::{
             CLSID_D2D1GaussianBlur, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE, D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED,
             D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
             D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_PROPERTY_TYPE_ENUM,
-            D2D1_PROPERTY_TYPE_FLOAT, D2D1_ROUNDED_RECT,
+            D2D1_PRIMITIVE_BLEND_COPY, D2D1_PRIMITIVE_BLEND_SOURCE_OVER, D2D1_PROPERTY_TYPE_FLOAT, D2D1_ROUNDED_RECT,
         },
     },
 };
@@ -104,6 +104,12 @@ pub fn circle(e: &Engine, c: Color, cx: f32, cy: f32, d: f32) -> Result<SpriteVi
 /// A blurred rounded-rect shadow, drawn once into a surface. Returns the surface and
 /// the padding around the shape, so the caller offsets it by `-pad`.
 pub fn shadow(e: &Engine, w: f32, h: f32, radius: f32, sh: Shadow, color: Color) -> Result<(Surface, f32)> {
+    shadow_ex(e, w, h, radius, sh, color, false)
+}
+
+/// `cutout` erases the shape's own footprint, leaving only the soft halo around it.
+/// Needed when the shadow lives in a window ABOVE the glass it belongs to.
+pub fn shadow_ex(e: &Engine, w: f32, h: f32, radius: f32, sh: Shadow, color: Color, cutout: bool) -> Result<(Surface, f32)> {
     let pad = (sh.blur * 2.0).ceil();
     let s = e.gpu.surface(&e.compositor, (w + pad * 2.0) as u32, (h + pad * 2.0) as u32)?;
     let [r, g, b, _] = col(color);
@@ -131,6 +137,22 @@ pub fn shadow(e: &Engine, w: f32, h: f32, radius: f32, sh: Shadow, color: Color)
         fx.SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE.0 as u32, D2D1_PROPERTY_TYPE_ENUM, &(D2D1_BORDER_MODE_SOFT.0 as u32).to_le_bytes())?;
         let out = fx.GetOutput()?;
         ctx.DrawImage(&out, Some(&Vector2 { X: 0.0, Y: 0.0 }), None, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+        if cutout {
+            // The shadow is offset downward, so erase the shape at its OFFSET position
+            // (the halo above the shape is what we keep thin).
+            ctx.SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
+            let clear = ctx.CreateSolidColorBrush(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }, None)?;
+            let dy = sh.offset_y;
+            ctx.FillRoundedRectangle(
+                &D2D1_ROUNDED_RECT {
+                    rect: D2D_RECT_F { left: pad, top: pad - dy, right: pad + w, bottom: pad - dy + h },
+                    radiusX: radius,
+                    radiusY: radius,
+                },
+                &clear,
+            );
+            ctx.SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_SOURCE_OVER);
+        }
         Ok(())
     })?;
     Ok((s, pad))
