@@ -196,7 +196,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
   let lastGroup = ''
   return (
     <motion.div
-      className="fixed inset-0 flex items-start justify-center pt-[6vh]"
+      className="fixed inset-0 flex items-center justify-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.16 } }}
       exit={{ opacity: 0, transition: { duration: 0.12 } }}
@@ -210,10 +210,10 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         // Start comes down from the top of the screen, like a sheet being lowered, and goes back up the same way.
-        initial={{ y: -180, opacity: 0, scale: 0.97 }}
-        animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 28, mass: 0.9 } }}
+        initial={{ y: -240, opacity: 0, scale: 0.94 }}
+        animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 230, damping: 26, mass: 1 } }}
         exit={{ y: -140, opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } }}
-        className="u-surface u-start flex h-[min(720px,calc(100vh-130px))] w-[min(860px,calc(100vw-40px))] flex-col overflow-hidden"
+        className="u-surface u-start flex h-[min(720px,calc(100vh-150px))] w-[min(860px,calc(100vw-40px))] flex-col overflow-hidden"
       >
         {/* Search */}
         <div className="px-6 pb-3 pt-5">
@@ -257,12 +257,11 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
             <div className="px-5 pb-4">
               <Header title="Pinned" action="All apps" onAction={() => setView('all')} />
               <div className="grid grid-cols-7 gap-1">
-                {pins.map((p, idx) => (
+                {pins.map((p) => (
                   <AppTileContextMenu key={pinKey(p)} action={{ path: p.kind === 'installed' ? `shell:AppsFolder\\${p.app.id}` : undefined, onOpen: () => finish(() => launchPin(p)), ...pinAction(p) }}>
                     <button
                       type="button"
-                      className="u-tile u-cascade"
-                      style={{ ['--i' as string]: idx }}
+                      className="u-tile"
                       draggable
                       onDragStart={() => (dragKey.current = pinKey(p))}
                       onDragOver={(e) => e.preventDefault()}

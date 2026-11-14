@@ -31,3 +31,11 @@ export async function changePin(current: string, next: string): Promise<'ok' | '
   await setPref('lock.pinHash', await sha256(next))
   return 'ok'
 }
+
+/** Sets a new PIN without asking for the old one: for someone who forgot it. Settings sits behind the lock itself, so this is no weaker than the lock. */
+export async function resetPin(next: string): Promise<'ok' | 'invalid'> {
+  if (!/^\d{4,8}$/.test(next)) return 'invalid'
+  await setPref('lock.pinLength', next.length)
+  await setPref('lock.pinHash', await sha256(next))
+  return 'ok'
+}

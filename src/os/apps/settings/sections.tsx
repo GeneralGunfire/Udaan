@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { usePref } from '@/os/kernel/prefs'
 import { usePoll } from '@/os/kernel/poll'
-import { changePin, loadPinConfig } from '@/os/kernel/lockPin'
+import { changePin, loadPinConfig, resetPin } from '@/os/kernel/lockPin'
 import { Button, Field } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
 import { CinemaCanvas, type CinemaKind } from '@/os/cinema/CinemaCanvas'
@@ -57,6 +57,21 @@ function PinChanger() {
       </Row>
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-4">
+          <button
+            type="button"
+            className="self-start text-[12px] text-(--u-accent) hover:underline"
+            onClick={async () => {
+              if (!next || next.length < 4 || next !== again) return setMsg({ ok: false, text: 'Forgot it? Type the new PIN below twice, then press this again.' })
+              if ((await resetPin(next)) === 'ok') {
+                reset()
+                setOpen(false)
+                setLength(next.length)
+                setMsg({ ok: true, text: 'PIN reset. Udaan Lock will ask for the new one.' })
+              }
+            }}
+          >
+            I forgot my current PIN
+          </button>
           <Field type="password" inputMode="numeric" autoComplete="off" placeholder="Current PIN" value={cur} onChange={(e) => setCur(e.target.value.replace(/\D/g, '').slice(0, 8))} />
           <Field type="password" inputMode="numeric" autoComplete="off" placeholder="New PIN (4 to 8 digits)" value={next} onChange={(e) => setNext(e.target.value.replace(/\D/g, '').slice(0, 8))} />
           <Field type="password" inputMode="numeric" autoComplete="off" placeholder="Repeat new PIN" value={again} onChange={(e) => setAgain(e.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={(e) => e.key === 'Enter' && void submit()} />

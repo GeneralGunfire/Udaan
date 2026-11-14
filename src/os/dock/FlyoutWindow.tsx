@@ -29,10 +29,19 @@ const sheetMotion = {
   exit: { opacity: 0, x: 40, transition: { duration: dur.fast, ease: curve.accelerate } },
 }
 
-const WIDTH = { 'notifications-panel': 320, calendar: 300, layouts: 380, network: 280, sound: 340, media: 320, 'context-menu': 188 } as const
+/**
+ * THE POPUP STANDARD. Every popup is one of two things:
+ *   a MENU   as wide as its longest label (150 to 280 px), as tall as its rows, never resized once open
+ *   a PANEL  one of three widths: S 280, M 340, L 380; as tall as its content (at most 70% of the screen)
+ * so a popup is never longer or wider than what it holds, and similar popups look alike.
+ */
+const S = 280
+const M = 340
+const L = 380
+const WIDTH = { 'notifications-panel': M, calendar: S, layouts: L, network: S, sound: M, media: S, 'context-menu': 0 } as const
 const GAP_ABOVE_DOCK = 10
 const EDGE = 8
-const MAX_HEIGHT = 640
+const MAX_HEIGHT = Math.round(window.screen.height * 0.7)
 
 type Kind = keyof typeof WIDTH
 
@@ -102,7 +111,7 @@ export function FlyoutWindow() {
       const [scale, monitor] = [pxScale(), await currentMonitor()]
       if (cancelled) return
       const { placement } = anchor.current
-      const naturalWidth = Math.max(WIDTH[kind], contentRef.current?.scrollWidth ?? 0, cardRef.current?.scrollWidth ?? 0)
+      const naturalWidth = kind === 'context-menu' ? (cardRef.current?.offsetWidth ?? 188) : Math.max(WIDTH[kind], contentRef.current?.scrollWidth ?? 0, cardRef.current?.scrollWidth ?? 0)
       const w = Math.round(naturalWidth * scale)
       const isPoint = placement === 'point' || placement === 'point-up'
       let x = isPoint ? Math.round(anchor.current.x * scale) : Math.round(anchor.current.x * scale - w / 2)
@@ -221,8 +230,9 @@ export function FlyoutWindow() {
               kind === 'context-menu' ? 'overflow-hidden rounded-(--os-radius-overlay)' : 'max-h-full overflow-y-auto rounded-(--os-radius-overlay)',
             )}
             style={{
-              width: kind === 'context-menu' ? undefined : WIDTH[kind],
-              minWidth: kind === 'context-menu' ? WIDTH[kind] : undefined,
+              width: kind === 'context-menu' ? 'max-content' : WIDTH[kind],
+              minWidth: kind === 'context-menu' ? 150 : undefined,
+              maxWidth: kind === 'context-menu' ? 280 : undefined,
               height: placement === 'sheet-right' ? '100%' : undefined,
               // Grow from the anchored edge. Scaling from the centre makes a
               // flyout look like it zoomed in from nowhere; scaling from the

@@ -205,9 +205,30 @@ export function LauncherWindow() {
     return () => subs.forEach((p) => void p.then((fn) => fn()))
   }, [toggleLaunchpad, present, dismiss, lock])
 
+  // Start's own menus (the power menu, a tile's right-click menu) are windows too: while one is open, Start
+  // losing focus to it must not close Start.
+  const popupOpen = useRef(false)
+  useEffect(() => {
+    let closedAt = 0
+    const subs = [
+      listen('taskbar-popup:show', () => {
+        popupOpen.current = true
+      }),
+      listen('taskbar-popup:hidden', () => {
+        closedAt = Date.now()
+        // Keep the guard a moment past the close: focus returns to Start a beat later.
+        setTimeout(() => {
+          if (Date.now() - closedAt >= 350) popupOpen.current = false
+        }, 400)
+      }),
+    ]
+    return () => subs.forEach((p) => void p.then((fn) => fn()))
+  }, [])
+
   // Clicking any other window dismisses Start, like the real one.
   useEffect(() => {
     const un = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused && popupOpen.current) return
       // Locked: stay in front. Alt+Tab or a click elsewhere comes straight back.
       if (!focused && modeRef.current === 'lock') {
         setTimeout(() => {

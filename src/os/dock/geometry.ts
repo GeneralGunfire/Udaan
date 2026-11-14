@@ -4,11 +4,11 @@
  * grows, shrinks or jumps.
  */
 export const DOCK = {
-  iconSize: 34,
-  slot: 44,
-  gap: 4,
-  pad: 5,
-  margin: 8,
+  iconSize: 38,
+  slot: 50,
+  gap: 6,
+  pad: 7,
+  margin: 5,
 } as const
 
 export function dockMetrics() {
