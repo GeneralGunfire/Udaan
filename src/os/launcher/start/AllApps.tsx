@@ -53,7 +53,7 @@ export function AllApps({
   const cell = (key: string, icon: ReactNode, name: string, run: () => void, pin: Pin, path?: string) => (
     <AppTileContextMenu key={key} action={{ path, onOpen: run, ...pinAction(pin) }}>
       {layout === 'grid' ? (
-        <button type="button" className="u-tile h-[92px] justify-center" onClick={run} title={name}>
+        <button type="button" className="u-tile h-[104px] justify-center gap-2" onClick={run} title={name}>
           {icon}
           <span className="line-clamp-2 w-full text-center text-[11.5px] font-medium leading-tight">{name}</span>
         </button>
@@ -65,7 +65,7 @@ export function AllApps({
       )}
     </AppTileContextMenu>
   )
-  const gridCls = layout === 'grid' ? 'grid grid-cols-6 gap-1' : 'grid grid-cols-3 gap-x-1'
+  const gridCls = layout === 'grid' ? 'grid grid-cols-7 gap-1' : 'grid grid-cols-3 gap-x-1'
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -90,7 +90,7 @@ export function AllApps({
             <div className={gridCls}>
               {udaan.map((id) => {
                 const run = () => finish(() => openApp(id))
-                return cell(`u-${id}`, <AppIcon appId={id} size={layout === 'grid' ? 40 : 26} />, APP_DEFS[id].name, run, { kind: 'udaan', appId: id })
+                return cell(`u-${id}`, <AppIcon appId={id} size={layout === 'grid' ? 44 : 26} />, APP_DEFS[id].name, run, { kind: 'udaan', appId: id })
               })}
             </div>
           </section>
@@ -98,11 +98,15 @@ export function AllApps({
 
         {groups.map(([letter, list]) => (
           <section key={letter} data-letter={letter} className="mb-2">
-            <p className="sticky top-[52px] z-10 -mx-1 bg-(--u-m-solid) px-1 py-1 text-[20px] font-light leading-none text-(--u-ink-2)">{letter}</p>
+            <p className="sticky top-[52px] z-10 -mx-1 flex items-baseline gap-2 bg-(--u-m-solid) px-1 pb-1.5 pt-2 leading-none">
+              <span className="text-[24px] font-light text-(--u-ink)">{letter}</span>
+              <span className="text-[11px] tabular-nums text-(--u-ink-3)">{list.length}</span>
+              <span className="ml-1 h-px flex-1 bg-(--u-edge)" />
+            </p>
             <div className={gridCls}>
               {list.map((a) => {
                 const pin: Pin = { kind: 'installed', app: a }
-                return cell(a.id, <Icon id={a.id} size={layout === 'grid' ? 40 : 26} />, a.name, () => finish(() => launchPin(pin)), pin, `shell:AppsFolder\${a.id}`)
+                return cell(a.id, <Icon id={a.id} size={layout === 'grid' ? 44 : 26} />, a.name, () => finish(() => launchPin(pin)), pin, `shell:AppsFolder\${a.id}`)
               })}
             </div>
           </section>

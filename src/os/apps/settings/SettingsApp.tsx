@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
 import { emit } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import { contentEnter } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
@@ -284,10 +285,11 @@ const CORNER_OPTIONS: { value: CornerAction; label: string }[] = [
   { value: 'screensaver', label: 'Screensaver' },
 ]
 
-function CornerRow({ pref, label }: { pref: (typeof CORNER_KEYS)[number]; label: string }) {
+function CornerPick({ pref, label, className }: { pref: (typeof CORNER_KEYS)[number]; label: string; className: string }) {
   const [value, setValue] = usePref(pref)
   return (
-    <Row title={label}>
+    <div className={cn('absolute flex flex-col gap-1', className)}>
+      <span className="u-label">{label}</span>
       <Select
         label={label}
         value={value}
@@ -297,7 +299,23 @@ function CornerRow({ pref, label }: { pref: (typeof CORNER_KEYS)[number]; label:
           await syncHotCorners()
         }}
       />
-    </Row>
+    </div>
+  )
+}
+
+/** The four corners laid out on a miniature screen, so each choice sits where it will happen. */
+function CornerMap() {
+  return (
+    <div className="p-4">
+      <div className="relative aspect-[16/8] w-full rounded-[12px] bg-(--u-wash-hover) shadow-[inset_0_0_0_1px_var(--u-edge)]">
+        <div className="absolute inset-x-0 top-0 h-2.5 rounded-t-[12px] bg-(--u-wash-on)" />
+        <div className="absolute bottom-1.5 left-1/2 h-3 w-24 -translate-x-1/2 rounded-full bg-(--u-wash-on)" />
+        <CornerPick pref="corners.tl" label="Top left" className="left-3 top-5" />
+        <CornerPick pref="corners.tr" label="Top right" className="right-3 top-5 items-end" />
+        <CornerPick pref="corners.bl" label="Bottom left" className="bottom-3 left-3" />
+        <CornerPick pref="corners.br" label="Bottom right" className="bottom-3 right-3 items-end" />
+      </div>
+    </div>
   )
 }
 
@@ -305,10 +323,7 @@ function WindowsSection() {
   return (
     <Stack>
       <Group title="Hot corners" footer="Rest the pointer in a screen corner to trigger an action.">
-        <CornerRow pref="corners.tl" label="Top left" />
-        <CornerRow pref="corners.tr" label="Top right" />
-        <CornerRow pref="corners.bl" label="Bottom left" />
-        <CornerRow pref="corners.br" label="Bottom right" />
+        <CornerMap />
       </Group>
       <Group title="Windows">
         <PrefToggleRow title="Always maximize new windows" description="Every app you open fills the screen, not just Udaan's." pref="windows.autoMaximize" onApply={(v) => setWindowWatcherEnabled(v)} />
@@ -403,6 +418,20 @@ function NotificationsSection() {
       <Group title="Notification Center">
         <Row title="Notification Center" description="See everything you've missed, grouped by app.">
           <ActionButton onClick={() => void emit('dock:open-notifications')}>Open</ActionButton>
+        </Row>
+        <Row title="Try a banner" description="Sends a sample notification so you can see your settings at work.">
+          <ActionButton
+            onClick={() =>
+              void invoke('notify_push', { incoming: { kind: 'test', title: 'Udaan', body: 'This is how notifications look with your settings.', source_app: 'settings' } })
+            }
+          >
+            Send test
+          </ActionButton>
+        </Row>
+        <Row title="Clear history" description="Removes every notification from Notification Center.">
+          <ActionButton danger onClick={() => void listNotifications(false, 500).then((all) => Promise.all(all.map((n) => invoke('notify_dismiss', { id: n.id }))))}>
+            Clear all
+          </ActionButton>
         </Row>
       </Group>
     </Stack>

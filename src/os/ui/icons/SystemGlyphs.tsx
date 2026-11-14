@@ -1,5 +1,4 @@
 import { useId } from 'react'
-import { SQUIRCLE } from './AppIcon'
 import { UdaanMark } from './UdaanMark'
 
 /** Udaan's mark for the menu bar: the wing, large enough to read on a 34px bar. */
@@ -13,48 +12,9 @@ export function StartGlyph({ size }: { size: number }) {
  * so it sits in the dock as one of the family.
  */
 export function StartTile({ size }: { size: number }) {
-  const id = useId().replace(/:/g, '')
-  return (
-    <span className="relative inline-flex text-white" style={{ width: size, height: size, filter: 'drop-shadow(0 1px 1px rgb(0 0 0 / 0.3)) drop-shadow(0 3px 6px rgb(0 0 0 / 0.25))' }}>
-      <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden className="absolute inset-0">
-        <defs>
-          <linearGradient id={`${id}-plate`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#4a4e57" />
-            <stop offset="1" stopColor="#14161a" />
-          </linearGradient>
-          <linearGradient id={`${id}-spec`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fff" stopOpacity="0.5" />
-            <stop offset="0.7" stopColor="#fff" stopOpacity="0.06" />
-            <stop offset="1" stopColor="#fff" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${id}-glow`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fff" stopOpacity="0" />
-            <stop offset="1" stopColor="#fff" stopOpacity="0.14" />
-          </linearGradient>
-          <linearGradient id={`${id}-edge`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fff" stopOpacity="0.7" />
-            <stop offset="0.45" stopColor="#fff" stopOpacity="0.12" />
-            <stop offset="1" stopColor="#000" stopOpacity="0.4" />
-          </linearGradient>
-          <clipPath id={`${id}-clip`}>
-            <path d={SQUIRCLE} />
-          </clipPath>
-        </defs>
-        <path d={SQUIRCLE} fill={`url(#${id}-plate)`} />
-        <g clipPath={`url(#${id}-clip)`}>
-          <ellipse cx="50" cy="-8" rx="66" ry="50" fill={`url(#${id}-spec)`} />
-          <rect x="0" y="62" width="100" height="38" fill={`url(#${id}-glow)`} />
-        </g>
-        <path d={SQUIRCLE} fill="none" stroke={`url(#${id}-edge)`} strokeWidth="1.4" />
-      </svg>
-      <span className="relative m-auto inline-flex" style={{ filter: 'drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.5))' }}>
-        <UdaanMark size={size * 0.64} />
-      </span>
-    </span>
-  )
+  return <img src="/logo/udaan.png" alt="" aria-hidden draggable={false} width={size} height={size} style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgb(0 0 0 / 0.35))' }} />
 }
 
-/** A mesh bin in the macOS style; `full` shows crumpled paper. */
 export function TrashGlyph({ size, full }: { size: number; full: boolean }) {
   const id = useId().replace(/:/g, '')
   return (

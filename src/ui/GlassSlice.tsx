@@ -71,6 +71,46 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
     }
   }, [parentRef])
 
+  // Adapt to the wallpaper behind the bar: measure how bright it is there and set the glass tint so the
+  // bar stays legible and clean on light, mid and dark pictures alike (no muddy beige on a sandy photo).
+  useEffect(() => {
+    const bar = parentRef.current
+    if (!bar || !src) return
+    let cancelled = false
+    const img = new Image()
+    img.onload = () => {
+      if (cancelled) return
+      const cw = 96
+      const ch = 54
+      const cv = document.createElement('canvas')
+      cv.width = cw
+      cv.height = ch
+      const ctx = cv.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+      ctx.drawImage(img, 0, 0, cw, ch)
+      const sw0 = window.screen.width
+      const sh0 = window.screen.height
+      const top0 = (edge === 'bottom' ? sh0 - window.innerHeight : 0) + rect.y
+      const x0 = Math.max(0, Math.floor((rect.x / sw0) * cw))
+      const x1 = Math.min(cw, Math.ceil(((rect.x + bar.offsetWidth) / sw0) * cw))
+      const y0 = Math.max(0, Math.floor((top0 / sh0) * ch))
+      const y1 = Math.min(ch, Math.ceil(((top0 + bar.offsetHeight) / sh0) * ch))
+      if (x1 <= x0 || y1 <= y0) return
+      const d = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data
+      let lum = 0
+      for (let i = 0; i < d.length; i += 4) lum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255
+      lum /= d.length / 4
+      // Brighter picture, denser tint.
+      const alpha = Math.min(0.88, Math.max(0.46, 0.42 + lum * 0.5))
+      bar.style.setProperty('--u-m-dock', `rgb(16 16 19 / ${alpha.toFixed(2)})`)
+      bar.style.setProperty('--u-dock-edge', lum > 0.5 ? 'rgb(255 255 255 / 0.22)' : 'rgb(255 255 255 / 0.16)')
+    }
+    img.src = src
+    return () => {
+      cancelled = true
+    }
+  }, [src, rect.x, rect.y, edge, parentRef])
+
   const sw = window.screen.width
   const sh = window.screen.height
   // The window is bound to a screen edge, so the bar's position on screen is known: a
@@ -87,7 +127,7 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
           backgroundImage: src ? `url("${src}")` : undefined,
           backgroundSize: `${sw}px ${sh}px`,
           backgroundPosition: `${PAD - rect.x}px ${PAD - screenTop}px`,
-          filter: 'blur(14px) saturate(1.25)',
+          filter: 'blur(16px) saturate(0.95) brightness(0.92)',
         }}
       />
     </span>

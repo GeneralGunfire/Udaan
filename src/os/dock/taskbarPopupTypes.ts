@@ -17,7 +17,7 @@ export type FlyoutPlacement = 'above' | 'below' | 'sheet-right' | 'point'
  * persistent menu-bar button with its own ref. */
 export type PanelKind = 'notifications-panel' | 'calendar' | 'layouts' | 'network' | 'sound' | 'media'
 
-export type FlyoutKind = PanelKind | 'context-menu' | 'tip'
+export type FlyoutKind = PanelKind | 'context-menu'
 
 /** One item in a `'context-menu'` flyout — mirrors ShellMenuItemDef but
  * kept dependency-free here since this file is the cross-window event

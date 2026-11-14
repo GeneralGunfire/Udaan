@@ -200,40 +200,16 @@ function DockIcon({
  * rather than letting it read as a free-floating tooltip. The window count
  * rides along, so a glance answers "how many of these are open".
  */
-/* Hover names are popups of their own (the dock window is only as big as the dock). Module level, so
-   every item shares one timer and moving between icons swaps the name instead of stacking them. */
-let tipTimer: ReturnType<typeof setTimeout> | undefined
-function hideTip() {
-  clearTimeout(tipTimer)
-  void emit('taskbar-tip:hide')
-}
-function showTip(el: HTMLElement, text: string, sub?: string) {
-  clearTimeout(tipTimer)
-  tipTimer = setTimeout(() => {
-    const r = el.getBoundingClientRect()
-    void emit('taskbar-popup:show', { kind: 'tip', x: window.screenX + r.left + r.width / 2, y: window.screenY + r.top, placement: 'above', items: [{ label: text, id: sub }] })
-  }, 350)
-}
-
-/** Declares an item's hover name. Renders nothing; it listens on the button it sits in. */
+/** The item's name on hover, a chip above the icon (the dock window leaves room for it). */
 function DockLabel({ text, count, sub }: { text: string; count: number; sub?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const label = count > 1 ? `${text} · ${count}` : text
-  const detail = sub && sub !== text ? (sub.length > 46 ? `${sub.slice(0, 45)}…` : sub) : undefined
-  useEffect(() => {
-    const el = ref.current?.parentElement
-    if (!el) return
-    const enter = () => showTip(el, label, detail)
-    el.addEventListener('pointerenter', enter)
-    el.addEventListener('pointerleave', hideTip)
-    el.addEventListener('pointerdown', hideTip)
-    return () => {
-      el.removeEventListener('pointerenter', enter)
-      el.removeEventListener('pointerleave', hideTip)
-      el.removeEventListener('pointerdown', hideTip)
-    }
-  }, [label, detail])
-  return <span ref={ref} hidden />
+  const detail = sub && sub !== text ? (sub.length > 46 ? `${sub.slice(0, 45)}…` : sub) : ''
+  return (
+    <span className="u-dock__label">
+      {text}
+      {count > 1 && <span className="tabular-nums text-(--u-ink-3)"> · {count}</span>}
+      {detail && <span className="block max-w-[260px] truncate text-[11px] font-normal text-(--u-ink-3)">{detail}</span>}
+    </span>
+  )
 }
 
 function DockGlyph({ item }: { item: DockItem }) {
@@ -500,8 +476,8 @@ export function DockWindow() {
     <div className="fixed inset-0 flex select-none items-end justify-center" onContextMenu={(e) => e.preventDefault()}>
       <div
         ref={barRef}
-        onPointerDownCapture={() => (setSuppressLabels(true), hideTip())}
-        onPointerLeave={() => (setSuppressLabels(false), hideTip())}
+        onPointerDownCapture={() => setSuppressLabels(true)}
+        onPointerLeave={() => setSuppressLabels(false)}
         onContextMenu={(e) => {
           e.preventDefault()
           openMenu(e, dockMenuItems)

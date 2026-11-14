@@ -2,3 +2,6 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
+
+# Built by scripts/build-watchdog.mjs for the bundler
+/binaries/

@@ -409,7 +409,7 @@
     display: flex;
     align-items: center;
     border-radius: 22px;
-    border: 1px solid var(--u-edge-strong);
+    border: 1px solid var(--u-dock-edge, var(--u-edge-strong));
     background: var(--u-m-dock);
     box-shadow: 0 10px 30px -8px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 35%);
   }

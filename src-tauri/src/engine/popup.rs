@@ -226,6 +226,61 @@ pub fn engine_popup_close(window: tauri::WebviewWindow) -> Result<(), String> {
   window.hide().map_err(|e| e.to_string())
 }
 
+
+// ---------------------------------------------------------------------------------------
+// Click-away: a click anywhere outside an open popup closes it
+// ---------------------------------------------------------------------------------------
+
+static WATCH_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// While a popup is open, watches the mouse buttons: the first press outside the popup's window
+/// (on the desktop, another app, the bar...) is announced as `engine://popup-outside` and the watch
+/// ends. A window-focus signal is not enough: clicking the desktop, which never takes focus, would
+/// leave the popup open. The thread exists only while a popup is open and wakes every 20 ms.
+#[tauri::command]
+pub fn engine_popup_watch(app: AppHandle, window: tauri::WebviewWindow, on: bool) -> Result<(), String> {
+  use std::sync::atomic::Ordering;
+  use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
+  use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowRect};
+  let gen = WATCH_GEN.fetch_add(1, Ordering::SeqCst) + 1;
+  if !on {
+    return Ok(());
+  }
+  let h = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
+  std::thread::Builder::new()
+    .name("popup-watch".into())
+    .spawn(move || {
+      let down = || unsafe { [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|k| (GetAsyncKeyState(k.0 as i32) as u16) & 0x8000 != 0) };
+      // A button already held (the click that opened the popup) must not count.
+      let mut was_down = true;
+      let started = std::time::Instant::now();
+      loop {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        if WATCH_GEN.load(Ordering::SeqCst) != gen || started.elapsed() > std::time::Duration::from_secs(600) {
+          return;
+        }
+        let now = down();
+        if now && !was_down {
+          let mut p = POINT::default();
+          let mut r = windows::Win32::Foundation::RECT::default();
+          unsafe {
+            let _ = GetCursorPos(&mut p);
+            let _ = GetWindowRect(HWND(h as *mut core::ffi::c_void), &mut r);
+          }
+          let inside = p.x >= r.left && p.x < r.right && p.y >= r.top && p.y < r.bottom;
+          if !inside {
+            super::trace::line("popup click-away");
+            let _ = app.emit("engine://popup-outside", ());
+            return;
+          }
+        }
+        was_down = now;
+      }
+    })
+    .map_err(|e| e.to_string())?;
+  Ok(())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

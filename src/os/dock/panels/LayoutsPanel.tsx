@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { invoke } from '@tauri-apps/api/core'
 import { shell, type ShellWindow } from '@/os/kernel/shell'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { playSound } from '@/os/sound/sounds'
-import { Button, Slider } from '@/os/ui/controls'
-import { cn } from '@/shared/lib/cn'
 
 /** A zone as fractions of the work area. */
 interface Zone {
@@ -34,24 +33,20 @@ const LAYOUTS: Layout[] = [
   { id: 'centre', name: 'Centred', zones: () => [{ x: 0.14, y: 0.05, w: 0.72, h: 0.9 }] },
 ]
 
-const ZONE_COLOURS = ['#3072f0', '#4cd37b', '#f5a623', '#b36bf0']
+const ZONE_COLOURS = ['var(--color-accent)', '#34c759', '#ff9f0a', '#bf5af2']
 const STORE = 'layouts.last'
 
 function Preview({ zones, active, assigned, onZone, size = 'small' }: { zones: Zone[]; active?: number; assigned?: (string | null)[]; onZone?: (i: number) => void; size?: 'small' | 'large' }) {
   const big = size === 'large'
   return (
-    <div className={cn('relative w-full overflow-hidden rounded-[8px] bg-(--u-wash-hover) shadow-[inset_0_0_0_1px_var(--u-edge)]', big ? 'aspect-[16/9]' : 'aspect-[16/10]')}>
+    <div className={`relative w-full overflow-hidden rounded-[8px] bg-[var(--surface-canvas)] ${big ? 'aspect-[16/9]' : 'aspect-[16/10]'}`}>
       {zones.map((z, i) => (
         <button
           key={i}
           type="button"
           tabIndex={onZone ? 0 : -1}
           onClick={onZone ? () => onZone(i) : undefined}
-          className={cn(
-            'absolute flex items-center justify-center overflow-hidden rounded-[5px] border transition-colors',
-            !onZone && 'pointer-events-none',
-            active === i ? 'border-(--u-accent) bg-(--u-accent)/20' : 'border-(--u-edge-strong) bg-(--u-wash-on) hover:bg-(--u-wash-press)',
-          )}
+          className={`absolute flex items-center justify-center overflow-hidden rounded-[5px] border transition-colors ${onZone ? 'cursor-default' : 'pointer-events-none'} ${active === i ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20' : 'border-[var(--border-hairline)] bg-(--os-hover) hover:bg-[var(--surface-hover)]'}`}
           style={{ left: `calc(${z.x * 100}% + 2px)`, top: `calc(${z.y * 100}% + 2px)`, width: `calc(${z.w * 100}% - 4px)`, height: `calc(${z.h * 100}% - 4px)` }}
         >
           {big && (
@@ -59,7 +54,7 @@ function Preview({ zones, active, assigned, onZone, size = 'small' }: { zones: Z
               <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-black" style={{ background: ZONE_COLOURS[i % 4] }}>
                 {i + 1}
               </span>
-              <span className="line-clamp-2 text-[11px] font-medium">{assigned?.[i] ?? 'Choose an app'}</span>
+              <span className="line-clamp-2 text-[11px] font-medium text-(--os-text)">{assigned?.[i] ?? 'Choose an app'}</span>
             </span>
           )}
         </button>
@@ -120,15 +115,23 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
 
   if (!layout) {
     return (
-      <div className="p-4">
+      <div className="p-4 text-(--os-text)">
         <h2 className="text-[15px] font-semibold">Arrange windows</h2>
-        <p className="mb-3 text-[12.5px] text-(--u-ink-3)">Pick a layout, then choose an app for each space.</p>
-        <div className="grid grid-cols-3 gap-2">
-          {LAYOUTS.map((l) => (
-            <button key={l.id} type="button" onClick={() => choose(l)} className="u-tile items-stretch gap-1.5 p-2 text-left">
+        <p className="mb-3 text-[12.5px] text-(--os-text-dim)">Pick a layout, then choose an app for each space.</p>
+        <div className="grid grid-cols-3 gap-2.5">
+          {LAYOUTS.map((l, i) => (
+            <motion.button
+              key={l.id}
+              type="button"
+              onClick={() => choose(l)}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.025, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col gap-1.5 rounded-[10px] p-2 text-left transition-colors hover:bg-(--os-hover)"
+            >
               <Preview zones={l.zones(0.5)} />
-              <span className="text-[11.5px] font-medium">{l.name}</span>
-            </button>
+              <span className="text-[11.5px] font-medium text-(--os-text)">{l.name}</span>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -137,32 +140,32 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
 
   const filled = assign.filter(Boolean).length
   return (
-    <div className="p-4">
+    <div className="p-4 text-(--os-text)">
       <div className="mb-3 flex items-center gap-2">
-        <Button size="sm" onClick={() => setLayout(null)}>
+        <button type="button" onClick={() => setLayout(null)} className="rounded-[7px] px-2 py-1 text-[12.5px] text-(--os-text-dim) hover:bg-(--os-hover) hover:text-(--os-text)">
           ‹ Layouts
-        </Button>
+        </button>
         <h2 className="flex-1 text-[14px] font-semibold">{layout.name}</h2>
       </div>
       <Preview size="large" zones={zones} active={zone} assigned={assign.map((a) => a?.title || a?.processName || null)} onZone={setZone} />
       {layout.adjustable && (
-        <label className="mt-3 flex items-center gap-3 text-[12px] text-(--u-ink-2)">
+        <label className="mt-3 flex items-center gap-3 text-[12px] text-(--os-text-dim)">
           Split
-          <Slider value={Math.round(ratio * 100)} min={30} max={70} step={5} aria-label="Split" onChange={(v) => setRatio(v / 100)} />
-          <span className="w-16 text-right tabular-nums text-(--u-ink)">
+          <input type="range" min={30} max={70} step={5} value={Math.round(ratio * 100)} onChange={(e) => setRatio(Number(e.target.value) / 100)} className="os-slider flex-1" />
+          <span className="w-16 text-right tabular-nums text-(--os-text)">
             {Math.round(ratio * 100)} / {100 - Math.round(ratio * 100)}
           </span>
         </label>
       )}
-      <p className="u-label mb-1.5 mt-3">
+      <p className="mb-1.5 mt-3 text-[12px] font-semibold text-(--os-text-dim)">
         Choose an app for space <span style={{ color: ZONE_COLOURS[zone % 4] }}>{zone + 1}</span>
       </p>
-      <div className="u-scroll u-surface--card max-h-[220px] overflow-y-auto p-1">
-        {windows.length === 0 && <p className="p-3 text-[12.5px] text-(--u-ink-3)">No windows open.</p>}
+      <div className="max-h-[220px] overflow-y-auto rounded-[10px] bg-(--os-hover)">
+        {windows.length === 0 && <p className="p-3 text-[12.5px] text-(--os-text-dim)">No windows open.</p>}
         {windows.map((w) => {
           const at = assign.findIndex((a) => a?.handle === w.handle)
           return (
-            <button key={w.handle} type="button" onClick={() => pick(w)} className="u-row gap-2.5">
+            <button key={w.handle} type="button" onClick={() => pick(w)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--surface-hover)]">
               {w.appId ? <AppIcon appId={w.appId} size={20} /> : <WindowIcon handle={w.handle} />}
               <span className="min-w-0 flex-1 truncate text-[13px]">{w.title || w.processName}</span>
               {at >= 0 && (
@@ -174,9 +177,14 @@ export function LayoutsPanel({ onDone }: { onDone: () => void }) {
           )
         })}
       </div>
-      <Button variant="primary" size="lg" disabled={!filled} onClick={() => void arrange()} className="mt-3 w-full">
+      <button
+        type="button"
+        disabled={!filled}
+        onClick={() => void arrange()}
+        className="mt-3 h-10 w-full rounded-[10px] bg-[var(--color-accent)] text-white text-[13.5px] font-semibold transition-[filter,opacity] hover:brightness-110 disabled:opacity-40"
+      >
         {filled === zones.length ? 'Arrange windows' : `Arrange ${filled} of ${zones.length}`}
-      </Button>
+      </button>
     </div>
   )
 }
@@ -191,5 +199,5 @@ function WindowIcon({ handle }: { handle: number }) {
       setSrc(r[handle] ?? null)
     })
   }, [handle])
-  return src ? <img src={src} alt="" className="h-5 w-5" /> : <span className="h-5 w-5 rounded bg-(--u-wash-on)" />
+  return src ? <img src={src} alt="" className="h-5 w-5" /> : <span className="h-5 w-5 rounded bg-(--os-hover)" />
 }
