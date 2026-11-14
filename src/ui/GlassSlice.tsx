@@ -78,6 +78,9 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
     if (!bar || !src) return
     let cancelled = false
     const img = new Image()
+    // Local pictures are served by the app's own protocol; without this the canvas is 'tainted' and cannot be read.
+    img.crossOrigin = 'anonymous'
+    img.onerror = () => bar.style.setProperty('--u-m-dock', 'rgb(16 16 19 / 0.72)')
     img.onload = () => {
       if (cancelled) return
       const cw = 96
@@ -96,7 +99,13 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
       const y0 = Math.max(0, Math.floor((top0 / sh0) * ch))
       const y1 = Math.min(ch, Math.ceil(((top0 + bar.offsetHeight) / sh0) * ch))
       if (x1 <= x0 || y1 <= y0) return
-      const d = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data
+      let d: Uint8ClampedArray
+      try {
+        d = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data
+      } catch {
+        bar.style.setProperty('--u-m-dock', 'rgb(16 16 19 / 0.72)')
+        return
+      }
       let lum = 0
       for (let i = 0; i < d.length; i += 4) lum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255
       lum /= d.length / 4
@@ -118,7 +127,7 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
   const screenTop = (edge === 'bottom' ? sh - window.innerHeight : 0) + rect.y
   const PAD = 24 // overscan so the blur has pixels to sample at the bar's edges
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ borderRadius: 'inherit' }}>
+    <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ borderRadius: 'inherit', zIndex: -2 }}>
       <span
         className="absolute"
         style={{

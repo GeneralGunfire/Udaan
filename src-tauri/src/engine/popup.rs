@@ -281,6 +281,34 @@ pub fn engine_popup_watch(app: AppHandle, window: tauri::WebviewWindow, on: bool
   Ok(())
 }
 
+/// Cuts the calling window to a rounded rectangle of its current size, so the compositor's blur
+/// follows the card's corners instead of filling a square. Call again after any resize.
+#[tauri::command]
+pub fn engine_window_round(window: tauri::WebviewWindow, radius: i32) -> Result<(), String> {
+  use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  let mut r = windows::Win32::Foundation::RECT::default();
+  unsafe {
+    let _ = GetWindowRect(hwnd, &mut r);
+    let dpi = windows::Win32::UI::HiDpi::GetDpiForWindow(hwnd).max(96) as i32;
+    let d = (radius.max(0) * dpi / 96) * 2;
+    // A window with a region falls back to the classic frame (a title bar with buttons) unless it has
+    // no caption or border at all, so make sure it has none, and do not force a redraw of the frame.
+    use windows::Win32::UI::WindowsAndMessaging::{
+      GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
+    };
+    let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+    let strip = WS_CAPTION.0 | WS_BORDER.0 | WS_DLGFRAME.0 | WS_THICKFRAME.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0;
+    if style & strip != 0 {
+      SetWindowLongW(hwnd, GWL_STYLE, (style & !strip) as i32);
+      let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    let rgn = CreateRoundRectRgn(0, 0, (r.right - r.left) + 1, (r.bottom - r.top) + 1, d, d);
+    let _ = SetWindowRgn(hwnd, Some(rgn), false);
+  }
+  Ok(())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

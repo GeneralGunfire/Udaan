@@ -58,7 +58,7 @@
   --os-dock-glass: linear-gradient(to bottom, rgb(255 255 255 / 9%), rgb(255 255 255 / 3%));
 
   --os-panel-solid: linear-gradient(to bottom, rgb(42 42 46 / 86%), rgb(26 26 29 / 90%));
-  --os-panel-glass: linear-gradient(to bottom, rgb(255 255 255 / 7%), rgb(255 255 255 / 2.5%));
+  --os-panel-glass: linear-gradient(to bottom, rgb(40 40 45 / 66%), rgb(24 24 27 / 74%));
 
   --os-widget-solid: linear-gradient(to bottom, rgb(56 56 61 / 62%), rgb(32 32 36 / 70%));
   --os-widget-glass: linear-gradient(to bottom, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%));
@@ -137,7 +137,7 @@
   --os-dock-glass: linear-gradient(to bottom, rgb(255 255 255 / 48%), rgb(255 255 255 / 26%));
 
   --os-panel-solid: linear-gradient(to bottom, rgb(253 253 254 / 92%), rgb(244 244 247 / 90%));
-  --os-panel-glass: linear-gradient(to bottom, rgb(255 255 255 / 46%), rgb(255 255 255 / 28%));
+  --os-panel-glass: linear-gradient(to bottom, rgb(255 255 255 / 74%), rgb(246 246 249 / 78%));
 
   --os-widget-solid: linear-gradient(to bottom, rgb(255 255 255 / 84%), rgb(246 246 249 / 78%));
   --os-widget-glass: linear-gradient(to bottom, rgb(255 255 255 / 44%), rgb(255 255 255 / 24%));

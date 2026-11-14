@@ -1,8 +1,7 @@
 import { useEffect, useState, type PropsWithChildren } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DEFAULT_WALLPAPER_ID, fittedWallpaperSrc, isValidWallpaperId } from '@/app/wallpapers'
-import { UdaanMark as SharedMark } from '@/os/ui/icons/UdaanMark'
-import { BootCanvas } from './BootCanvas'
+import { CinemaCanvas } from '@/os/cinema/CinemaCanvas'
 import { activateShell, showDock } from '@/os/kernel/session'
 import { runBootOptimize, onBootOptimizeProgress } from '@/integrations/boot-optimize/client'
 import { listOpenWindows } from '@/integrations/taskbar/client'
@@ -18,15 +17,15 @@ const SLOW_HINT_MS = 4000
 /** Floor so a stage (and its status text) stays on screen long enough to actually read, even when the
  *  underlying work resolves near-instantly — a fast machine could otherwise blow through all three
  *  stages in well under a second, which is what "too short, didn't get to see what it was doing" was about. */
-const MIN_STAGE_MS = 300
+const MIN_STAGE_MS = 900
 /** Overall floor for the whole boot sequence (stages 1-3 combined), independent of the per-stage
  *  floor above — real work is genuinely done well within this on a fast machine, but the splash
  *  should still hold for the full duration rather than exit early once that work finishes. */
-const MIN_BOOT_MS = 2500
+const MIN_BOOT_MS = 6500
 /** How long the logo holds fully stopped, centered, before sliding into the reveal position. */
-const HOLD_BEFORE_SLIDE_MS = 200
+const HOLD_BEFORE_SLIDE_MS = 300
 /** How long the wordmark reveal holds before the whole splash dissolves into the app. */
-const HOLD_AFTER_REVEAL_MS = 350
+const HOLD_AFTER_REVEAL_MS = 1000
 
 /** The wallpaper the desktop will show, rendered (or decoded) ahead of time. */
 function currentWallpaperId(): string {
@@ -348,137 +347,83 @@ export function SplashScreen({ children }: PropsWithChildren) {
   const stopped = phase !== 'boot'
   const progress = stopped ? 1 : (stage - 1) / 3 + 0.12
   const statusText = errorHint ?? subStatus ?? STAGE_LABEL[stage]
+  const finale = phase === 'reveal' || phase === 'exiting'
 
   return (
     <>
       <AnimatePresence>
         {visible && (
           <motion.div
-            className="fixed inset-0 z-[9999] overflow-hidden bg-[#08090c]"
+            className="fixed inset-0 z-[9999] overflow-hidden bg-[#03040a]"
             initial={{ opacity: 1 }}
-            // The whole screen scales up very slightly as it dissolves, so
-            // the desktop appears to come *through* it rather than the boot
-            // screen simply vanishing.
-            exit={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
-            transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
+            // The finale: the whole picture pushes toward you and dissolves, so the desktop arrives
+            // from behind it rather than the boot screen simply switching off.
+            exit={{ opacity: 0, scale: 1.14, filter: 'blur(10px)', transition: { duration: 1.2, ease: [0.5, 0, 0.15, 1] } }}
             role="presentation"
             aria-hidden="true"
           >
-            {/* Light gathering toward the centre, converging as boot
-                completes. Without it the wait reads as a frozen screen. */}
-            <BootCanvas progress={progress} />
+            {/* The scene: slow ribbons of light, fading in out of the dark. */}
+            <motion.div className="absolute inset-0" initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 0.62, scale: 1 }} transition={{ duration: 3.2, ease: [0.16, 1, 0.3, 1] }}>
+              <CinemaCanvas kind="aurora" scale={0.4} fps={24} />
+            </motion.div>
+            <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 48%, transparent 30%, rgb(0 0 0 / 0.78) 100%)' }} />
 
             <div className="relative flex h-full flex-col items-center justify-center">
-              <motion.div
-                className="flex flex-col items-center"
-                // The whole lockup drifts up a few pixels over the sequence,
-                // which keeps the composition alive during the wait without
-                // anything appearing to actually move.
-                animate={{ y: stopped ? -6 : 0 }}
-                transition={{ duration: 0.8, ease: [0.05, 0.7, 0.1, 1] }}
-              >
-                {/* The mark arrives first and the word follows. Staging the
-                    two reads as the brand assembling itself; animating them
-                    together reads as one picture fading in. */}
-                <UdaanMark size={92} />
+              {/* The anamorphic streak: a thin line of light that opens across the screen. */}
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 h-[2px] w-[min(78vw,860px)] -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{ background: 'linear-gradient(90deg, transparent, rgb(150 200 255 / 0.9) 30%, #fff 50%, rgb(255 190 120 / 0.9) 70%, transparent)', boxShadow: '0 0 30px 4px rgb(120 170 255 / 0.35)' }}
+                initial={{ scaleX: 0, opacity: 0 }}
+                animate={{ scaleX: [0, 1, 1], opacity: [0, 1, 0] }}
+                transition={{ delay: 0.5, duration: 2.4, times: [0, 0.4, 1], ease: [0.16, 1, 0.3, 1] }}
+              />
+
+              <motion.div className="flex flex-col items-center" animate={{ scale: finale ? 1.18 : 1, y: finale ? -4 : 0 }} transition={{ duration: 1.1, ease: [0.5, 0, 0.15, 1] }}>
+                {/* The mark resolves out of blur, as a lens pulls focus. */}
+                <motion.img
+                  src="/logo/udaan.png"
+                  alt=""
+                  draggable={false}
+                  width={132}
+                  height={132}
+                  className="select-none"
+                  initial={{ opacity: 0, scale: 0.82, filter: 'blur(22px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  transition={{ delay: 0.7, duration: 2.1, ease: [0.16, 1, 0.3, 1] }}
+                />
                 <motion.p
-                  className="mt-6 overflow-hidden text-[32px] font-light tracking-[0.18em] text-white"
-                  initial={{ opacity: 0, y: 10, letterSpacing: '0.38em' }}
-                  animate={{ opacity: 1, y: 0, letterSpacing: '0.18em' }}
-                  transition={{ delay: 0.3, duration: 0.9, ease: [0.05, 0.7, 0.1, 1] }}
+                  className="mt-7 text-[30px] font-extralight uppercase text-white"
+                  initial={{ opacity: 0, letterSpacing: '0.9em', y: 8 }}
+                  animate={{ opacity: 1, letterSpacing: '0.46em', y: 0 }}
+                  transition={{ delay: 1.5, duration: 2.6, ease: [0.16, 1, 0.3, 1] }}
                 >
                   Udaan
                 </motion.p>
               </motion.div>
 
-              {/* The progress track fades away once the work is done, so the
-                  finale is the mark alone rather than a completed bar. */}
-              <motion.div
-                className="mt-11 h-[2px] w-[200px] overflow-hidden rounded-full bg-white/[0.09]"
-                animate={{ opacity: stopped ? 0 : 1 }}
-                transition={{ duration: 0.4 }}
-              >
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, var(--color-accent-alt, #7bb8ff), var(--color-accent, #2b7fd4))' }}
-                  initial={{ width: '4%' }}
-                  animate={{ width: `${Math.min(100, progress * 100)}%` }}
-                  transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-                />
-              </motion.div>
-
-              {/* Status crossfades between stages rather than cutting, so a
-                  fast machine's rapid stage changes don't flicker. */}
-              <div className="mt-4 h-4">
+              <div className="absolute bottom-[11vh] flex h-5 items-center justify-center">
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.p
-                    key={stopped ? 'done' : statusText}
-                    className="text-[12.5px] tracking-wide text-white/45"
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.22 }}
-                  >
+                  <motion.p key={stopped ? 'done' : statusText} className="text-[12px] font-light uppercase tracking-[0.3em] text-white/40" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.35 }}>
                     {stopped ? '' : statusText}
-                    {!stopped && slowHint ? ' — taking longer than usual' : ''}
+                    {!stopped && slowHint ? ' (taking longer than usual)' : ''}
                   </motion.p>
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* One hairline along the bottom edge carries the real progress, in the logo's colours. */}
+            <motion.div
+              className="absolute bottom-0 left-0 h-[2px] origin-left"
+              style={{ width: '100%', background: 'linear-gradient(90deg, #3072f0, #00c8ff 45%, #ff8c28)' }}
+              initial={{ scaleX: 0.02 }}
+              animate={{ scaleX: Math.min(1, progress), opacity: stopped ? 0 : 1 }}
+              transition={{ scaleX: { duration: 1.1, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.8 } }}
+            />
           </motion.div>
         )}
       </AnimatePresence>
       {children}
     </>
-  )
-}
-
-/**
- * Udaan's mark at hero size.
- *
- * Three things happen at once, and the overlap is what makes it feel
- * composed rather than merely animated: the mark rises into place, its
- * glow blooms behind it a beat later, and it breathes very slowly
- * afterwards so the screen is never completely still while waiting.
- */
-function UdaanMark({ size }: { size: number }) {
-  return (
-    <span className="relative inline-flex">
-      {/* The glow, behind and slightly larger. It arrives after the mark so
-          the mark lands first and is then lit, rather than appearing
-          pre-lit, which reads as a static image. */}
-      <motion.span
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 rounded-full"
-        style={{
-          width: size * 2.6,
-          height: size * 2.6,
-          x: '-50%',
-          y: '-50%',
-          background: 'radial-gradient(circle, color-mix(in srgb, var(--color-accent, #2b7fd4) 42%, transparent), transparent 62%)',
-        }}
-        initial={{ opacity: 0, scale: 0.65 }}
-        animate={{ opacity: [0, 0.9, 0.62], scale: 1 }}
-        transition={{ delay: 0.42, duration: 1.5, ease: [0.05, 0.7, 0.1, 1], times: [0, 0.45, 1] }}
-      />
-      <motion.span
-        className="inline-flex"
-        initial={{ opacity: 0, y: 14, scale: 0.9 }}
-        animate={{
-          opacity: 1,
-          y: 0,
-          // Settles, then breathes: a 4% swell over six seconds. Slow
-          // enough to be felt rather than watched.
-          scale: [0.9, 1.03, 1, 1.015, 1],
-        }}
-        transition={{
-          opacity: { delay: 0.1, duration: 0.5, ease: [0.05, 0.7, 0.1, 1] },
-          y: { delay: 0.1, duration: 0.7, ease: [0.05, 0.7, 0.1, 1] },
-          scale: { delay: 0.1, duration: 6, times: [0, 0.12, 0.3, 0.65, 1], repeat: Infinity, ease: 'easeInOut' },
-        }}
-      >
-        <SharedMark size={size} tone="brand" />
-      </motion.span>
-    </span>
   )
 }

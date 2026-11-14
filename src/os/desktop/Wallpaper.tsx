@@ -35,7 +35,7 @@ export const Wallpaper = memo(function Wallpaper({ dim = 0 }: { dim?: number; co
   }, [wp.id, wp.src])
 
   return (
-    <div className="fixed -inset-1 overflow-hidden" style={{ background: wp.color ?? '#0b0f16' }}>
+    <div className="u-wp-settle fixed -inset-1 overflow-hidden" style={{ background: wp.color ?? '#0b0f16' }}>
       {layers.map((l, i) => (
         <img key={l.key} src={l.src} alt="" aria-hidden draggable={false} className={`absolute inset-0 h-full w-full select-none ${i === layers.length - 1 && layers.length > 1 ? 'u-wp-in' : ''}`} style={{ objectFit: 'cover' }} />
       ))}

@@ -6,6 +6,7 @@ import { usePoll } from '@/os/kernel/poll'
 import { changePin, loadPinConfig } from '@/os/kernel/lockPin'
 import { Button, Field } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
+import { CinemaCanvas, CINEMA_KINDS } from '@/os/cinema/CinemaCanvas'
 import { ActionButton, Group, Row, Segmented, Stack, Switch } from './ui'
 
 /* ── Lock screen & screensaver ─────────────────────────────────── */
@@ -66,6 +67,45 @@ function PinChanger() {
   )
 }
 
+
+function SaverTile({ id, name, blurb, on, onPick }: { id: string; name: string; blurb: string; on: boolean; onPick: () => void }) {
+  const [hover, setHover] = useState(false)
+  const kind = CINEMA_KINDS.find((k) => k.id === id)
+  return (
+    <button type="button" aria-pressed={on} onClick={onPick} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} className={cn('u-tile items-stretch gap-1.5 p-1.5 text-left', on && 'bg-(--u-wash-on) shadow-[inset_0_0_0_2px_var(--u-accent)]')}>
+      <span className="relative block aspect-video overflow-hidden rounded-[8px] bg-black shadow-[inset_0_0_0_1px_var(--u-edge)]">
+        {kind ? (
+          <CinemaCanvas kind={kind.id} still={!hover} scale={0.25} fps={20} />
+        ) : id === 'clock' ? (
+          <span className="flex h-full w-full items-center justify-center text-[22px] font-extralight tabular-nums text-white">10:09</span>
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-[11px] uppercase tracking-widest text-white/70">Surprise me</span>
+        )}
+      </span>
+      <span className="px-0.5">
+        <span className="block text-[12.5px] font-medium">{name}</span>
+        <span className="block truncate text-[11px] text-(--u-ink-3)">{blurb}</span>
+      </span>
+    </button>
+  )
+}
+
+function SaverPicker() {
+  const [kind, setKind] = usePref('screensaver.scene')
+  const all = [
+    { id: 'clock', name: 'Clock', blurb: 'The classic clock face.' },
+    ...CINEMA_KINDS.map((k) => ({ id: k.id as string, name: k.name, blurb: k.blurb })),
+    { id: 'shuffle', name: 'Shuffle', blurb: 'A different scene each time.' },
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-2 p-3">
+      {all.map((a) => (
+        <SaverTile key={a.id} {...a} on={kind === a.id} onPick={() => void setKind(a.id)} />
+      ))}
+    </div>
+  )
+}
+
 export function LockSection() {
   const [lockAfter, setLockAfter] = usePref('lock.afterScreensaver')
   const [delay, setDelay] = usePref('screensaver.idleSeconds')
@@ -77,7 +117,8 @@ export function LockSection() {
         </Row>
         <PinChanger />
       </Group>
-      <Group title="Screensaver">
+      <Group title="Screensaver" footer="Hover a scene to see it move. They slow down by themselves on a busy PC.">
+        <SaverPicker />
         <Row stack title="Start after" description="How long the PC sits untouched before the clock screensaver appears. It never starts over a full-screen app, a show or music.">
           <Segmented value={delay} options={DELAYS} onChange={(v) => void setDelay(v)} />
         </Row>

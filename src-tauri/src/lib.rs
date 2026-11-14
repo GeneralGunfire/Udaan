@@ -129,6 +129,7 @@ pub fn run() {
       engine::popup::engine_popup_resize,
       engine::popup::engine_popup_close,
       engine::popup::engine_popup_watch,
+      engine::popup::engine_window_round,
       engine::wallpaper_packs::wallpaper_library,
       engine::wallpaper_packs::wallpaper_set_folders,
       engine::wallpaper_packs::wallpaper_pack_save,

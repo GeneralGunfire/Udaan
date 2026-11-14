@@ -57,11 +57,9 @@ export function FlyoutWindow() {
     setKind(null)
     void invoke('engine_popup_watch', { on: false }).catch(() => {})
     void emit('taskbar-popup:hidden')
-    setTimeout(() => {
-      if (!openRef.current) {
-        void getCurrentWindow().hide()
-      }
-    }, 180)
+    // Gone at once: the compositor's blur belongs to the window, so waiting for a fade-out would leave a
+    // blurred rectangle on screen after the card has already left.
+    void getCurrentWindow().hide()
   }, [])
 
   useEffect(() => {
@@ -136,6 +134,7 @@ export function FlyoutWindow() {
         }
       }
       await invoke('shell_set_window_rect', { x, y, w: finalW, h })
+      void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
       await win.show()
       await win.setFocus()
       // Any click outside the popup (the desktop included) closes it.
@@ -174,6 +173,7 @@ export function FlyoutWindow() {
         const pos = await win.outerPosition()
         const y = anchor.current.placement === 'above' ? pos.y + size.height - h : pos.y
         await invoke('shell_set_window_rect', { x: pos.x, y, w, h })
+        void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
       }, 70)
     })
     ro.observe(el)

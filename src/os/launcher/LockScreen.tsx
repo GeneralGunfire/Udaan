@@ -5,6 +5,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { keepAwake } from '@/integrations/power-state'
 import { Wallpaper } from '@/os/desktop/Wallpaper'
 import { playSound } from '@/os/sound/sounds'
+import { usePref } from '@/os/kernel/prefs'
+import { CinemaCanvas, CINEMA_KINDS, type CinemaKind } from '@/os/cinema/CinemaCanvas'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 
 import { DEFAULT_PIN_HASH, DEFAULT_PIN_LENGTH, loadPinConfig, sha256, type PinConfig } from '@/os/kernel/lockPin'
@@ -99,7 +101,7 @@ function Backdrop({ blur }: { blur: boolean }) {
  * either returns to the desktop or, when the lock follows the screensaver,
  * hands over to the lock screen.
  */
-export function Screensaver({ onDismiss }: { onDismiss: () => void }) {
+function ClockScreensaver({ onDismiss }: { onDismiss: () => void }) {
   const now = useNow()
   const np = useNowPlaying()
   const dateLabel = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
@@ -172,6 +174,7 @@ export function Screensaver({ onDismiss }: { onDismiss: () => void }) {
 
       <div className="absolute bottom-[13%] right-[7%] flex flex-col items-end gap-5">
         <AnimatePresence>{np && <MediaPill np={np} />}</AnimatePresence>
+            <img src="/logo/udaan-128.png" alt="" aria-hidden draggable={false} width={34} height={34} className="opacity-90" />
       </div>
       <motion.p
         className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] font-medium uppercase tracking-[0.2em] text-white/35"
@@ -283,9 +286,9 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
             transition={{ duration: 0.4, ease }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-accent)] text-[32px] font-semibold text-[var(--color-accent-contrast)] shadow-[0_10px_40px_rgb(0_0_0/0.35)]">{user.charAt(0).toUpperCase() || 'U'}</span>
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-[32px] font-light text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22),0_10px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl">{user.charAt(0).toUpperCase() || 'U'}</span>
             <p className="mt-3 text-[18px] font-medium">{user || 'Udaan'}</p>
-            <p className="mt-0.5 text-[12.5px] text-white/60">{wrong > 0 ? 'Incorrect PIN — try again' : 'Enter your Udaan PIN'}</p>
+            <p className={`mt-0.5 text-[12.5px] ${wrong > 0 ? "text-[#ff8a80]" : "text-white/60"}`}>{wrong > 0 ? 'Incorrect PIN, try again' : 'Enter your Udaan PIN'}</p>
 
             <motion.div animate={shake} className="mt-5 flex gap-5">
               {Array.from({ length: PIN_LENGTH }, (_, i) => (
@@ -340,6 +343,57 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  )
+}
+
+
+/**
+ * The screensaver. Which one is a setting: the clock, one of the cinematic scenes (aurora, starflight,
+ * currents, the Udaan mark), or shuffle, which picks a different scene each time it starts.
+ */
+export function Screensaver({ onDismiss }: { onDismiss: () => void }) {
+  const [kind] = usePref('screensaver.scene')
+  const [shuffled] = useState(() => CINEMA_KINDS[Math.floor(Math.random() * CINEMA_KINDS.length)].id)
+  if (kind === 'clock') return <ClockScreensaver onDismiss={onDismiss} />
+  const scene = (kind === 'shuffle' ? shuffled : CINEMA_KINDS.some((k) => k.id === kind) ? kind : 'aurora') as CinemaKind
+  return <CinemaSaver kind={scene} onDismiss={onDismiss} />
+}
+
+function CinemaSaver({ kind, onDismiss }: { kind: CinemaKind; onDismiss: () => void }) {
+  const now = useNow(1000)
+  useEffect(() => {
+    void keepAwake(true)
+    return () => void keepAwake(false)
+  }, [])
+  useEffect(() => {
+    // Deliberate input only: the click that opened it would otherwise close it.
+    const opened = Date.now()
+    const end = () => Date.now() - opened > 400 && onDismiss()
+    window.addEventListener('keydown', end)
+    window.addEventListener('mousedown', end)
+    return () => {
+      window.removeEventListener('keydown', end)
+      window.removeEventListener('mousedown', end)
+    }
+  }, [onDismiss])
+  const hh = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] cursor-none overflow-hidden bg-black"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 1.8, ease: [0.4, 0, 0.2, 1] } }}
+      exit={{ opacity: 0, transition: { duration: 0.7 } }}
+    >
+      <motion.div className="absolute inset-0" initial={{ scale: 1.12 }} animate={{ scale: 1 }} transition={{ duration: 14, ease: [0.1, 0.5, 0.2, 1] }}>
+        <CinemaCanvas kind={kind} />
+      </motion.div>
+      {/* Letterbox-style vignette: pulls the eye to the middle, like a film frame. */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 45%, rgb(0 0 0 / 0.62) 100%)' }} />
+      <motion.div className="pointer-events-none absolute bottom-[9vh] left-[7vw] text-white" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.2, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}>
+        <p className="text-[clamp(44px,5.5vw,84px)] font-extralight leading-none tracking-[0.06em] tabular-nums">{hh}</p>
+        <p className="mt-3 text-[clamp(11px,0.95vw,14px)] font-light uppercase tracking-[0.34em] text-white/50">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      </motion.div>
     </motion.div>
   )
 }

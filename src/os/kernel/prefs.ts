@@ -56,6 +56,8 @@ export interface Prefs {
   /** SHA-256 of the Udaan Lock PIN; empty = the built-in default. */
   'lock.pinHash': string
   'lock.pinLength': number
+  /** Which screensaver: clock, aurora, warp, flow, drift or shuffle. */
+  'screensaver.scene': string
 }
 
 export type CornerAction = 'none' | 'task-view' | 'start' | 'show-desktop' | 'notifications' | 'screensaver'
@@ -95,6 +97,7 @@ export const PREF_DEFAULTS: Prefs = {
   'ui.opaque': false,
   'lock.pinHash': '',
   'lock.pinLength': 4,
+  'screensaver.scene': 'aurora',
 }
 
 export type PrefKey = keyof Prefs

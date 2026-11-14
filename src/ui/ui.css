@@ -410,11 +410,11 @@
     align-items: center;
     border-radius: 22px;
     border: 1px solid var(--u-dock-edge, var(--u-edge-strong));
-    background: var(--u-m-dock);
     box-shadow: 0 10px 30px -8px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 35%);
   }
-  :root { --u-m-dock: rgb(20 20 23 / 58%); }
+  :root { --u-m-dock: rgb(16 16 19 / 70%); }
   [data-theme='light'] { --u-m-dock: rgb(246 245 243 / 60%); }
+  /* Layers, back to front: the blurred wallpaper slice (-2), then the tint and top light (-1), then the grain, then the icons. */
   .u-dock::before {
     content: '';
     position: absolute;
@@ -422,9 +422,19 @@
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(to bottom, var(--u-light), transparent 22px), var(--u-grain);
-    background-size: auto, 96px 96px;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 12%), transparent 26px), var(--u-m-dock);
+  }
+  .u-dock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: var(--u-grain);
+    background-size: 96px 96px;
     mix-blend-mode: soft-light;
+    opacity: 0.8;
   }
   .u-dock__item {
     position: relative;
@@ -451,7 +461,12 @@
   @media (hover: hover) {
     .u-dock:not(.dock-no-hover) .u-dock__item:hover::after { opacity: 1; }
   }
-  .u-dock__glyph { transition: transform 140ms var(--u-ease); transform-origin: bottom center; }
+  .u-dock__glyph { transition: transform 200ms var(--u-ease); transform-origin: bottom center; }
+  @media (hover: hover) {
+    .u-dock:not(.dock-no-hover) .u-dock__item:hover .u-dock__glyph { transform: translateY(-4px) scale(1.07); }
+  }
+  /* The window you are in keeps a quiet plate behind its icon. */
+  .u-dock__item[aria-pressed='true']::after { opacity: 0.9; background: var(--u-wash-press); }
   .u-dock__item:active .u-dock__glyph { transform: scale(0.9); }
   .u-dock__dot {
     position: absolute;
@@ -626,3 +641,25 @@
 @layer components {
   .u-popup--tip { width: max-content; }
 }
+
+@layer components {
+  /* ── ARRIVAL: the desktop settles into place after the boot screen ── */
+  .u-wp-settle { animation: u-wp-settle 2.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes u-wp-settle { from { transform: scale(1.07); filter: brightness(0.7); } to { transform: none; filter: none; } }
+  .u-dock { animation: u-dock-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 0.5s both; }
+  @keyframes u-dock-rise { from { opacity: 0; transform: translateY(26px) scale(0.96); } to { opacity: 1; transform: none; } }
+  .u-menubar { animation: u-bar-fall 800ms cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+  @keyframes u-bar-fall { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+  /* Dock icons arrive one after another. */
+  .u-dock__item { animation: u-item-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .u-dock__item:nth-child(2) { animation-delay: 0.75s; }
+  .u-dock__item:nth-child(3) { animation-delay: 0.82s; }
+  .u-dock__item:nth-child(4) { animation-delay: 0.89s; }
+  .u-dock__item:nth-child(5) { animation-delay: 0.96s; }
+  .u-dock__item:nth-child(6) { animation-delay: 1.03s; }
+  @keyframes u-item-in { from { opacity: 0; transform: translateY(14px) scale(0.85); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .u-wp-settle, .u-dock, .u-menubar, .u-dock__item { animation: none; }
+  }
+}
+[data-motion='off'] .u-wp-settle, [data-motion='off'] .u-dock, [data-motion='off'] .u-menubar, [data-motion='off'] .u-dock__item { animation: none; }
