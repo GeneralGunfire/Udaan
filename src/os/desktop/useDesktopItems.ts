@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { desktopDir } from '@tauri-apps/api/path'
-import { listDir } from '@/integrations/file-explorer/client'
+import { invoke } from '@tauri-apps/api/core'
 import type { FileEntry } from '@/integrations/file-explorer/types'
 import { getTaskbarPref, setTaskbarPref } from '@/integrations/taskbar-prefs/client'
-import { inTauri, onDirChanged, shell } from '@/os/kernel/shell'
+import { listen } from '@tauri-apps/api/event'
+import { inTauri, shell } from '@/os/kernel/shell'
 import { useQuickstarts, type Quickstart } from '@/os/kernel/quickstarts'
 import type { Cell, IconSize, SortBy } from './layout'
 import { usePoll } from '@/os/kernel/poll'
@@ -31,7 +31,6 @@ export interface DesktopPrefs {
 
 const PREFS_KEY = 'desktop-layout'
 const DEFAULT_PREFS: DesktopPrefs = { iconSize: 'medium', autoArrange: false, sortBy: 'name', showIcons: true, positions: {} }
-const HIDDEN_NAMES = new Set(['desktop.ini', 'thumbs.db'])
 
 function toItem(e: FileEntry): DesktopItem {
   const ext = e.extension.toLowerCase()
@@ -43,13 +42,6 @@ function toItem(e: FileEntry): DesktopItem {
     iconUrl: null,
     isShortcut,
   }
-}
-
-/** The user's Desktop plus the all-users Public Desktop, merged like Explorer shows them. */
-async function resolveDesktopDirs(): Promise<string[]> {
-  const mine = (await desktopDir()).replace(/[\\/]+$/, '')
-  const usersRoot = mine.split(/[\\/]/).slice(0, -2).join('\\')
-  return [mine, `${usersRoot}\\Public\\Desktop`]
 }
 
 function recycleBinItem(full: boolean): DesktopItem {
@@ -101,22 +93,18 @@ export function useDesktopItems() {
   const [binFull, setBinFull] = useState(false)
   const refreshBin = useCallback(async () => {
     if (!inTauri) return
-    const info = await shell.recycleBinInfo().catch(() => null)
+    // Asked of Windows in one call (count and size), not by enumerating the bin.
+    const info = await invoke<{ itemCount: number }>('desktop_recycle_bin').catch(() => null)
     if (info) setBinFull(info.itemCount > 0)
   }, [])
 
   usePoll(() => void refreshBin(), 10_000)
 
-  const reload = useCallback(async (dirList: string[]) => {
-    const lists = await Promise.all(dirList.map((d) => listDir(d).catch(() => [] as FileEntry[])))
-    const merged = new Map<string, DesktopItem>()
-    for (const entry of lists.flat()) {
-      const lower = entry.name.toLowerCase()
-      if (HIDDEN_NAMES.has(lower) || lower.startsWith('~$')) continue
-      const item = toItem(entry)
-      merged.set(item.id, item)
-    }
-    const next = [...merged.values()]
+  // The engine assembles the desktop: both real folders (asked of Windows), minus what Explorer
+  // hides, each item once. This only decorates it with labels and icons.
+  const reload = useCallback(async () => {
+    const entries = await invoke<FileEntry[]>('desktop_items_list').catch(() => [] as FileEntry[])
+    const next = entries.map(toItem)
     const missing = next.filter((i) => !icons.current.has(i.path)).map((i) => i.path)
     if (missing.length && inTauri) {
       const fetched = await shell.fileIcons(missing).catch(() => ({}) as Record<string, string | null>)
@@ -132,7 +120,7 @@ export function useDesktopItems() {
     let cancelled = false
     void (async () => {
       try {
-        const [d, raw] = await Promise.all([resolveDesktopDirs(), getTaskbarPref(PREFS_KEY).catch(() => null)])
+        const [d, raw] = await Promise.all([invoke<string[]>('desktop_items_dirs'), getTaskbarPref(PREFS_KEY).catch(() => null)])
         if (cancelled) return
         if (raw) {
           try {
@@ -143,8 +131,7 @@ export function useDesktopItems() {
         }
         prefsLoaded.current = true
         setDirs(d)
-        await reload(d)
-        await shell.watchDirs(d)
+        await reload()
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       }
@@ -154,14 +141,12 @@ export function useDesktopItems() {
     }
   }, [reload])
 
+  // The engine watches both folders and announces a change once the burst settles.
   useEffect(() => {
-    if (!dirs.length) return
-    const lowered = dirs.map((d) => d.toLowerCase())
-    const unlisten = onDirChanged((dir) => {
-      if (lowered.includes(dir.toLowerCase())) void reload(dirs)
-    })
+    if (!inTauri) return
+    const unlisten = listen('desktop://changed', () => void reload())
     return () => void unlisten.then((fn) => fn())
-  }, [dirs, reload])
+  }, [reload])
 
   const updatePrefs = useCallback((patch: Partial<DesktopPrefs>) => {
     setPrefs((prev) => {
@@ -174,9 +159,9 @@ export function useDesktopItems() {
   const refreshIcon = useCallback(
     (path: string) => {
       icons.current.delete(path)
-      void shell.invalidateIcon(path).then(() => reload(dirs))
+      void shell.invalidateIcon(path).then(() => reload())
     },
-    [dirs, reload],
+    [reload],
   )
 
   return useMemo(
@@ -186,7 +171,7 @@ export function useDesktopItems() {
       items: [recycleBinItem(binFull), ...quickstarts.map(quickstartItem), ...items],
       prefs,
       updatePrefs,
-      reload: () => reload(dirs),
+      reload,
       refreshBin,
       refreshIcon,
       error,

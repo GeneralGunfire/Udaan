@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { WallpaperContext } from '@/shared/hooks/useWallpaper'
 import { DEFAULT_WALLPAPER_ID, isValidWallpaperId } from './wallpapers'
 
@@ -28,6 +29,22 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  // The engine changes the wallpaper by itself (rotation, packs, next/previous). Follow it, and keep
+  // the stored copy in step so a window opened later starts from the right one.
+  useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return
+    const un = listen<string>('wallpaper://changed', (e) => {
+      if (!isValidWallpaperId(e.payload)) return
+      setWallpaperIdState(e.payload)
+      try {
+        localStorage.setItem(STORAGE_KEY, e.payload)
+      } catch {
+        // Best-effort persistence only.
+      }
+    })
+    return () => void un.then((fn) => fn())
   }, [])
 
   const setWallpaperId = useCallback((id: string) => {

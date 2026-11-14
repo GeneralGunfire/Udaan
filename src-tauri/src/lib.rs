@@ -119,11 +119,22 @@ pub fn run() {
       engine::search::search_record_launch,
       engine::search::search_status,
       engine::search::search_refresh_apps,
+      engine::desktop_items::desktop_items_dirs,
+      engine::desktop_items::desktop_items_list,
+      engine::desktop_items::desktop_recycle_bin,
       engine::edges::engine_edge_bind,
       engine::edges::engine_edge_release,
       engine::popup::engine_popup_open,
       engine::popup::engine_popup_resize,
       engine::popup::engine_popup_close,
+      engine::wallpaper_packs::wallpaper_library,
+      engine::wallpaper_packs::wallpaper_set_folders,
+      engine::wallpaper_packs::wallpaper_pack_save,
+      engine::wallpaper_packs::wallpaper_pack_delete,
+      engine::wallpaper_packs::wallpaper_set_rotation,
+      engine::wallpaper_packs::wallpaper_set,
+      engine::wallpaper_packs::wallpaper_step,
+      engine::wallpaper_packs::wallpaper_current,
       engine::wallpapers::wallpaper_fit,
       engine::wallpapers::wallpaper_thumb,
       engine::wallpapers::wallpaper_scan,
@@ -506,6 +517,8 @@ pub fn run() {
       engine::create_windows(app.handle());
       engine::apps::start(app.handle().clone());
       engine::search::start(app.handle().clone());
+      engine::stores::manage(app.handle(), "wallpaper_packs", engine::wallpaper_packs::start(app.handle()).map(|_| ()));
+      engine::desktop_items::start(app.handle().clone());
 
       if let Some(main_window) = app.get_webview_window("main") {
         webview_permissions::allow_media_capture(&main_window);

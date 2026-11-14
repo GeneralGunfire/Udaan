@@ -13,6 +13,7 @@
 //! - [`apps`]: how long closed app windows stay warm; capped, shorter when RAM is tight.
 //! - [`desktop`]: the wallpaper/icons layer: always the bottom of the stack, fitted to the
 //!   primary monitor, and recovered when monitors, DPI or Explorer change.
+//! - [`desktop_items`]: what is on the desktop, as Explorer would show it, kept current.
 //! - [`doctor`]: checks the engine's own invariants and repairs them after a display change or an
 //!   Explorer restart.
 //! - [`governor`]: decides which webviews are actually allowed to render. A window nobody
@@ -21,6 +22,7 @@
 //! - [`popup`]: where a popup goes (flip, clamp, fit) and when it dismisses itself.
 //! - [`edges`]: the dock and menu bar: reserve a strip, sit exactly on it, stay there, and give
 //!   it back however the window ends.
+//! - [`wallpaper_packs`]: packs (cars, windows, abstract...) and automatic changing on a timer.
 //! - [`wallpapers`]: a library of pictures on disk, served at the size they are shown.
 //! - [`watchdog`]: an external process that restores Explorer's taskbar even after a hard kill.
 //! - [`search`]: the Start search index: apps, settings, actions and files, ranked, with frecency.
@@ -29,6 +31,7 @@
 
 pub mod apps;
 pub mod desktop;
+pub mod desktop_items;
 pub mod doctor;
 pub mod edges;
 pub mod governor;
@@ -40,6 +43,7 @@ pub mod search;
 pub mod stores;
 pub mod supervisor;
 pub mod trace;
+pub mod wallpaper_packs;
 pub mod wallpapers;
 pub mod watchdog;
 
