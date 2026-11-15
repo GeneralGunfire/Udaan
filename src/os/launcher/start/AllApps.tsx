@@ -6,7 +6,8 @@ import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { useAppMenu } from './appMenu'
 import { Button, Segmented } from '@/os/ui/controls'
 import { SearchIcon } from '@/shared/icons'
-import { launchPin, type InstalledApp, type Pin } from './model'
+import { useProfile } from '@/os/kernel/profile'
+import { launchPin, WORK_ONLY_APPS, type InstalledApp, type Pin } from './model'
 
 /**
  * ALL APPS: every app on the PC, A to Z.
@@ -37,7 +38,10 @@ export function AllApps({
   const scroller = useRef<HTMLDivElement>(null)
   const f = filter.trim().toLowerCase()
 
-  const udaan = useMemo(() => APP_IDS.filter((id) => !f || APP_DEFS[id].name.toLowerCase().includes(f)), [f])
+  // Work's own apps (Anvil) are not part of Personal's Start at all.
+  const profile = useProfile()
+  const shownIds = useMemo(() => APP_IDS.filter((id) => profile === 'work' || !WORK_ONLY_APPS.includes(id)), [profile])
+  const udaan = useMemo(() => shownIds.filter((id) => !f || APP_DEFS[id].name.toLowerCase().includes(f)), [f, shownIds])
   const groups = useMemo(() => {
     const m = new Map<string, InstalledApp[]>()
     for (const a of installed) {
@@ -76,7 +80,7 @@ export function AllApps({
             ‹ Back
           </Button>
           <h2 className="text-[15px] font-semibold">All apps</h2>
-          <span className="text-[12px] text-(--u-ink-3)">{APP_IDS.length + installed.length}</span>
+          <span className="text-[12px] text-(--u-ink-3)">{shownIds.length + installed.length}</span>
           <span className="flex-1" />
           <label className="u-search h-8 w-[200px] gap-2 px-3">
             <SearchIcon width={13} height={13} className="shrink-0 opacity-50" />

@@ -31,7 +31,11 @@ export interface Hit {
 /** What a pinned tile points at. */
 export type Pin = { kind: 'udaan'; appId: AppId } | { kind: 'installed'; app: InstalledApp }
 
-export const pinKey = (p: Pin) => (p.kind === 'udaan' ? `u:${p.appId}` : `i:${p.app.id}`)
+/** Apps that belong to Work only: never listed, pinned or searched for in Personal. */
+export const WORK_ONLY_APPS: AppId[] = ['anvil']
+const personalOk = (id: string) => currentProfile() === 'work' || !WORK_ONLY_APPS.includes(id as AppId)
+
+export const pinKey =(p: Pin) => (p.kind === 'udaan' ? `u:${p.appId}` : `i:${p.app.id}`)
 export const pinName = (p: Pin) => (p.kind === 'udaan' ? APP_DEFS[p.appId].name : p.app.name)
 
 /* ── Pinned apps ─────────────────────────────────────────────────── */
@@ -57,7 +61,7 @@ export async function workStartPins(): Promise<Pin[]> {
 function valid(p: unknown): p is Pin {
   const x = p as Pin | null
   if (!x) return false
-  return x.kind === 'udaan' ? isAppId(x.appId) : x.kind === 'installed' && !!x.app?.id
+  return x.kind === 'udaan' ? isAppId(x.appId) && personalOk(x.appId) : x.kind === 'installed' && !!x.app?.id
 }
 
 /** Saved pins outlive the apps in them, so anything that no longer exists is dropped on load. */
@@ -172,7 +176,7 @@ export function registerStartEntries() {
   void invoke('search_register', { source: 'udaan-actions', entries: actions })
 }
 
-export const search = (query: string, limit = 24) => invoke<Hit[]>('search_query', { query, limit })
+export const search = (query: string, limit = 24) => invoke<Hit[]>('search_query', { query, limit }).then((hits) => hits.filter((h) => personalOk(h.target) && personalOk(h.id.replace(/^udaan:/, ''))))
 
 /* ── Launching ───────────────────────────────────────────────────── */
 

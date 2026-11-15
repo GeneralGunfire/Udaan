@@ -1,6 +1,17 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
+import { emit, listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useWallpaper } from '@/shared/hooks/useWallpaper'
 import { fittedWallpaperSrc, getWallpaper } from '@/app/wallpapers'
+
+/** Only the desktop window announces that a picture is on screen; the profile switch waits for it. */
+const isDesktop = () => {
+  try {
+    return getCurrentWindow().label === 'main'
+  } catch {
+    return false
+  }
+}
 
 /**
  * The desktop wallpaper: the engine's screen-sized picture, crossfaded when it changes.
@@ -16,18 +27,35 @@ export const Wallpaper = memo(function Wallpaper({ dim = 0 }: { dim?: number; co
   const { wallpaperId, revision } = useWallpaper()
   const wp = getWallpaper(wallpaperId)
   const [layers, setLayers] = useState<{ key: number; src: string }[]>([])
+  // Switching between Personal and Work happens behind a cover: the new picture replaces the old at once,
+  // with no crossfade, so the old profile's wallpaper is never seen fading out.
+  const switching = useRef(false)
+  useEffect(() => {
+    const un = listen('profile://changing', () => (switching.current = true))
+    return () => void un.then((fn) => fn())
+  }, [])
 
   useEffect(() => {
-    if (!wp.src) return void setLayers([])
+    if (!wp.src) {
+      setLayers([])
+      if (isDesktop()) void emit('wallpaper://shown', wp.id)
+      return
+    }
     let cancelled = false
     void fittedWallpaperSrc(wp.id).then(async (src) => {
       const img = new Image()
       img.src = src
       await img.decode().catch(() => undefined)
       if (cancelled) return
-      setLayers((l) => [...l.slice(-1), { key: Date.now(), src }])
-      // Once the new picture has faded in, drop the one beneath it.
-      setTimeout(() => !cancelled && setLayers((l) => l.slice(-1)), 900)
+      if (switching.current) {
+        switching.current = false
+        setLayers([{ key: Date.now(), src }])
+      } else {
+        setLayers((l) => [...l.slice(-1), { key: Date.now(), src }])
+        // Once the new picture has faded in, drop the one beneath it.
+        setTimeout(() => !cancelled && setLayers((l) => l.slice(-1)), 900)
+      }
+      if (isDesktop()) void emit('wallpaper://shown', wp.id)
     })
     return () => {
       cancelled = true

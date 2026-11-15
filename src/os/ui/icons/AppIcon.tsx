@@ -368,38 +368,45 @@ const DRAWINGS: Record<AppId, Drawing> = {
 
 
   clipboard: (c) => (
-  anvil: (c) => (
-    <Plate c={c} from="#4a5568" to="#161a22" rim="#8794ab">
+    <Plate c={c} from="#4b5b73" to="#1a2230" rim="#9db1cf">
       <defs>
-        <linearGradient id={c.id('steel')} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={c.id('sheet')} x1="0.2" y1="0" x2="0.8" y2="1">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.45" stopColor="#dbe2ee" />
-          <stop offset="1" stopColor="#a9b4c6" />
+          <stop offset="1" stopColor="#dde3ec" />
+        </linearGradient>
+        <linearGradient id={c.id('steel')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#d3dae6" />
+          <stop offset="1" stopColor="#8e9bb0" />
         </linearGradient>
       </defs>
       <g style={{ filter: liftHeavy }}>
-        {/* A side-on anvil: tapered horn on the left, flat face, narrow waist, wide foot. */}
-        <path
-          d="M14 44C22 41.5 33 41 41 41H84V52H69C69 58 66 61 66 66L77 70V80H31V70L42 66C42 61 39 58 39 55C32 53 21 50 14 44Z"
-          fill={`url(#${c.id('steel')})`}
-        />
-        {/* The struck face catches the light. */}
-        <path d="M41 41H84V44H41Z" fill="#fff" />
-        {/* Sparks. */}
-        <circle cx="58" cy="29" r="2.6" fill="#ffb347" />
-        <circle cx="68" cy="22" r="1.9" fill="#ff8a3c" />
-        <circle cx="49" cy="23" r="1.5" fill="#ffd27a" />
+        {/* The sheet on its board. */}
+        <rect x="27" y="23" width="46" height="58" rx="7" fill={`url(#${c.id('sheet')})`} />
+        {/* A steel clip, a separate piece standing proud of the sheet. */}
+        <rect x="38" y="15" width="24" height="14" rx="4.5" fill={`url(#${c.id('steel')})`} />
+        <rect x="44.5" y="19.5" width="11" height="4.5" rx="2.25" fill="#5a677d" />
+        {/* History: the newest copy leads, in the accent. */}
+        <circle cx="36" cy="43" r="2.7" fill="#3072f0" />
+        <circle cx="36" cy="54" r="2.7" fill="#9aa6ba" />
+        <circle cx="36" cy="65" r="2.7" fill="#9aa6ba" />
+        <g strokeLinecap="round" strokeWidth="4.2">
+          <path d="M44 43h20" stroke="#3072f0" />
+  anvil: (c) => (
+    <Plate c={c} from="#434d5f" to="#12161d" rim="#6f7b90">
+      <defs>
+        <linearGradient id={c.id('steel')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f4f6fa" />
+          <stop offset="1" stopColor="#aeb8c8" />
+        </linearGradient>
+      </defs>
+      <g style={{ filter: liftHeavy }} transform="translate(50 50) scale(1.08) translate(-48 -53)">
+        {/* A plain geometric anvil: wedge horn, flat face, narrow waist, flared foot. One colour, no ornament. */}
+        <path d="M12 40L26 34H84V44H70L66 52V60H78L84 72H30L36 60H46V52L42 44H26Z" fill={`url(#${c.id('steel')})`} />
+        <path d="M26 34H84V36.2H26Z" fill="#fff" />
       </g>
     </Plate>
   ),
-    <Plate c={c} from="#9b98ff" to="#3b2fc4" rim="#c7c5ff">
-      <g style={{ filter: liftHeavy }}>
-        <rect x="26" y="25" width="48" height="58" rx="8" fill="#fff" />
-        {/* The clip, drawn as a separate piece above the board. */}
-        <rect x="38" y="16" width="24" height="14" rx="6" fill="#d8d6ff" />
-        <rect x="38" y="16" width="24" height="14" rx="6" fill="none" stroke="#fff" strokeWidth="1.4" strokeOpacity="0.8" />
-        <g stroke="#6b66e8" strokeWidth="4.5" strokeLinecap="round">
-          <path d="M37 48h26M37 59h26M37 70h15" />
+          <path d="M44 54h20M44 65h12" stroke="#b4bece" />
         </g>
       </g>
     </Plate>

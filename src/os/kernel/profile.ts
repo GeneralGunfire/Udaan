@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { emit } from '@tauri-apps/api/event'
+import { emit, listen } from '@tauri-apps/api/event'
 import { localDataDir, join } from '@tauri-apps/api/path'
 import { getPref, onPrefChanged, setPref, usePref } from './prefs'
 import { inTauri } from './shell'
@@ -84,7 +84,17 @@ export async function switchProfile(to: Profile): Promise<void> {
   await applyProfile(to)
   await setPref('profile.active', to)
   await emit('dock://pins-changed')
+  // The cover (lock screen or veil) stays up until the desktop says the new profile's wallpaper is on screen,
+  // so the old one is never seen. A safety limit keeps a missing answer from holding the screen.
+  let shown: () => void = () => {}
+  const wallpaperShown = new Promise<void>((resolve) => {
+    shown = resolve
+    setTimeout(resolve, 1500)
+  })
+  const off = listen('wallpaper://shown', () => shown())
   await emit('profile://changed', to)
+  if (from !== to) await wallpaperShown
+  void off.then((fn) => fn())
 }
 
 /** Points the Rust-side stores at a profile. Also run once at start so they match the saved choice. */
