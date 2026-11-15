@@ -88,19 +88,7 @@ fn serve(sink: Arc<TcpSink>) -> Result<(u16, String), String> {
               // A CORS preflight (any extra request header triggers one): allow it.
               let _ = s.write_all(b"HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Max-Age: 600\r\nConnection: close\r\n\r\n");
             } else if req.starts_with(&want) {
-              let head = "HTTP/1.1 200 OK
-
-Content-Type: application/octet-stream
-
-Access-Control-Allow-Origin: *
-
-Cache-Control: no-store
-
-Connection: close
-
-
-
-";
+              let head = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
               if s.write_all(head.as_bytes()).is_ok() {
                 let _ = s.set_nodelay(true);
                 let _ = s.set_write_timeout(Some(StdDuration::from_millis(100)));
@@ -109,13 +97,7 @@ Connection: close
                 }
               }
             } else {
-              let _ = s.write_all(b"HTTP/1.1 404 Not Found
-
-Connection: close
-
-
-
-");
+              let _ = s.write_all(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
             }
           }
           Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(StdDuration::from_millis(25)),
