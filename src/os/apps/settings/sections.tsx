@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { usePref } from '@/os/kernel/prefs'
+import { APP_DEFS, APP_IDS, type AppId } from '@/os/kernel/registry'
 import { usePoll } from '@/os/kernel/poll'
 import { changePin, loadPinConfig, resetPin } from '@/os/kernel/lockPin'
 import { Button, Field } from '@/os/ui/controls'
@@ -298,6 +299,109 @@ export function AppearanceExtras() {
         </Row>
         <Row title="Reduce motion" description="Replaces springs and slides with simple fades.">
           <Switch checked={motionOff} onChange={(v) => void setMotionOff(v)} label="Reduce motion" />
+        </Row>
+      </Group>
+    </Stack>
+  )
+}
+
+/* ── Startup & apps ────────────────────────────────────────────── */
+
+function useIdList(pref: 'apps.warm' | 'apps.startup') {
+  const [raw, setRaw] = usePref(pref)
+  let ids: string[] = []
+  try {
+    ids = JSON.parse(raw) as string[]
+  } catch {
+    /* none */
+  }
+  const toggle = (id: string, on: boolean) => void setRaw(JSON.stringify(on ? [...new Set([...ids, id])] : ids.filter((x) => x !== id)))
+  return { ids, toggle }
+}
+
+export function StartupSection() {
+  const warm = useIdList('apps.warm')
+  const startup = useIdList('apps.startup')
+  const apps = APP_IDS.filter((id: AppId) => id !== 'settings')
+  return (
+    <Stack>
+      <Group title="Open when Udaan starts" footer="These apps open by themselves after sign-in.">
+        {apps.map((id) => (
+          <Row key={id} title={APP_DEFS[id].name}>
+            <Switch checked={startup.ids.includes(id)} onChange={(v) => startup.toggle(id, v)} label={`Open ${APP_DEFS[id].name} at startup`} />
+          </Row>
+        ))}
+      </Group>
+      <Group title="Keep ready for instant opening" footer="A kept-ready app waits in the background, which opens it at once but uses about 85 MB of memory. Udaan skips this on its own when memory is low.">
+        {apps.map((id) => (
+          <Row key={id} title={APP_DEFS[id].name}>
+            <Switch checked={warm.ids.includes(id)} onChange={(v) => warm.toggle(id, v)} label={`Keep ${APP_DEFS[id].name} ready`} />
+          </Row>
+        ))}
+      </Group>
+    </Stack>
+  )
+}
+
+/* ── Power & performance ───────────────────────────────────────── */
+
+const PROFILES = [
+  { value: 'eco', label: 'Eco' },
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'performance', label: 'Performance' },
+]
+const PROFILE_TEXT: Record<string, string> = {
+  eco: 'No animation and no blur. Solid surfaces. The lightest on the processor, memory and battery.',
+  balanced: 'Smooth animation and glass, scaled down by itself when the PC is busy.',
+  performance: 'Everything on, always: full animation, blur and kept-ready apps.',
+}
+
+export function PowerSection() {
+  const [profile, setProfile] = usePref('power.profile')
+  return (
+    <Stack>
+      <Group title="Profile" footer={PROFILE_TEXT[profile] ?? ''}>
+        <Row stack title="How much should Udaan do for looks?" description="One switch for animation, blur and background work.">
+          <Segmented value={profile} options={PROFILES} onChange={(v) => void setProfile(v)} />
+        </Row>
+      </Group>
+      <PerformanceGroup />
+    </Stack>
+  )
+}
+
+/* ── Privacy & security ────────────────────────────────────────── */
+
+export function PrivacySection() {
+  const [previews, setPreviews] = usePref('notifications.previews')
+  const [lockAfter, setLockAfter] = usePref('lock.afterScreensaver')
+  const [cleared, setCleared] = useState(false)
+  return (
+    <Stack>
+      <Group title="On screen">
+        <Row title="Show message text in banners" description="Off: banners only say who a notification is from, so nothing private shows over your work.">
+          <Switch checked={previews} onChange={(v) => void setPreviews(v)} label="Show message text in banners" />
+        </Row>
+        <Row title="Lock when the screensaver ends" description="Ask for your PIN when you wake the PC.">
+          <Switch checked={lockAfter} onChange={(v) => void setLockAfter(v)} label="Lock when the screensaver ends" />
+        </Row>
+      </Group>
+      <Group title="History" footer="Removes what Udaan remembers on this PC: pinned-and-recent lists in Start and wallpaper choices history. Your files and apps are untouched.">
+        <Row title="Clear Start history" description={cleared ? 'Cleared.' : 'Forgets which apps you open most.'}>
+          <ActionButton
+            danger
+            onClick={() => {
+              try {
+                localStorage.removeItem('udaan-start-pins-v3')
+              } catch {
+                /* nothing to clear */
+              }
+              void invoke('search_clear_history').catch(() => {})
+              setCleared(true)
+            }}
+          >
+            Clear
+          </ActionButton>
         </Row>
       </Group>
     </Stack>

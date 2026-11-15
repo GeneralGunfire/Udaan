@@ -5,9 +5,7 @@ import {
   ExplorerIcon,
   FileTextIcon,
   DiscIcon,
-  GaugeIcon,
   NewspaperIcon,
-  RecordIcon,
   ChatBubbleIcon,
   CalendarIcon,
   HeadphonesIcon,
@@ -23,16 +21,12 @@ export type AppId =
   | 'file-explorer'
   | 'notes'
   | 'cnc-mod-switcher'
-  | 'claude-usage'
   | 'private-player'
   | 'live-dj'
   | 'news-brief'
-  | 'audio-recorder'
   | 'settings'
-  | 'viewer-3d'
   | 'tv'
   | 'clipboard'
-  | 'screenshot'
   | 'photos'
   | 'storage'
 
@@ -49,15 +43,11 @@ export interface AppArgsMap {
   'file-explorer': { initialPath?: string }
   notes: Record<string, never>
   'cnc-mod-switcher': Record<string, never>
-  'claude-usage': Record<string, never>
   'private-player': Record<string, never>
   'live-dj': Record<string, never>
   'news-brief': Record<string, never>
-  'audio-recorder': Record<string, never>
-  'viewer-3d': { initialPath?: string }
   tv: Record<string, never>
   'clipboard': Record<string, never>
-  'screenshot': Record<string, never>
   'photos': Record<string, never>
   'storage': Record<string, never>
   settings: { section?: 'personalization' | 'dock' | 'keyboard' | 'windows' | 'widgets' | 'quickstarts' | 'notifications' | 'sound' | 'system' }
@@ -83,14 +73,10 @@ export const APP_DEFS: Record<AppId, AppDef> = {
   'file-explorer': { name: 'Files', icon: ExplorerIcon, size: { width: 1120, height: 720 }, minSize: { width: 640, height: 420 }, tint: '#3fa7e0' },
   notes: { name: 'Notes', icon: FileTextIcon, size: { width: 980, height: 700 }, minSize: { width: 560, height: 420 }, tint: '#e8c547' },
   'cnc-mod-switcher': { name: 'C&C Mods', icon: DiscIcon, size: { width: 900, height: 640 }, minSize: { width: 600, height: 440 }, tint: '#9aa0a6' },
-  'claude-usage': { name: 'Claude Usage', icon: GaugeIcon, size: { width: 1100, height: 760 }, minSize: { width: 680, height: 480 }, tint: '#d97757' },
   'private-player': { name: 'Music', icon: HeadphonesIcon, size: { width: 1280, height: 820 }, minSize: { width: 820, height: 560 }, tint: '#fa586a' },
   'live-dj': { name: 'Live DJ', icon: DiscIcon, size: { width: 1180, height: 840 }, minSize: { width: 860, height: 600 }, tint: '#b5179e' },
   'news-brief': { name: 'News', icon: NewspaperIcon, size: { width: 1040, height: 780 }, minSize: { width: 620, height: 480 }, tint: '#6f7782' },
-  'audio-recorder': { name: 'Recorder', icon: RecordIcon, size: { width: 760, height: 560 }, minSize: { width: 480, height: 400 }, tint: '#e0484f' },
-  'viewer-3d': { name: '3D Viewer', icon: LayersIcon, size: { width: 1200, height: 800 }, minSize: { width: 640, height: 440 }, tint: '#5e5ce6' },
   'clipboard': { name: 'Clipboard', icon: LayersIcon, size: { width: 820, height: 700 }, minSize: { width: 640, height: 480 }, tint: '#5e5ce6' },
-  'screenshot': { name: 'Screenshot', icon: LayersIcon, size: { width: 1100, height: 760 }, minSize: { width: 640, height: 480 }, tint: '#0a84ff' },
   'photos': { name: 'Photos', icon: LayersIcon, size: { width: 1200, height: 820 }, minSize: { width: 640, height: 480 }, tint: '#ff9f0a' },
   'storage': { name: 'Storage', icon: LayersIcon, size: { width: 1000, height: 760 }, minSize: { width: 640, height: 480 }, tint: '#30d158' },
   tv: { name: 'TV', icon: LayersIcon, size: { width: 1600, height: 900 }, minSize: { width: 960, height: 600 }, tint: '#0a0a0c' },
@@ -114,7 +100,6 @@ export const APP_COMPONENTS: { [Id in AppId]: ComponentType<any> } = {
   'file-explorer': lazy(() => import('@/features/file-explorer/FileExplorerView').then((m) => ({ default: m.FileExplorerView }))),
   notes: lazy(() => import('@/features/notes/NotesView').then((m) => ({ default: m.NotesView }))),
   'cnc-mod-switcher': lazy(() => import('@/features/cnc-mod-switcher/CncModSwitcherView').then((m) => ({ default: m.CncModSwitcherView }))),
-  'claude-usage': lazy(() => import('@/features/claude-usage/ClaudeUsageView').then((m) => ({ default: m.ClaudeUsageView }))),
   // The player's audio graph lives in its provider, so it loads (and only
   // ever runs) inside the Music window itself.
   'private-player': lazy(async () => {
@@ -126,10 +111,7 @@ export const APP_COMPONENTS: { [Id in AppId]: ComponentType<any> } = {
   }),
   'live-dj': lazy(() => import('@/features/live-dj/LiveDjView').then((m) => ({ default: m.LiveDjView }))),
   'news-brief': lazy(() => import('@/features/news-brief/NewsBriefView').then((m) => ({ default: m.NewsBriefView }))),
-  'audio-recorder': lazy(() => import('@/features/audio-recorder/AudioRecorderView').then((m) => ({ default: m.AudioRecorderView }))),
-  'viewer-3d': lazy(() => import('@/os/apps/viewer3d/Viewer3DApp').then((m) => ({ default: m.Viewer3DApp }))),
   'clipboard': lazy(() => import('@/os/apps/utilities/ClipboardApp').then((m) => ({ default: m.ClipboardApp }))),
-  'screenshot': lazy(() => import('@/os/apps/utilities/ScreenshotApp').then((m) => ({ default: m.ScreenshotApp }))),
   'photos': lazy(() => import('@/os/apps/utilities/PhotosApp').then((m) => ({ default: m.PhotosApp }))),
   'storage': lazy(() => import('@/os/apps/utilities/StorageApp').then((m) => ({ default: m.StorageApp }))),
   tv: lazy(() => import('@/os/apps/tv/TvApp').then((m) => ({ default: m.TvApp }))),

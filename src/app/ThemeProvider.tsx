@@ -84,9 +84,11 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       const root = document.documentElement
       if (key === 'ui.accent' && typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty('--u-accent', value)
       if (key === 'ui.opaque') root.toggleAttribute('data-opaque', value === true)
+      if (key === 'power.profile' && typeof value === 'string') root.setAttribute('data-profile', value)
     }
     void getPref('ui.accent').then((v) => apply('ui.accent', v))
     void getPref('ui.opaque').then((v) => apply('ui.opaque', v))
+    void getPref('power.profile').then((v) => apply('power.profile', v))
     const un = onPrefChanged(apply)
     return () => void un.then((fn) => fn())
   }, [])

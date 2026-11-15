@@ -39,7 +39,7 @@ const KEY = 'udaan-start-pins-v3'
 const OLD_KEY = 'udaan-start-pinned-v2'
 
 const DEFAULT_PINS: Pin[] = (
-  ['file-explorer', 'chat', 'calendar', 'notes', 'private-player', 'news-brief', 'omni-find', 'studio', 'tv', 'audio-recorder', 'screenshot', 'clipboard', 'photos', 'settings'] as AppId[]
+  ['file-explorer', 'chat', 'calendar', 'notes', 'private-player', 'news-brief', 'omni-find', 'studio', 'tv', 'clipboard', 'photos', 'settings'] as AppId[]
 ).map((appId) => ({ kind: 'udaan', appId }))
 
 function valid(p: unknown): p is Pin {

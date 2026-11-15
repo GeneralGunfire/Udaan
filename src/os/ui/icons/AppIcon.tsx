@@ -343,32 +343,7 @@ const DRAWINGS: Record<AppId, Drawing> = {
     </Plate>
   ),
 
-  'audio-recorder': (c) => (
-    <Plate c={c} from="#45454d" to="#121215" rim="#ff5a52">
-      <g style={{ filter: lift }}>
-        {/* Level ring plus a live red core — reads as "armed", not "a circle". */}
-        <circle cx="50" cy="50" r="26" fill="none" stroke="#fff" strokeOpacity="0.22" strokeWidth="4" />
-        <path d="M50 24a26 26 0 0 1 22.5 13" fill="none" stroke="#fff" strokeOpacity="0.85" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="50" cy="50" r="15" fill="#ff3b30" />
-        <circle cx="50" cy="50" r="15" fill="none" stroke="#fff" strokeOpacity="0.3" strokeWidth="1.4" />
-      </g>
-      <ellipse cx="50" cy="50" rx="22" ry="22" fill="#ff3b30" opacity="0.14" />
-    </Plate>
-  ),
 
-  'claude-usage': (c) => (
-    <Plate c={c} from="#f5b28c" to="#b85330" rim="#ffd4bc">
-      <g style={{ filter: lift }}>
-        {/* A gauge that actually reads as a gauge: full arc track, filled
-            sweep, and a needle from the pivot. */}
-        <path d="M24 64a26 26 0 0 1 52 0" fill="none" stroke="#fff" strokeOpacity="0.3" strokeWidth="8" strokeLinecap="round" />
-        <path d="M24 64a26 26 0 0 1 37-23.5" fill="none" stroke="#fff" strokeWidth="8" strokeLinecap="round" />
-        <path d="M50 64 66 45" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
-        <circle cx="50" cy="64" r="6" fill="#fff" />
-        <circle cx="50" cy="64" r="2.4" fill="#b85330" />
-      </g>
-    </Plate>
-  ),
 
   'cnc-mod-switcher': (c) => (
     <Plate c={c} from="#9aa3ae" to="#3f464f" rim="#d4dae1">
@@ -391,19 +366,6 @@ const DRAWINGS: Record<AppId, Drawing> = {
     </Plate>
   ),
 
-  'viewer-3d': (c) => (
-    <Plate c={c} from="#8e8bff" to="#2f2cbd" rim="#bfbdff">
-      <g style={{ filter: liftHeavy }} strokeLinejoin="round">
-        {/* Each face shaded differently — an isometric cube drawn in one flat
-            tone reads as a hexagon. */}
-        <path d="M50 19 77 34v32L50 81 23 66V34z" fill="#fff" fillOpacity="0.12" />
-        <path d="M50 19 77 34 50 49 23 34z" fill="#fff" fillOpacity="0.62" />
-        <path d="M50 49 77 34v32L50 81z" fill="#fff" fillOpacity="0.3" />
-        <path d="M50 49 23 34v32l27 15z" fill="#fff" fillOpacity="0.16" />
-        <path d="M50 19 77 34v32L50 81 23 66V34zM23 34 50 49l27-15M50 49v32" fill="none" stroke="#fff" strokeWidth="2.6" />
-      </g>
-    </Plate>
-  ),
 
   clipboard: (c) => (
     <Plate c={c} from="#9b98ff" to="#3b2fc4" rim="#c7c5ff">
@@ -419,24 +381,6 @@ const DRAWINGS: Record<AppId, Drawing> = {
     </Plate>
   ),
 
-  screenshot: (c) => (
-    <Plate c={c} from="#74b8ff" to="#0f58d4" rim="#a9d6ff">
-      <g style={{ filter: lift }}>
-        {/* Crop brackets plus a shutter: the brackets survive at 16px where a
-            full camera body turns to mush. */}
-        <path
-          d="M24 38V27a5 5 0 0 1 5-5h11M60 22h11a5 5 0 0 1 5 5v11M76 62v11a5 5 0 0 1-5 5H60M40 78H29a5 5 0 0 1-5-5V62"
-          fill="none"
-          stroke="#fff"
-          strokeWidth="6"
-          strokeLinecap="round"
-        />
-        <circle cx="50" cy="50" r="12" fill="#fff" />
-        <circle cx="50" cy="50" r="5.5" fill="#1f63cf" />
-        <circle cx="50" cy="50" r="12" fill="none" stroke="#1f63cf" strokeOpacity="0.25" strokeWidth="1.2" />
-      </g>
-    </Plate>
-  ),
 
   photos: (c) => (
     <Plate c={c} from="#ffd166" to="#f07800" rim="#ffe3a8">

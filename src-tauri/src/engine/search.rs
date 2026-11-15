@@ -370,6 +370,15 @@ pub fn search_record_launch(id: String) {
   save_usage();
 }
 
+/// Forgets what has been opened: the 'most used' list starts empty again. Entries themselves stay.
+#[tauri::command(async)]
+pub fn search_clear_history() {
+  if let Ok(mut i) = index().write() {
+    i.usage.clear();
+  }
+  save_usage();
+}
+
 /// How many entries each source has, for diagnostics.
 #[tauri::command(async)]
 pub fn search_status() -> HashMap<String, usize> {

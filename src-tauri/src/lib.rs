@@ -3,10 +3,8 @@ mod scholar;
 mod ai_fallback;
 mod asset_library;
 mod audio_library;
-mod audio_recorder;
 mod boot_optimize;
 mod claude_code;
-mod claude_usage;
 mod cnc_mod_switcher;
 mod client_tracker;
 mod daily_brief;
@@ -118,6 +116,7 @@ pub fn run() {
       engine::search::search_register,
       engine::search::search_query,
       engine::search::search_record_launch,
+      engine::search::search_clear_history,
       engine::search::search_status,
       engine::search::search_refresh_apps,
       engine::desktop_items::desktop_items_dirs,
@@ -207,7 +206,6 @@ pub fn run() {
       engine::notify::notify_dismiss,
       engine::notify::notify_dismiss_banner,
       engine::notify::notify_banners,
-      claude_usage::claude_usage_get_report,
       general_chat::general_chat_create_session,
       general_chat::general_chat_list_sessions,
       general_chat::general_chat_list_messages,
@@ -292,13 +290,6 @@ pub fn run() {
       omni_find::omni_find_search,
       omni_find::omni_find_fetch_page,
       audio_library::audio_library_import_file,
-      audio_recorder::audio_recorder_status,
-      audio_recorder::audio_recorder_start,
-      audio_recorder::audio_recorder_stop,
-      audio_recorder::audio_recorder_open_downloads,
-      audio_recorder::audio_recorder_rename,
-      audio_recorder::audio_recorder_get_settings,
-      audio_recorder::audio_recorder_save_settings,
       audio_library::audio_library_list_dj_presets,
       audio_library::audio_library_save_dj_preset,
       audio_library::audio_library_delete_dj_preset,
@@ -517,9 +508,7 @@ pub fn run() {
       notifications::windows_mirror::start(app.handle().clone());
 
       engine::stores::manage(app.handle(), "audio_library", audio_library::init(app.handle()));
-      engine::stores::manage(app.handle(), "audio_recorder", audio_recorder::init(app.handle()));
       engine::stores::manage(app.handle(), "daily_brief", daily_brief::init(app.handle()));
-      app.manage(claude_usage::ClaudeUsageState::default());
 
       // All state is registered: only now may the shell's pages start loading.
       engine::create_windows(app.handle());

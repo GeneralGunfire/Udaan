@@ -151,7 +151,7 @@ const ALWAYS_SHOWN_OTHER_APPS: AppDefinition[] = [
 const udaanApp = (id: AppId): AppDefinition => ({ id, name: APP_DEFS[id].name, icon: APP_DEFS[id].icon, launch: () => openApp(id) })
 
 const UDAAN_APPS: AppDefinition[] = (
-  ['file-explorer', 'chat', 'calendar', 'private-player', 'notes', 'studio', 'omni-find', 'news-brief', 'audio-recorder', 'claude-usage', 'cnc-mod-switcher', 'viewer-3d', 'settings'] as AppId[]
+  ['file-explorer', 'chat', 'calendar', 'private-player', 'notes', 'studio', 'omni-find', 'news-brief', 'cnc-mod-switcher', 'settings'] as AppId[]
 ).map(udaanApp)
 
 export const PINNED_APPS: AppDefinition[] = [

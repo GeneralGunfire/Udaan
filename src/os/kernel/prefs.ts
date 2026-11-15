@@ -58,6 +58,12 @@ export interface Prefs {
   'lock.pinLength': number
   /** Which screensaver: clock, aurora, warp, flow, drift or shuffle. */
   'screensaver.scene': string
+  /** Udaan apps kept loaded in the background for instant opening (JSON list of app ids). */
+  'apps.warm': string
+  /** Udaan apps opened automatically when Udaan starts (JSON list of app ids). */
+  'apps.startup': string
+  /** eco, balanced or performance. */
+  'power.profile': string
 }
 
 export type CornerAction = 'none' | 'task-view' | 'start' | 'show-desktop' | 'notifications' | 'screensaver'
@@ -98,6 +104,9 @@ export const PREF_DEFAULTS: Prefs = {
   'lock.pinHash': '',
   'lock.pinLength': 4,
   'screensaver.scene': 'clock',
+  'apps.warm': '["settings","file-explorer"]',
+  'apps.startup': '[]',
+  'power.profile': 'balanced',
 }
 
 export type PrefKey = keyof Prefs

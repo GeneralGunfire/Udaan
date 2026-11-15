@@ -34,7 +34,8 @@ import {
 } from '@/shared/icons'
 import { inTauri, onHotkey, openApp, shell, useShell } from '@/os/kernel/shell'
 import { applyStartupPrefs } from '@/os/kernel/session'
-import { usePref } from '@/os/kernel/prefs'
+import { getPref, usePref } from '@/os/kernel/prefs'
+import { isAppId } from '@/os/kernel/registry'
 import { dockZone } from '@/os/dock/geometry'
 import {
   ContextMenu,
@@ -53,7 +54,6 @@ import { useDesktopItems, type DesktopItem } from './useDesktopItems'
 import { Wallpaper } from './Wallpaper'
 import type { IconSize, SortBy } from './layout'
 
-const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'obj', 'stl', 'fbx', 'ply'])
 
 function uniqueName(existing: DesktopItem[], base: string, ext = ''): string {
   const names = new Set(existing.map((i) => i.name.toLowerCase()))
@@ -113,7 +113,22 @@ export function Desktop() {
       void invoke('wallpaper_prerender', { width: Math.round(window.screen.width * dpr), height: Math.round(window.screen.height * dpr) }).catch(() => {})
     }, 6000)
     const t = setTimeout(() => {
-      void invoke('shell_prewarm_apps', { appIds: ['settings', 'file-explorer'] }).catch((err) => console.error('[shell] prewarm failed', err))
+      void getPref('apps.warm').then((raw) => {
+        let ids: string[] = []
+        try {
+          ids = JSON.parse(raw) as string[]
+        } catch {
+          /* nothing chosen */
+        }
+        if (ids.length) void invoke('shell_prewarm_apps', { appIds: ids }).catch((err) => console.error('[shell] prewarm failed', err))
+      })
+      void getPref('apps.startup').then((raw) => {
+        try {
+          for (const id of JSON.parse(raw) as string[]) if (isAppId(id)) void openApp(id)
+        } catch {
+          /* nothing chosen */
+        }
+      })
     }, 4000)
     return () => {
       clearTimeout(t)
@@ -140,7 +155,6 @@ export function Desktop() {
           if (qs) await runQuickstart(qs)
         } else if (item.system) await launchApp(item.path)
         else if (item.isDir) await openApp('file-explorer', { initialPath: item.path })
-        else if (MODEL_EXTENSIONS.has(item.extension.toLowerCase())) await openApp('viewer-3d', { initialPath: item.path })
         else await openWithSystem(item.path)
       } catch (err) {
         toastError(`Couldn't open ${item.label}`, err)

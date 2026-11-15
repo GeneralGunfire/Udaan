@@ -19,14 +19,14 @@ import { createElement } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
 import { QuickstartsSection } from './QuickstartsSection'
-import { AppearanceExtras, LockSection, PerformanceGroup } from './sections'
+import { AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
 import { ActionButton, Group, IconTile, KeyCaps, Row, SearchField, Segmented, Select, Stack, Switch } from './ui'
 import { LockGlyph, AppearanceGlyph, DockGlyph, GeneralGlyph, KeyboardGlyph, NotificationsGlyph, QuickstartsGlyph, SoundGlyph, WidgetsGlyph, WindowsGlyph } from './glyphs'
 import { getVersion } from '@tauri-apps/api/app'
 import { listNotifications } from '@/integrations/notifications/client'
 import { notificationSource } from '@/os/ui/NotificationIcon'
 
-type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock'
+type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock' | 'startup' | 'power' | 'privacy'
 
 interface NavItem {
   id: Section
@@ -49,8 +49,11 @@ const NAV: NavItem[][] = [
   ],
   [
     { id: 'lock', label: 'Lock Screen', icon: LockGlyph },
+    { id: 'privacy', label: 'Privacy & Security', icon: LockGlyph },
     { id: 'windows', label: 'Windows & Hot Corners', icon: WindowsGlyph },
-    { id: 'system', label: 'General & Performance', icon: GeneralGlyph },
+    { id: 'startup', label: 'Startup & Apps', icon: QuickstartsGlyph },
+    { id: 'power', label: 'Power & Performance', icon: GeneralGlyph },
+    { id: 'system', label: 'General', icon: GeneralGlyph },
   ],
 ]
 const SECTIONS = NAV.flat()
@@ -75,6 +78,9 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Motivation video', section: 'dock', keywords: 'focus pill youtube menu bar' },
   { title: 'Windows key', section: 'keyboard', keywords: 'win shortcut launcher start' },
   { title: 'Keyboard shortcuts', section: 'keyboard', keywords: 'keys hotkeys' },
+  { title: 'Power profile', section: 'power', keywords: 'eco balanced performance battery animation blur' },
+  { title: 'Open apps at startup', section: 'startup', keywords: 'autostart login warm instant' },
+  { title: 'Clear history', section: 'privacy', keywords: 'privacy recent forget' },
   { title: 'Change lock PIN', section: 'lock', keywords: 'password pin lock screen security' },
   { title: 'Screensaver', section: 'lock', keywords: 'idle clock saver' },
   { title: 'Accent colour', section: 'personalization', keywords: 'colour color blue theme highlight' },
@@ -459,7 +465,6 @@ function SystemSection() {
   }, [])
   return (
     <Stack>
-      <PerformanceGroup />
       <Group title="About">
         <Row title="Udaan">
           <span className="text-[13px] text-[var(--color-text-secondary)]">{version ? `Version ${version}` : ''}</span>
@@ -574,6 +579,9 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
               {!searching && section === 'windows' && <WindowsSection />}
               {!searching && section === 'system' && <SystemSection />}
               {!searching && section === 'lock' && <LockSection />}
+              {!searching && section === 'startup' && <StartupSection />}
+              {!searching && section === 'power' && <PowerSection />}
+              {!searching && section === 'privacy' && <PrivacySection />}
             </motion.div>
           </AnimatePresence>
         </div>
