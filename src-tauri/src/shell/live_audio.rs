@@ -204,6 +204,70 @@ mod imp {
     }
   }
 
+  /// The app's own level meters. They read the signal BEFORE the session volume, which is what lets the
+  /// capture loop measure how much Windows really turned the app down (it is far less than a naive
+  /// volume-squared guess: 0.3 is only about -8.5 dB), and so how much to give back.
+  struct Meters {
+    pid: u32,
+    list: Vec<IAudioMeterInformation>,
+    at: std::time::Instant,
+  }
+
+  impl Meters {
+    fn new(pid: u32) -> Self {
+      let mut m = Meters { pid, list: Vec::new(), at: std::time::Instant::now() - Duration::from_secs(10) };
+      m.refresh();
+      m
+    }
+    fn refresh(&mut self) {
+      self.at = std::time::Instant::now();
+      self.list.clear();
+      let Ok(mgr) = session_manager() else { return };
+      unsafe {
+        let Ok(list) = mgr.GetSessionEnumerator() else { return };
+        let n = list.GetCount().unwrap_or(0);
+        for i in 0..n {
+          let Ok(ctl) = list.GetSession(i) else { continue };
+          let Ok(ctl2) = ctl.cast::<IAudioSessionControl2>() else { continue };
+          if ctl2.GetProcessId().ok() != Some(self.pid) {
+            continue;
+          }
+          if let Ok(m) = ctl.cast::<IAudioMeterInformation>() {
+            self.list.push(m);
+          }
+        }
+      }
+    }
+    fn peak(&mut self) -> f32 {
+      if self.at.elapsed() > Duration::from_millis(500) {
+        self.refresh();
+      }
+      let mut best = 0.0f32;
+      for m in &self.list {
+        if let Ok(v) = unsafe { m.GetPeakValue() } {
+          best = best.max(v);
+        }
+      }
+      best
+    }
+  }
+
+  /// What Windows does to an app's level for a session volume, as measured (not squared): used until the
+  /// meters have given a real reading.
+  fn model_attenuation(volume: f32) -> f32 {
+    volume.clamp(0.01, 1.0).powf(0.78)
+  }
+
+  /// Soft ceiling: a boosted peak bends toward full scale instead of flattening into a click.
+  fn soft_limit(x: f32) -> f32 {
+    let a = x.abs();
+    if a <= 0.85 {
+      x
+    } else {
+      x.signum() * (0.85 + 0.15 * ((a - 0.85) / 0.15).tanh())
+    }
+  }
+
   fn run_capture(pid: u32, rate: u32, stop: Arc<AtomicBool>, channel: Channel<InvokeResponseBody>) -> Result<(), String> {
     let _ = initialize_mta();
     let fmt = WaveFormat::new(32, 32, &SampleType::Float, rate as usize, 2, None);
@@ -219,6 +283,12 @@ mod imp {
     let mut last_duck = std::time::Instant::now();
     let clock_start = std::time::Instant::now();
     let mut sent_frames: u64 = 0;
+    let mut meters = Meters::new(pid);
+    let mut win_t = [0f32; 100];
+    let mut win_m = [0f32; 100];
+    let mut wi = 0usize;
+    let mut a_est = 1.0f32;
+    let mut last_est = std::time::Instant::now();
     while !stop.load(Ordering::Relaxed) {
       // The level can change while live (the board's "Original" control).
       // Apply the volume first, and only then use its gain, so the stream is
@@ -229,10 +299,14 @@ mod imp {
       let wanted = f32::from_bits(LEVEL.load(Ordering::Relaxed));
       if (wanted - applied).abs() > 1e-4 || (applied < 0.999 && last_duck.elapsed() > Duration::from_millis(120)) {
         let _ = set_session_volume(pid, wanted);
+        if (wanted - applied).abs() > 1e-4 {
+          a_est = model_attenuation(wanted);
+          win_t = [0f32; 100];
+          win_m = [0f32; 100];
+        }
         applied = wanted;
         last_duck = std::time::Instant::now();
       }
-      let gain = gain_for(applied);
       if now_ms().saturating_sub(LAST_PING.load(Ordering::Relaxed)) > WATCHDOG.as_millis() as u64 {
         break;
       }
@@ -263,11 +337,27 @@ mod imp {
       }
       if !queue.is_empty() {
         let mut bytes: Vec<u8> = queue.drain(..).collect();
+        // How loud is the tap now, against how loud the app really is (its meter, before the volume)?
+        let mut tap_peak = 0.0f32;
+        for c in bytes.chunks_exact(4) {
+          tap_peak = tap_peak.max(f32::from_le_bytes([c[0], c[1], c[2], c[3]]).abs());
+        }
+        win_t[wi] = tap_peak;
+        win_m[wi] = meters.peak();
+        wi = (wi + 1) % win_t.len();
         if applied < 0.999 {
-          // Undo the turn-down in float, with a hard ceiling so a session
-          // that has not been turned down yet can never produce a blast.
+          if last_est.elapsed() > Duration::from_millis(100) {
+            last_est = std::time::Instant::now();
+            let mt = win_t.iter().cloned().fold(0.0f32, f32::max);
+            let mm = win_m.iter().cloned().fold(0.0f32, f32::max);
+            if mm > 0.05 && mt > 1e-6 {
+              let a_new = (mt / mm).clamp(0.003, 1.0);
+              a_est = 0.7 * a_est + 0.3 * a_new;
+            }
+          }
+          let gain = (1.0 / a_est.max(0.003)).clamp(1.0, 120.0);
           for c in bytes.chunks_exact_mut(4) {
-            let v = (f32::from_le_bytes([c[0], c[1], c[2], c[3]]) * gain).clamp(-1.0, 1.0);
+            let v = soft_limit(f32::from_le_bytes([c[0], c[1], c[2], c[3]]) * gain);
             c.copy_from_slice(&v.to_le_bytes());
           }
         }
@@ -287,7 +377,7 @@ mod imp {
     let flag = stop_flag.clone();
     // Fail fast and visibly if the tap can't be built, instead of
     // muting an app and then discovering there's nothing to play.
-    LEVEL.store(level.clamp(0.1, 1.0).to_bits(), Ordering::Relaxed);
+    LEVEL.store(level.clamp(0.02, 1.0).to_bits(), Ordering::Relaxed);
     let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     let thread = std::thread::Builder::new()
       .name("live-audio-capture".into())
@@ -324,7 +414,7 @@ mod imp {
 
   /// Changes how loud the original plays while live; applied by the capture loop.
   pub fn set_level(level: f32) {
-    LEVEL.store(level.clamp(0.1, 1.0).to_bits(), Ordering::Relaxed);
+    LEVEL.store(level.clamp(0.02, 1.0).to_bits(), Ordering::Relaxed);
   }
 
   pub fn stop() {
