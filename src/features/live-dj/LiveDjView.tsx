@@ -227,7 +227,7 @@ export function LiveDjView() {
     }
   }
 
-  const delayMs = stats && deck ? Math.round(10 + stats.fillMs + (deck.ctx.baseLatency + (deck.ctx.outputLatency || 0)) * 1000) : null
+  const delayMs = stats && deck && !stats.looping ? Math.round(10 + stats.fillMs + (deck.ctx.baseLatency + (deck.ctx.outputLatency || 0)) * 1000) : null
 
   async function savePreset() {
     const name = presetName?.trim()
