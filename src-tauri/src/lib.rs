@@ -404,6 +404,7 @@ pub fn run() {
       shell::media::shell_media_seek,
       shell::live_audio::live_audio_sources,
       shell::live_audio::live_audio_start,
+      shell::live_audio::live_audio_start_stream,
       shell::live_audio::live_audio_stop,
       shell::live_audio::live_audio_set_level,
       shell::live_audio::live_audio_ping,

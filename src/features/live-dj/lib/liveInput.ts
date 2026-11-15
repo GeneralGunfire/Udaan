@@ -1,4 +1,4 @@
-import { Channel, invoke } from '@tauri-apps/api/core'
+import { invoke } from '@tauri-apps/api/core'
 import { createDeckChain, DECK_DEFAULTS, type EffectChain, type ParamValues } from '@/features/private-player/lib/dsp'
 import { ensureMasterBus } from '@/features/private-player/lib/audioGraph'
 
@@ -29,7 +29,7 @@ export const SOURCE_LEVELS: Record<SourceLevel, number> = { off: 0.02, quiet: 0.
 export type Latency = 'low' | 'balanced' | 'stable'
 /** Jitter buffer per mode: the whole delay between the original app and
  * what you hear (capture ≈10 ms + this + output). */
-const TARGET_MS: Record<Latency, number> = { low: 50, balanced: 90, stable: 150 }
+const TARGET_MS: Record<Latency, number> = { low: 30, balanced: 60, stable: 110 }
 
 const loadedModules = new WeakSet<AudioContext>()
 
@@ -51,6 +51,7 @@ export class LiveInput {
   private node: AudioWorkletNode | null = null
   private bypassed = false
   private pid: number | null = null
+  private worker: Worker | null = null
   onStats: (s: LiveStats) => void = () => {}
 
   private constructor(ctx: AudioContext, chain: EffectChain, analyser: AnalyserNode, deckGain: GainNode) {
@@ -98,9 +99,15 @@ export class LiveInput {
     const node = this.node
     node.port.postMessage({ type: 'target', ms: TARGET_MS[opts.latency] })
 
-    const channel = new Channel<ArrayBuffer>()
-    channel.onmessage = (buf) => node.port.postMessage({ type: 'pcm', buf }, [buf])
-    await invoke('live_audio_start', { pid, sampleRate: this.ctx.sampleRate, sourceLevel: SOURCE_LEVELS[opts.level], onAudio: channel })
+    // Audio path: Rust -> loopback stream -> worker -> private channel -> worklet. The page's main thread is
+    // not in it, so rendering the board's UI can no longer make the sound stutter.
+    const ch = new MessageChannel()
+    node.port.postMessage({ type: 'feed' }, [ch.port1])
+    this.worker?.terminate()
+    const worker = new Worker('/live-feed-worker.js')
+    this.worker = worker
+    const info = await invoke<{ port: number; path: string }>('live_audio_start_stream', { pid, sampleRate: this.ctx.sampleRate, sourceLevel: SOURCE_LEVELS[opts.level] })
+    worker.postMessage({ type: 'start', url: `http://127.0.0.1:${info.port}${info.path}`, port: ch.port2 }, [ch.port2])
     this.pid = pid
     // A worklet node that was connected in the same tick it was created is not always pulled by the
     // audio thread (measured: no frames until it was reconnected). Connect it again once the tap is live.
@@ -111,6 +118,9 @@ export class LiveInput {
     if (this.pid === null) return
     this.pid = null
     this.node?.port.postMessage({ type: 'loop-off' })
+    this.worker?.postMessage({ type: 'stop' })
+    this.worker?.terminate()
+    this.worker = null
     await invoke('live_audio_stop').catch(() => {})
   }
 

@@ -43,15 +43,18 @@ class LiveCapture extends AudioWorkletProcessor {
     this.port.onmessage = (e) => {
       const d = e.data
       if (d.type === 'pcm') {
-        const f = new Float32Array(d.buf)
-        const n = f.length >> 1
-        const mask = this.mask
-        let w = this.w
-        for (let i = 0; i < n; i++, w++) {
-          this.L[w & mask] = f[2 * i]
-          this.R[w & mask] = f[2 * i + 1]
+        this.push(d.buf)
+      } else if (d.type === 'feed') {
+        // The audio now arrives straight from a worker on a private channel: the page's main thread is not
+        // involved at all. Start from an empty ring so nothing stale plays.
+        const p = e.ports && e.ports[0]
+        if (p) {
+          this.w = 0
+          this.r = 0
+          this.primed = false
+          p.onmessage = (ev) => ev.data && ev.data.type === 'pcm' && this.push(ev.data.buf)
+          this.feedPort = p
         }
-        this.w = w
       } else if (d.type === 'gain') {
         this.gain = d.gain
       } else if (d.type === 'target') {
@@ -76,6 +79,18 @@ class LiveCapture extends AudioWorkletProcessor {
         }
       }
     }
+  }
+
+  push(buf) {
+    const f = new Float32Array(buf)
+    const n = f.length >> 1
+    const mask = this.mask
+    let w = this.w
+    for (let i = 0; i < n; i++, w++) {
+      this.L[w & mask] = f[2 * i]
+      this.R[w & mask] = f[2 * i + 1]
+    }
+    this.w = w
   }
 
   process(_inputs, outputs) {

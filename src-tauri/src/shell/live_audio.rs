@@ -10,6 +10,130 @@
 //! the webview multiplies the stream back up to full level.
 
 use serde::Serialize;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::{Arc, Mutex as StdMutex};
+use std::time::Duration as StdDuration;
+use tauri::ipc::{Channel as IpcChannel, InvokeResponseBody as IpcBody};
+
+/// Where captured audio goes. The Tauri channel hands it to the page's MAIN thread, and any hiccup there
+/// (React rendering, a canvas frame) starves the player and is heard as stutter. The stream sink instead
+/// writes it to a loopback socket that a Web Worker reads, so the main thread is not in the audio path.
+pub enum Sink {
+  Chan(IpcChannel<IpcBody>),
+  Tcp(Arc<TcpSink>),
+}
+
+#[derive(Default)]
+pub struct TcpSink {
+  conn: StdMutex<Option<TcpStream>>,
+}
+
+impl Sink {
+  /// False means "stop capturing" (the page went away).
+  pub fn send(&self, bytes: Vec<u8>) -> bool {
+    match self {
+      Sink::Chan(c) => c.send(IpcBody::Raw(bytes)).is_ok(),
+      Sink::Tcp(t) => {
+        if let Ok(mut g) = t.conn.lock() {
+          if let Some(s) = g.as_mut() {
+            if s.write_all(&bytes).is_err() {
+              *g = None;
+            }
+          }
+        }
+        true
+      }
+    }
+  }
+}
+
+static SERVER_STOP: StdMutex<Option<Arc<AtomicBool>>> = StdMutex::new(None);
+
+pub fn stop_server() {
+  if let Ok(mut g) = SERVER_STOP.lock() {
+    if let Some(f) = g.take() {
+      f.store(true, AtomicOrdering::Relaxed);
+    }
+  }
+}
+
+/// A one-client, loopback-only HTTP stream of raw PCM. The path carries a random token, so nothing else
+/// on the machine can listen in by guessing the port.
+fn serve(sink: Arc<TcpSink>) -> Result<(u16, String), String> {
+  stop_server();
+  let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+  listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+  let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+  let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(1);
+  let path = format!("/pcm/{:x}{:x}", nanos, std::process::id());
+  let stop = Arc::new(AtomicBool::new(false));
+  if let Ok(mut g) = SERVER_STOP.lock() {
+    *g = Some(stop.clone());
+  }
+  let want = format!("GET {path} ");
+  std::thread::Builder::new()
+    .name("live-audio-stream".into())
+    .spawn(move || {
+      while !stop.load(AtomicOrdering::Relaxed) {
+        match listener.accept() {
+          Ok((mut s, _)) => {
+            let _ = s.set_nonblocking(false);
+            let _ = s.set_read_timeout(Some(StdDuration::from_secs(2)));
+            let mut buf = [0u8; 2048];
+            let n = s.read(&mut buf).unwrap_or(0);
+            let req = String::from_utf8_lossy(&buf[..n]);
+            if req.starts_with(&want) {
+              let head = "HTTP/1.1 200 OK
+
+Content-Type: application/octet-stream
+
+Access-Control-Allow-Origin: *
+
+Cache-Control: no-store
+
+Connection: close
+
+
+
+";
+              if s.write_all(head.as_bytes()).is_ok() {
+                let _ = s.set_nodelay(true);
+                let _ = s.set_write_timeout(Some(StdDuration::from_millis(100)));
+                if let Ok(mut g) = sink.conn.lock() {
+                  *g = Some(s);
+                }
+              }
+            } else {
+              let _ = s.write_all(b"HTTP/1.1 404 Not Found
+
+Connection: close
+
+
+
+");
+            }
+          }
+          Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(StdDuration::from_millis(25)),
+          Err(_) => break,
+        }
+      }
+      // Closing the stream tells the worker the tap has ended.
+      if let Ok(mut g) = sink.conn.lock() {
+        *g = None;
+      }
+    })
+    .map_err(|e| e.to_string())?;
+  Ok((port, path))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamInfo {
+  pub port: u16,
+  pub path: String,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,7 +157,6 @@ mod imp {
   use std::sync::{Arc, Mutex};
   use std::thread::JoinHandle;
   use std::time::{Duration, SystemTime, UNIX_EPOCH};
-  use tauri::ipc::{Channel, InvokeResponseBody};
   use wasapi::{initialize_mta, AudioClient, Direction, SampleType, StreamMode, WaveFormat};
   use windows::core::Interface;
   use windows::Win32::Media::Audio::Endpoints::IAudioMeterInformation;
@@ -268,7 +391,7 @@ mod imp {
     }
   }
 
-  fn run_capture(pid: u32, rate: u32, stop: Arc<AtomicBool>, channel: Channel<InvokeResponseBody>) -> Result<(), String> {
+  fn run_capture(pid: u32, rate: u32, stop: Arc<AtomicBool>, sink: Sink) -> Result<(), String> {
     let _ = initialize_mta();
     let fmt = WaveFormat::new(32, 32, &SampleType::Float, rate as usize, 2, None);
     let mut client = AudioClient::new_application_loopback_client(pid, true).map_err(|e| e.to_string())?;
@@ -361,7 +484,7 @@ mod imp {
             c.copy_from_slice(&v.to_le_bytes());
           }
         }
-        if channel.send(InvokeResponseBody::Raw(bytes)).is_err() {
+        if !sink.send(bytes) {
           break;
         }
       }
@@ -370,7 +493,7 @@ mod imp {
     Ok(())
   }
 
-  pub fn start(pid: u32, rate: u32, level: f32, channel: Channel<InvokeResponseBody>) -> Result<(), String> {
+  pub fn start(pid: u32, rate: u32, level: f32, sink: Sink) -> Result<(), String> {
     stop();
     ping();
     let stop_flag = Arc::new(AtomicBool::new(false));
@@ -394,7 +517,7 @@ mod imp {
         if failed {
           return;
         }
-        if let Err(e) = run_capture(pid, rate, flag, channel) {
+        if let Err(e) = run_capture(pid, rate, flag, sink) {
           log::warn!("live audio capture ended: {e}");
         }
         restore_all();
@@ -477,11 +600,10 @@ mod imp {
 #[cfg(not(target_os = "windows"))]
 mod imp {
   use super::*;
-  use tauri::ipc::{Channel, InvokeResponseBody};
   pub fn sources() -> Result<Vec<AudioSource>, String> {
     Err("Windows only".into())
   }
-  pub fn start(_: u32, _: u32, _: f32, _: Channel<InvokeResponseBody>) -> Result<(), String> {
+  pub fn start(_: u32, _: u32, _: f32, _: Sink) -> Result<(), String> {
     Err("Windows only".into())
   }
   pub fn stop() {}
@@ -499,6 +621,7 @@ mod imp {
 /// Called when Udaan exits so a turned-down app is never left quiet.
 pub fn restore_all() {
   imp::stop();
+  stop_server();
 }
 
 #[tauri::command]
@@ -511,14 +634,35 @@ pub async fn live_audio_sources() -> Result<Vec<AudioSource>, String> {
 /// The Rust capture loop restores full level itself (in float, with a hard
 /// ceiling), so the stream the webview receives is always at unity.
 pub async fn live_audio_start(pid: u32, sample_rate: u32, source_level: f32, on_audio: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>) -> Result<(), String> {
-  tauri::async_runtime::spawn_blocking(move || imp::start(pid, sample_rate.clamp(8000, 192000), source_level, on_audio))
+  tauri::async_runtime::spawn_blocking(move || imp::start(pid, sample_rate.clamp(8000, 192000), source_level, Sink::Chan(on_audio)))
     .await
     .map_err(|e| e.to_string())?
 }
 
+/// Starts the tap and streams it over a private loopback socket instead of the page's main thread.
+/// Returns where the worker should connect.
+#[tauri::command]
+pub async fn live_audio_start_stream(pid: u32, sample_rate: u32, source_level: f32) -> Result<StreamInfo, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    let sink = Arc::new(TcpSink::default());
+    let (port, path) = serve(sink.clone())?;
+    if let Err(e) = imp::start(pid, sample_rate.clamp(8000, 192000), source_level, Sink::Tcp(sink)) {
+      stop_server();
+      return Err(e);
+    }
+    Ok(StreamInfo { port, path })
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn live_audio_stop() {
-  let _ = tauri::async_runtime::spawn_blocking(imp::stop).await;
+  let _ = tauri::async_runtime::spawn_blocking(|| {
+    imp::stop();
+    stop_server();
+  })
+  .await;
 }
 
 /// Changes how loud the original plays while live.
