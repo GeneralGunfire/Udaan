@@ -126,12 +126,12 @@ export function FlyoutWindow() {
       } else if (isPoint) {
         // Context menu: top-left anchored exactly at the click point, like
         // a native right-click menu — not centred like the other panels.
-        const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? cardRef.current?.scrollHeight ?? 300) + 2
+        const height = Math.min(MAX_HEIGHT, cardRef.current?.offsetHeight ?? 300)
         h = Math.round(height * scale)
         // 'point-up' opens upward from the point (a menu on the dock sits above it, never over it).
         y = placement === 'point-up' ? Math.round(anchor.current.y * scale) - h : Math.round(anchor.current.y * scale)
       } else {
-        const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? cardRef.current?.scrollHeight ?? 400) + 2
+        const height = Math.min(MAX_HEIGHT, cardRef.current?.offsetHeight ?? 400)
         h = Math.round(height * scale)
         y = placement === 'below' ? Math.round(anchor.current.y * scale + 6 * scale) : Math.round(anchor.current.y * scale - h - GAP_ABOVE_DOCK * scale)
       }
@@ -175,7 +175,7 @@ export function FlyoutWindow() {
       timer = setTimeout(async () => {
         const win = getCurrentWindow()
         const scale = pxScale()
-        const height = Math.min(MAX_HEIGHT, el.scrollHeight) + 2
+        const height = Math.min(MAX_HEIGHT, cardRef.current?.offsetHeight ?? el.scrollHeight)
         const h = Math.round(height * scale)
         const naturalWidth = Math.max(WIDTH[kind], el.scrollWidth)
         let w = Math.round(naturalWidth * scale)
@@ -211,7 +211,7 @@ export function FlyoutWindow() {
   }, [hide])
 
   return (
-    <div className="fixed inset-0">
+    <div className="popup-host fixed inset-0">
       <AnimatePresence>
         {kind && (
           <motion.div

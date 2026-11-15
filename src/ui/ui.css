@@ -447,7 +447,7 @@
     background: transparent;
     transition: background-color 120ms ease-out;
   }
-  .u-dock__item::after { /* hover plate */
+  .u-dock__item::after { display: none; /* no plate behind icons: it read as a stray box */
     content: '';
     position: absolute;
     inset: 3px 2px;
@@ -465,7 +465,7 @@
     .u-dock:not(.dock-no-hover) .u-dock__item:hover .u-dock__glyph { transform: translateY(-4px) scale(1.07); }
   }
   /* The window you are in keeps a quiet plate behind its icon. */
-  .u-dock__item[aria-pressed='true']::after { opacity: 0.9; background: var(--u-wash-press); }
+
   .u-dock__item:active .u-dock__glyph { transform: scale(0.9); }
   .u-dock__dot {
     position: absolute;
@@ -692,3 +692,11 @@
     transition-duration: 50ms;
   }
 }
+
+/* Popups never show scroll bars: they are as tall as their content, and the rare long list scrolls by wheel. */
+.popup-host, .popup-host * { scrollbar-width: none; }
+.popup-host *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* The dock clock is text, not a button-shaped box. */
+.u-dock__clock { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px; border: 0; background: transparent; color: var(--u-ink); line-height: 1.15; }
+.u-dock__clock:hover { background: transparent; }

@@ -575,7 +575,7 @@ function DockClock() {
     <button
       type="button"
       onClick={() => void emit('launcher:toggle')}
-      className="u-btn flex-col gap-0 px-2.5 leading-tight"
+      className="u-dock__clock"
       style={{ height: METRICS.slot }}
     >
       <span className="text-[15px] font-semibold tabular-nums tracking-tight">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>

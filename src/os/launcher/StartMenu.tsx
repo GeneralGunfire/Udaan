@@ -210,9 +210,10 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         // Start comes down from the top of the screen, like a sheet being lowered, and goes back up the same way.
-        initial={{ y: -240, opacity: 0, scale: 0.94 }}
-        animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 230, damping: 26, mass: 1 } }}
-        exit={{ y: -140, opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } }}
+        initial={{ y: -110, opacity: 0 }}
+        animate={{ y: 0, opacity: 1, transition: { y: { duration: 0.42, ease: [0.16, 1, 0.3, 1] }, opacity: { duration: 0.16, ease: 'easeOut' } } }}
+        exit={{ y: -70, opacity: 0, transition: { duration: 0.2, ease: [0.5, 0, 1, 1] } }}
+        style={{ willChange: 'transform, opacity' }}
         className="u-surface u-start flex h-[min(720px,calc(100vh-150px))] w-[min(860px,calc(100vw-40px))] flex-col overflow-hidden"
       >
         {/* Search */}
