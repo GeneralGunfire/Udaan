@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { WeekView } from './components/WeekView'
 import { BigMonthGrid } from './components/BigMonthGrid'
-import { ViewToggle, type CalendarViewMode } from './components/ViewToggle'
+import type { CalendarViewMode } from './components/ViewToggle'
+import { AgendaView } from './components/AgendaView'
+import { Segmented } from '@/os/ui/controls'
+import { TAG_CONFIG } from './lib/tags'
 import { EventModal } from './components/EventModal'
 import { DayEventsPanel } from './components/DayEventsPanel'
 import { CommandBar } from './components/CommandBar'
@@ -34,7 +37,28 @@ export function CalendarView() {
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [weekAnchor, setWeekAnchor] = useState(today)
-  const [activeTags] = useState<Set<EventTag>>(() => new Set(TAG_ORDER))
+  const [activeTags, setActiveTags] = useState<Set<EventTag>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('udaan.calendar.tags') ?? 'null') as EventTag[] | null
+      return new Set(v && v.length ? v.filter((t) => TAG_ORDER.includes(t)) : TAG_ORDER)
+    } catch {
+      return new Set(TAG_ORDER)
+    }
+  })
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const toggleTag = (t: EventTag) =>
+    setActiveTags((cur) => {
+      const next = new Set(cur)
+      if (!next.delete(t)) next.add(t)
+      if (next.size === 0) TAG_ORDER.forEach((x) => next.add(x))
+      try {
+        localStorage.setItem('udaan.calendar.tags', JSON.stringify([...next]))
+      } catch {
+        /* not remembered */
+      }
+      return next
+    })
 
   const [dayPanelDate, setDayPanelDate] = useState<Date | null>(null)
   const [eventModalDate, setEventModalDate] = useState<Date | null>(null)
@@ -44,10 +68,15 @@ export function CalendarView() {
 
   const { addEvent, updateEvent, deleteEvent, toggleEventDone, eventsByDate, events, loadError } = useEvents()
 
-  const visibleEvents = useMemo(
-    () => events.filter((e) => activeTags.has(e.tag)),
-    [events, activeTags],
-  )
+  const visibleEvents = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return events.filter((e) => activeTags.has(e.tag) && (!q || e.title.toLowerCase().includes(q) || e.notes.toLowerCase().includes(q)))
+  }, [events, activeTags, search])
+  const tagCounts = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const e of events) m[e.tag] = (m[e.tag] ?? 0) + 1
+    return m
+  }, [events])
 
   const datesWithEvents = useMemo(() => {
     const set = new Set<string>()
@@ -87,6 +116,17 @@ export function CalendarView() {
   function goNextWeek() {
     setWeekAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() + 7))
   }
+
+  function goPrevDay() {
+    setWeekAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() - 1))
+  }
+
+  function goNextDay() {
+    setWeekAnchor((prev) => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() + 1))
+  }
+
+  const goPrev = () => (viewMode === 'month' ? goPrevMonth() : viewMode === 'week' ? goPrevWeek() : viewMode === 'day' ? goPrevDay() : undefined)
+  const goNext = () => (viewMode === 'month' ? goNextMonth() : viewMode === 'week' ? goNextWeek() : viewMode === 'day' ? goNextDay() : undefined)
 
   function handleSelectDate(date: Date) {
     const iso = toISODate(date)
@@ -188,15 +228,21 @@ export function CalendarView() {
     if (e.ctrlKey || e.metaKey || e.altKey) return
     const target = e.target as HTMLElement | null
     if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
-    if (e.key === 'ArrowLeft') {
-      if (viewMode === 'month') goPrevMonth()
-      else goPrevWeek()
-    } else if (e.key === 'ArrowRight') {
-      if (viewMode === 'month') goNextMonth()
-      else goNextWeek()
-    } else if (e.key.toLowerCase() === 't') goToday()
-    else if (e.key.toLowerCase() === 'm') setViewMode('month')
+    if (e.key === 'ArrowLeft') goPrev()
+    else if (e.key === 'ArrowRight') goNext()
+    else if (e.key.toLowerCase() === 't') goToday()
+    else if (e.key.toLowerCase() === 'd') setViewMode('day')
     else if (e.key.toLowerCase() === 'w') setViewMode('week')
+    else if (e.key.toLowerCase() === 'm') setViewMode('month')
+    else if (e.key.toLowerCase() === 'a') setViewMode('agenda')
+    else if (e.key === '/') {
+      e.preventDefault()
+      searchRef.current?.focus()
+    } else if (e.key.toLowerCase() === 'n') {
+      setEditingEvent(null)
+      setPrefillTime(null)
+      setEventModalDate(viewMode === 'month' ? today : weekAnchor)
+    }
   }
   useEffect(() => {
     const handler = (e: KeyboardEvent) => onKey.current(e)
@@ -278,6 +324,28 @@ export function CalendarView() {
           onShift={(n) => (n < 0 ? goPrevMonth() : goNextMonth())}
         />
 
+        <section>
+          <p className="text-text-tertiary mb-2 text-[11px] font-medium">Calendars</p>
+          <div className="flex flex-col">
+            {TAG_ORDER.map((t) => {
+              const on = activeTags.has(t)
+              return (
+                <button key={t} type="button" aria-pressed={on} onClick={() => toggleTag(t)} className="hover:bg-surface-hover -mx-2 flex items-center gap-2.5 rounded-[5px] px-2 py-1.5 text-left text-[13px] transition-colors duration-100">
+                  <span className={cn('flex h-[15px] w-[15px] items-center justify-center rounded-[4px]', on ? TAG_CONFIG[t].dot : 'bg-transparent shadow-[inset_0_0_0_1.5px_var(--tag-personal)]')}>
+                    {on && (
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12.5 10 17 19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className={cn('flex-1', !on && 'text-text-tertiary')}>{TAG_CONFIG[t].label}</span>
+                  <span className="text-text-tertiary text-[11.5px] tabular-nums">{tagCounts[t] ?? 0}</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
         <section className="min-h-0">
           <p className="text-text-tertiary mb-2.5 text-[11px] font-medium">Up next</p>
           {upcoming.length === 0 ? (
@@ -307,7 +375,7 @@ export function CalendarView() {
         </section>
 
         <p className="text-text-tertiary mt-auto text-[11.5px] leading-relaxed">
-          Ctrl + K to type things like &ldquo;maths test friday 9am&rdquo;.
+          Ctrl + K to type things like &ldquo;maths test friday 9am&rdquo;. D, W, M and A switch view, T is today, N a new event, / searches.
         </p>
       </aside>
 
@@ -332,26 +400,48 @@ export function CalendarView() {
             Today
           </Button>
           <div className="flex items-center">
-            <Button variant="ghost" size="icon-sm" onClick={viewMode === 'month' ? goPrevMonth : goPrevWeek} aria-label="Previous">
+            <Button variant="ghost" size="icon-sm" onClick={goPrev} disabled={viewMode === 'agenda'} aria-label="Previous">
               <ChevronRightIcon width={16} height={16} className="rotate-180" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={viewMode === 'month' ? goNextMonth : goNextWeek} aria-label="Next">
+            <Button variant="ghost" size="icon-sm" onClick={goNext} disabled={viewMode === 'agenda'} aria-label="Next">
               <ChevronRightIcon width={16} height={16} />
             </Button>
           </div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.h1
-              key={viewMode === 'month' ? `${viewYear}-${viewMonth}` : `week-${weekAnchor.toDateString()}`}
+              key={viewMode === 'month' ? `${viewYear}-${viewMonth}` : `${viewMode}-${weekAnchor.toDateString()}`}
               initial={reducedMotion ? undefined : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reducedMotion ? undefined : { opacity: 0, y: -8 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               className="flex-1 text-[26px] font-bold tracking-tight"
             >
-              {viewMode === 'month' ? formatMonthYear(viewYear, viewMonth) : formatMonthYear(weekAnchor.getFullYear(), weekAnchor.getMonth())}
+              {viewMode === 'month'
+                ? formatMonthYear(viewYear, viewMonth)
+                : viewMode === 'day'
+                  ? weekAnchor.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+                  : viewMode === 'agenda'
+                    ? 'Upcoming'
+                    : formatMonthYear(weekAnchor.getFullYear(), weekAnchor.getMonth())}
             </motion.h1>
           </AnimatePresence>
-          <ViewToggle value={viewMode} onChange={setViewMode} />
+          <label className="u-search h-8 w-[170px]">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search events" />
+          </label>
+          <Segmented<CalendarViewMode>
+            value={viewMode}
+            options={[
+              { value: 'day', label: 'Day' },
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' },
+              { value: 'agenda', label: 'Agenda' },
+            ]}
+            onChange={setViewMode}
+          />
         </div>
 
         <div className="relative min-h-0 flex-1">
@@ -374,9 +464,22 @@ export function CalendarView() {
                   onSelectEvent={openEventFromList}
                 />
               </motion.div>
+            ) : viewMode === 'agenda' ? (
+              <motion.div key="agenda" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }} className="h-full">
+                <AgendaView
+                  events={visibleEvents}
+                  today={today}
+                  onOpen={openEventFromList}
+                  onToggleDone={toggleEventDone}
+                  onCreate={() => {
+                    setEditingEvent(null)
+                    setEventModalDate(today)
+                  }}
+                />
+              </motion.div>
             ) : (
               <motion.div
-                key="week"
+                key={viewMode}
                 initial={{ opacity: 0, scale: 0.97, y: 8 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.97, y: -8 }}
@@ -384,7 +487,7 @@ export function CalendarView() {
                 className="h-full overflow-y-auto"
               >
                 <WeekView
-                  weekDates={weekDates}
+                  weekDates={viewMode === 'day' ? [weekAnchor] : weekDates}
                   today={today}
                   events={visibleEvents}
                   onSelectDate={handleSelectDate}

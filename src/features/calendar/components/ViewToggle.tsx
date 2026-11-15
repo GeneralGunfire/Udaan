@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
 import { spring, pressableIcon, prefersReducedMotion } from '@/shared/lib/motion'
 
-export type CalendarViewMode = 'month' | 'week'
+export type CalendarViewMode = 'day' | 'week' | 'month' | 'agenda'
 
 export interface ViewToggleProps {
   value: CalendarViewMode
@@ -10,8 +10,10 @@ export interface ViewToggleProps {
 }
 
 const OPTIONS: { value: CalendarViewMode; label: string }[] = [
-  { value: 'month', label: 'Month' },
+  { value: 'day', label: 'Day' },
   { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+  { value: 'agenda', label: 'Agenda' },
 ]
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
