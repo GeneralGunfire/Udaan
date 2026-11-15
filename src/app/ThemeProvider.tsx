@@ -49,8 +49,10 @@ function readStored(): Theme {
  */
 const SURFACE_MATERIAL: Record<string, MaterialKind> = {
   menubar: 'mica',
-  // Fit to its content by FlyoutWindow's resize observer, so it qualifies.
-  'taskbar-popup': 'acrylic',
+  // NOT 'taskbar-popup': the compositor blurs the whole window rectangle the instant it is shown, while the
+  // card inside is still fading and scaling in, so every popup flashed a blurred white plate before its card
+  // arrived (and sometimes not, depending on timing). The popup card is a near-opaque matte surface of its
+  // own, so it needs no OS blur at all.
 }
 
 /** Shell windows with square corners: full-width bars must not round. */
