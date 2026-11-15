@@ -167,6 +167,7 @@ pub fn run() {
       sound_fx::sound_fx_curve,
       news_image::news_page_image,
       tv::tv_top_movies,
+      tv::tv_top_shows,
       utilities::clip_history_list,
       utilities::clip_history_copy,
       utilities::clip_history_pin,

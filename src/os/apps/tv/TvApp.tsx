@@ -50,8 +50,11 @@ const BAR_H = 44
 interface Poster {
   title: string
   image: string
+  /** Large artwork for the featured poster and its backdrop. */
+  imageHi?: string
   genre: string
   summary: string
+  year?: string
 }
 
 const logo = (domain: string) => `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
@@ -89,6 +92,17 @@ export function TvApp({ onClose }: { onClose: () => void }) {
   const [active, setActive] = useState<string | null>(null)
   const [page, setPage] = useState<'home' | 'store'>('home')
   const [posters, setPosters] = useState<Poster[]>([])
+  const [shows, setShows] = useState<Poster[]>([])
+  const [genre, setGenre] = useState('All')
+  const [query, setQuery] = useState('')
+  const [provider, setProvider] = useState('appletv')
+  const [recent, setRecent] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('tv.recent') ?? '[]') as string[]
+    } catch {
+      return []
+    }
+  })
   const [hero, setHero] = useState(0)
   const [np, setNp] = useState<NowPlaying | null>(null)
   const [volume, setVolume] = useState<number | null>(null)
@@ -135,6 +149,7 @@ export function TvApp({ onClose }: { onClose: () => void }) {
         }, () => {}),
     )
     void invoke<Poster[]>('tv_top_movies').then(setPosters, () => {})
+    void invoke<Poster[]>('tv_top_shows').then(setShows, () => {})
     void invoke<{ level: number; muted?: boolean }>('shell_volume').then((v) => { setVolume(v.level); setMuted(!!v.muted) }, () => {})
     const t = setInterval(
       () =>
@@ -211,6 +226,15 @@ export function TvApp({ onClose }: { onClose: () => void }) {
       await invoke('tv_host_open', { id: s.id, url, tvUi: !!s.tvUi })
       setRunning((r) => [...new Set([...r, s.id])])
       setActive(s.id)
+      setRecent((r) => {
+        const next = [s.id, ...r.filter((x) => x !== s.id)].slice(0, 6)
+        try {
+          localStorage.setItem('tv.recent', JSON.stringify(next))
+        } catch {
+          /* not remembered */
+        }
+        return next
+      })
     } catch (e) {
       say(String(e), 8000)
     } finally {
@@ -262,8 +286,13 @@ export function TvApp({ onClose }: { onClose: () => void }) {
   }
 
   const featured = posters[hero]
-  const appleTv = CATALOG.find((s) => s.id === 'appletv')!
-  const watch = (p: Poster) => void open(appleTv, `https://tv.apple.com/search?term=${encodeURIComponent(p.title)}`)
+  const searchable = useMemo(() => CATALOG.filter((s) => s.search && (s.id === 'appletv' || installed.includes(s.id))), [installed])
+  const chosen = searchable.find((s) => s.id === provider) ?? searchable[0] ?? CATALOG.find((s) => s.id === 'appletv')!
+  const searchOn = (svc: Service, q: string) => void open(svc, (svc.search ?? svc.url).replace('{q}', encodeURIComponent(q)))
+  const watch = (p: Poster) => searchOn(chosen, p.title)
+  const genres = useMemo(() => ['All', ...Array.from(new Set(posters.map((p) => p.genre).filter(Boolean))).slice(0, 7)], [posters])
+  const films = useMemo(() => (genre === 'All' ? posters : posters.filter((p) => p.genre === genre)), [posters, genre])
+  const recentApps = useMemo(() => recent.map((id) => CATALOG.find((s) => s.id === id)).filter((s): s is Service => !!s && installed.includes(s.id)).slice(0, 4), [recent, installed])
 
   return (
     <div className="relative flex h-full w-full select-none flex-col overflow-hidden bg-[#050507] text-white">
@@ -384,7 +413,7 @@ export function TvApp({ onClose }: { onClose: () => void }) {
                     <AnimatePresence>
                       {featured && (
                         <motion.div key={featured.image} className="absolute inset-0" initial={{ opacity: 0, scale: 1.12 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.4, ease: EASE }}>
-                          <img src={featured.image} alt="" className="h-full w-full scale-110 object-cover blur-2xl brightness-[0.45]" />
+                          <img src={featured.imageHi ?? featured.image} alt="" className="h-full w-full scale-110 object-cover blur-2xl brightness-[0.45]" />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -395,7 +424,7 @@ export function TvApp({ onClose }: { onClose: () => void }) {
                         <AnimatePresence mode="wait">
                           <motion.div key={featured.title} initial="hidden" animate="show" exit={{ opacity: 0, y: -10, transition: { duration: 0.25 } }} variants={{ show: { transition: { staggerChildren: 0.08 } } }} className="max-w-[640px] flex-1">
                             <motion.p variants={RISE} className="text-[13px] font-bold uppercase tracking-[0.25em] text-white/60">
-                              Top film this week · {featured.genre}
+                              Top film this week · {featured.genre}{featured.year ? ` · ${featured.year}` : ''}
                             </motion.p>
                             <h1 className="mt-3 flex flex-wrap text-[58px] font-bold leading-[1.02] tracking-tight">
                               {featured.title.split(' ').map((w, i) => (
@@ -414,7 +443,7 @@ export function TvApp({ onClose }: { onClose: () => void }) {
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                                   <path d="M8 5.5v13l10.5-6.5Z" />
                                 </svg>
-                                Find on Apple TV
+                                Find on {chosen.name}
                               </motion.button>
                               <motion.button type="button" whileHover={{ scale: 1.05, backgroundColor: 'rgb(255 255 255 / 0.24)' }} whileTap={{ scale: 0.95 }} onClick={() => setHero((h) => (h + 1) % Math.min(posters.length, 8))} className="h-12 rounded-full bg-white/[0.14] px-6 text-[15px] font-semibold backdrop-blur">
                                 Next
@@ -422,7 +451,7 @@ export function TvApp({ onClose }: { onClose: () => void }) {
                             </motion.div>
                           </motion.div>
                         </AnimatePresence>
-                        <TiltPoster key={`p-${featured.image}`} src={featured.image} />
+                        <TiltPoster key={`p-${featured.image}`} src={featured.imageHi ?? featured.image} />
                       </div>
                     ) : (
                       <div className="relative flex h-full items-end px-16 pb-14">
@@ -503,31 +532,65 @@ export function TvApp({ onClose }: { onClose: () => void }) {
                     </div>
                   </section>
 
-                  {/* Posters */}
-                  {posters.length > 0 && (
-                    <section className="relative px-16 pb-16 pt-10">
-                      <motion.h2 initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3, duration: 0.5, ease: EASE }} className="text-[20px] font-semibold">
-                        Top films this week
-                      </motion.h2>
-                      <div className="-mx-2 mt-4 flex gap-4 overflow-x-auto px-2 pb-4 [scrollbar-width:none]">
-                        {posters.map((p, i) => (
-                          <motion.button
-                            key={p.title}
-                            type="button"
-                            initial={{ opacity: 0, y: 34 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.35 + i * 0.045, duration: 0.55, ease: EASE }}
-                            whileHover={{ y: -10, scale: 1.06 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => watch(p)}
-                            className="group w-[150px] shrink-0 text-left"
-                          >
-                            <img src={p.image} alt="" loading="lazy" className="aspect-[2/3] w-full rounded-[12px] object-cover shadow-[0_12px_30px_rgb(0_0_0/0.5)] transition-shadow duration-300 group-hover:shadow-[0_24px_50px_rgb(0_0_0/0.75)]" />
-                            <p className="mt-2 truncate text-[13px] font-medium">{p.title}</p>
-                            <p className="truncate text-[11.5px] text-white/45">{p.genre}</p>
-                          </motion.button>
+                  {/* Search across your apps */}
+                  <section className="relative px-16 pt-8">
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        if (query.trim()) searchOn(chosen, query.trim())
+                      }}
+                      className="flex flex-wrap items-center gap-3"
+                    >
+                      <label className="flex h-12 min-w-[320px] flex-1 items-center gap-3 rounded-full bg-white/[0.09] px-5 backdrop-blur focus-within:bg-white/[0.15]">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-white/55">
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m20 20-3.5-3.5" />
+                        </svg>
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${chosen.name} for a show, film or song`} className="h-full flex-1 bg-transparent text-[15px] outline-none placeholder:text-white/40" />
+                      </label>
+                      <div className="flex items-center gap-1.5" role="group" aria-label="Search in">
+                        <span className="mr-1 text-[12px] text-white/45">Search in</span>
+                        {searchable.map((svc) => (
+                          <button key={svc.id} type="button" title={svc.name} aria-pressed={chosen.id === svc.id} onClick={() => setProvider(svc.id)} className={`flex h-9 items-center gap-2 rounded-full pl-1.5 pr-3 text-[12.5px] font-medium transition-colors ${chosen.id === svc.id ? 'bg-white text-black' : 'bg-white/[0.09] text-white/75 hover:bg-white/[0.16]'}`}>
+                            <Logo s={svc} size={22} />
+                            {svc.name}
+                          </button>
                         ))}
                       </div>
+                    </form>
+                    {recentApps.length > 0 && (
+                      <div className="mt-4 flex items-center gap-2 text-[12.5px] text-white/50">
+                        <span>Recently</span>
+                        {recentApps.map((svc) => (
+                          <button key={svc.id} type="button" onClick={() => void open(svc)} className="flex h-8 items-center gap-2 rounded-full bg-white/[0.07] pl-1 pr-3 text-white/80 hover:bg-white/[0.14]">
+                            <Logo s={svc} size={22} />
+                            {svc.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Posters */}
+                  {posters.length > 0 && (
+                    <section className="relative px-16 pb-6 pt-8">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <motion.h2 initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3, duration: 0.5, ease: EASE }} className="mr-2 text-[20px] font-semibold">
+                          Top films this week
+                        </motion.h2>
+                        {genres.map((g) => (
+                          <button key={g} type="button" aria-pressed={genre === g} onClick={() => setGenre(g)} className={`h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors ${genre === g ? 'bg-white text-black' : 'bg-white/[0.09] text-white/70 hover:bg-white/[0.16]'}`}>
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                      <PosterRail items={films} onPick={watch} />
+                    </section>
+                  )}
+                  {shows.length > 0 && (
+                    <section className="relative px-16 pb-16 pt-6">
+                      <h2 className="text-[20px] font-semibold">Top series right now</h2>
+                      <PosterRail items={shows} onPick={watch} />
                     </section>
                   )}
                 </div>
@@ -692,6 +755,38 @@ function Store({ installed, onToggle, onBack }: { installed: string[]; onToggle:
             })}
           </div>
         </section>
+      ))}
+    </div>
+  )
+}
+
+
+/** A row of posters: sharp artwork, year and genre, and the plot on hover. */
+function PosterRail({ items, onPick }: { items: Poster[]; onPick: (p: Poster) => void }) {
+  return (
+    <div className="-mx-2 mt-4 flex gap-4 overflow-x-auto px-2 pb-6 pt-2 [scrollbar-width:none]">
+      {items.map((p, i) => (
+        <motion.button
+          key={p.title}
+          type="button"
+          initial={{ opacity: 0, y: 34 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 + Math.min(i, 10) * 0.04, duration: 0.5, ease: EASE }}
+          whileHover={{ y: -10, scale: 1.05 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onPick(p)}
+          title={p.summary}
+          className="group w-[176px] shrink-0 text-left"
+        >
+          <span className="relative block overflow-hidden rounded-[12px] shadow-[0_12px_30px_rgb(0_0_0/0.5)] transition-shadow duration-300 group-hover:shadow-[0_24px_50px_rgb(0_0_0/0.75)]">
+            <img src={p.image} alt="" loading="lazy" className="aspect-[2/3] w-full object-cover" />
+            <span className="absolute inset-x-0 bottom-0 flex translate-y-2 flex-col justify-end bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-10 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+              <span className="line-clamp-4 text-[11.5px] leading-snug text-white/85">{p.summary}</span>
+            </span>
+          </span>
+          <p className="mt-2 truncate text-[13px] font-medium">{p.title}</p>
+          <p className="truncate text-[11.5px] text-white/45">{[p.year, p.genre].filter(Boolean).join(' · ')}</p>
+        </motion.button>
       ))}
     </div>
   )

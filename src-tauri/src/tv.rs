@@ -381,18 +381,30 @@ pub fn tv_host_close(id: Option<String>) -> usize {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Poster {
   pub title: String,
+  /// Card-sized artwork (600x900), sharp on a 1080p screen.
   pub image: String,
+  /// Hero-sized artwork (1400x2100) for the big featured poster and its backdrop.
+  pub image_hi: String,
   pub genre: String,
   pub summary: String,
+  pub year: String,
 }
 
-/// This week's top films on Apple's store (public RSS, no key) for the home screen.
-#[tauri::command]
-pub async fn tv_top_movies() -> Result<Vec<Poster>, String> {
+/// Apple's artwork URLs end in `<w>x<h>bb.png` and serve any size up to the original, so the thumbnail the
+/// feed hands out (about 113x170) can be swapped for a real poster.
+fn art(url: &str, w: u32, h: u32) -> String {
+  match url.rfind('/') {
+    Some(i) => format!("{}/{}x{}bb.jpg", &url[..i], w, h),
+    None => url.to_string(),
+  }
+}
+
+async fn feed(url: &str) -> Result<Vec<Poster>, String> {
   let json: serde_json::Value = reqwest::Client::new()
-    .get("https://itunes.apple.com/za/rss/topmovies/limit=24/json")
+    .get(url)
     .timeout(std::time::Duration::from_secs(12))
     .send()
     .await
@@ -406,14 +418,29 @@ pub async fn tv_top_movies() -> Result<Vec<Poster>, String> {
       .iter()
       .filter_map(|e| {
         let title = e["im:name"]["label"].as_str()?.to_string();
-        let image = e["im:image"].as_array()?.last()?["label"].as_str()?.replace("113x170", "600x900").replace("170x170", "600x900");
+        let thumb = e["im:image"].as_array()?.last()?["label"].as_str()?.to_string();
+        let year = e["im:releaseDate"]["label"].as_str().unwrap_or("").chars().take(4).collect::<String>();
         Some(Poster {
           title,
-          image,
+          image: art(&thumb, 600, 900),
+          image_hi: art(&thumb, 1400, 2100),
           genre: e["category"]["attributes"]["label"].as_str().unwrap_or("").to_string(),
-          summary: e["summary"]["label"].as_str().unwrap_or("").chars().take(280).collect(),
+          summary: e["summary"]["label"].as_str().unwrap_or("").chars().take(320).collect(),
+          year,
         })
       })
       .collect(),
   )
+}
+
+/// This week's top films on Apple's store (public RSS, no key) for the home screen.
+#[tauri::command]
+pub async fn tv_top_movies() -> Result<Vec<Poster>, String> {
+  feed("https://itunes.apple.com/za/rss/topmovies/limit=30/json").await
+}
+
+/// This week's top TV series on Apple's store.
+#[tauri::command]
+pub async fn tv_top_shows() -> Result<Vec<Poster>, String> {
+  feed("https://itunes.apple.com/za/rss/toptvseasons/limit=30/json").await
 }
