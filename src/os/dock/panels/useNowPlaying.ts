@@ -17,7 +17,7 @@ export interface NowPlayingState {
  * between polls (the OS only reports a snapshot), so a progress bar can
  * move every frame without hammering the shell command.
  */
-export function useNowPlaying(pollMs: number, tickMs = 250): NowPlayingState {
+export function useNowPlaying(pollMs: number, tickMs = 250, audibleFallback = false): NowPlayingState {
   const [media, setMedia] = useState<NowPlaying | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [positionMs, setPositionMs] = useState<number | null>(null)
@@ -29,7 +29,13 @@ export function useNowPlaying(pollMs: number, tickMs = 250): NowPlayingState {
     let t: ReturnType<typeof setTimeout>
     const poll = async () => {
       try {
-        const m = await invoke<NowPlaying | null>('shell_now_playing')
+        let m = await invoke<NowPlaying | null>('shell_now_playing')
+        if (!m && audibleFallback) {
+          // Some pages make sound without telling Windows what it is: show which app is playing.
+          const src = await invoke<{ name: string; exe: string; active: boolean; peak: number }[]>('live_audio_sources').catch(() => [])
+          const hit = src.find((x) => x.active && x.peak > 0.02)
+          if (hit) m = { title: `${hit.name} audio`, artist: 'Playing sound', album: '', source: hit.exe, playing: true, canNext: false, canPrevious: false, thumbnail: null, positionMs: null, durationMs: null, canSeek: false } as NowPlaying
+        }
         if (stopped) return
         mediaRef.current = m
         setMedia(m)
@@ -51,7 +57,7 @@ export function useNowPlaying(pollMs: number, tickMs = 250): NowPlayingState {
       stopped = true
       clearTimeout(t)
     }
-  }, [pollMs])
+  }, [pollMs, audibleFallback])
 
   useEffect(() => {
     const id = setInterval(() => {

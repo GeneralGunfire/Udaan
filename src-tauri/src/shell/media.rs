@@ -72,7 +72,34 @@ mod imp {
 
   fn session() -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
     let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().ok()?.get().ok()?;
-    manager.GetCurrentSession().ok()
+    // Windows' "current" session is simply the one touched last, and is often not the app that is making
+    // sound (an idle editor can be "current" while a browser plays). Prefer a session that is playing and
+    // has a title; only fall back to the current one when none qualifies.
+    let mut best = None;
+    let mut best_score = 0u8;
+    if let Ok(list) = manager.GetSessions() {
+      for s in list {
+        let playing = s
+          .GetPlaybackInfo()
+          .ok()
+          .and_then(|i| i.PlaybackStatus().ok())
+          .map(|st| st == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing)
+          .unwrap_or(false);
+        let titled = s
+          .TryGetMediaPropertiesAsync()
+          .ok()
+          .and_then(|o| o.get().ok())
+          .and_then(|p| p.Title().ok())
+          .map(|t| !t.is_empty())
+          .unwrap_or(false);
+        let score = (playing as u8) * 2 + titled as u8;
+        if score > best_score {
+          best_score = score;
+          best = Some(s);
+        }
+      }
+    }
+    best.or_else(|| manager.GetCurrentSession().ok())
   }
 
   static ART: std::sync::Mutex<Option<(String, Option<String>)>> = std::sync::Mutex::new(None);

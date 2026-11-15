@@ -171,7 +171,7 @@ export function MenuBarWindow() {
   const { battery } = useSystemStatus()
   const network = usePolled<NetworkStatus>('shell_network_status', 15000)
   const volume = usePolled<{ level: number; muted: boolean }>('shell_volume', 5000)
-  const { media, positionMs } = useNowPlaying(3000, 500)
+  const { media, positionMs } = useNowPlaying(3000, 500, true)
   const [unread, setUnread] = useState(0)
   const reduced = prefersReducedMotion()
   const openShellMenu = useShellMenu()
