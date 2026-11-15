@@ -326,6 +326,8 @@ pub fn run() {
       file_explorer::file_explorer_move,
       file_explorer::file_explorer_check_conflicts,
       file_explorer::file_explorer_duplicate,
+      file_explorer::file_explorer_zip,
+      file_explorer::file_explorer_unzip,
       file_explorer::file_explorer_read_file,
       file_explorer::file_explorer_read_thumbnail,
       file_explorer::file_explorer_read_text_preview,

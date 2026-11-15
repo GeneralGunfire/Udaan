@@ -585,6 +585,99 @@ pub fn file_explorer_duplicate(path: String) -> Result<DirEntryInfo, String> {
   entry_info(dest).ok_or_else(|| "Failed to stat duplicated entry".to_string())
 }
 
+
+/// A name in `dir` that does not exist yet: "name", then "name (2)", "name (3)"...
+fn free_name(dir: &Path, stem: &str, ext: &str) -> PathBuf {
+  let first = dir.join(if ext.is_empty() { stem.to_string() } else { format!("{stem}.{ext}") });
+  if !first.exists() {
+    return first;
+  }
+  for n in 2..10_000 {
+    let c = dir.join(if ext.is_empty() { format!("{stem} ({n})") } else { format!("{stem} ({n}).{ext}") });
+    if !c.exists() {
+      return c;
+    }
+  }
+  first
+}
+
+fn add_to_zip(zip: &mut zip::ZipWriter<std::fs::File>, path: &Path, name_in_zip: &str, opts: zip::write::SimpleFileOptions) -> Result<(), String> {
+  if path.is_dir() {
+    zip.add_directory(format!("{name_in_zip}/"), opts).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(path).map_err(|e| e.to_string())?.flatten() {
+      let child = entry.path();
+      let child_name = format!("{name_in_zip}/{}", entry.file_name().to_string_lossy());
+      add_to_zip(zip, &child, &child_name, opts)?;
+    }
+  } else {
+    zip.start_file(name_in_zip, opts).map_err(|e| e.to_string())?;
+    let mut f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    std::io::copy(&mut f, zip).map_err(|e| e.to_string())?;
+  }
+  Ok(())
+}
+
+/// Packs files and folders into one .zip in `dest_dir`, named after the single item (or "Archive").
+#[tauri::command]
+pub async fn file_explorer_zip(paths: Vec<String>, dest_dir: String) -> Result<DirEntryInfo, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    if paths.is_empty() {
+      return Err("Nothing selected to compress.".to_string());
+    }
+    let dir = Path::new(&dest_dir);
+    let stem = if paths.len() == 1 {
+      Path::new(&paths[0]).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Archive".into())
+    } else {
+      "Archive".to_string()
+    };
+    let out = free_name(dir, &stem, "zip");
+    let file = std::fs::File::create(&out).map_err(|e| e.to_string())?;
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    for p in &paths {
+      let path = Path::new(p);
+      let name = path.file_name().ok_or_else(|| format!("Invalid path: {p}"))?.to_string_lossy().to_string();
+      add_to_zip(&mut zip, path, &name, opts)?;
+    }
+    zip.finish().map_err(|e| e.to_string())?;
+    entry_info(out).ok_or_else(|| "Could not read the new archive.".to_string())
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+/// Extracts a .zip next to itself into a new folder named after it. Entries that would land outside that
+/// folder (a "zip slip" archive) are skipped.
+#[tauri::command]
+pub async fn file_explorer_unzip(path: String) -> Result<DirEntryInfo, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    let src = Path::new(&path);
+    let dir = src.parent().ok_or("The file has no folder.")?;
+    let stem = src.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Extracted".into());
+    let out = free_name(dir, &stem, "");
+    let file = std::fs::File::open(src).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("That is not a readable zip file: {e}"))?;
+    std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+    for i in 0..archive.len() {
+      let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+      let Some(rel) = entry.enclosed_name() else { continue };
+      let target = out.join(rel);
+      if entry.is_dir() {
+        std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+      } else {
+        if let Some(parent) = target.parent() {
+          std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let mut f = std::fs::File::create(&target).map_err(|e| e.to_string())?;
+        std::io::copy(&mut entry, &mut f).map_err(|e| e.to_string())?;
+      }
+    }
+    entry_info(out).ok_or_else(|| "Could not read the extracted folder.".to_string())
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
 /// `async` + `spawn_blocking`: reading a file's full bytes is real disk
 /// I/O — for a multi-MB file this was previously running synchronously on
 /// the IPC thread, and Grid view fans this out once per visible image

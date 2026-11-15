@@ -41,6 +41,8 @@ interface FileContextMenuProps {
   /** Only offered when `selectionExtension` is a Document Reader-supported type (.txt/.md/.pdf/.docx). Opens Document Reader directly with this file rather than routing through the OS's own file association. */
   onReadAloud?: () => void
   onRename?: () => void
+  onZip?: () => void
+  onUnzip?: () => void
   onDelete?: () => void
   onCopy?: () => void
   onCut?: () => void
@@ -65,6 +67,8 @@ export function FileContextMenu({
   onOpenWith,
   onReadAloud,
   onRename,
+  onZip,
+  onUnzip,
   onDelete,
   onCopy,
   onCut,
@@ -131,6 +135,16 @@ export function FileContextMenu({
                 {onDuplicate && (
                   <DropdownMenuItem onSelect={onDuplicate}>
                     <LayersIcon width={14} height={14} /> Duplicate
+                  </DropdownMenuItem>
+                )}
+                {onZip && (
+                  <DropdownMenuItem onSelect={onZip}>
+                    <LayersIcon width={14} height={14} /> Compress to ZIP
+                  </DropdownMenuItem>
+                )}
+                {onUnzip && (
+                  <DropdownMenuItem onSelect={onUnzip}>
+                    <LayersIcon width={14} height={14} /> Extract here
                   </DropdownMenuItem>
                 )}
                 {onCopyPath && (

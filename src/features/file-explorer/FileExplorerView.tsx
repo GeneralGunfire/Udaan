@@ -16,6 +16,8 @@ import {
   getQuickAccess,
   statPath,
   duplicateEntry,
+  zipEntries,
+  unzipEntry,
 } from '@/integrations/file-explorer/client'
 import { ExplorerSidebar } from './components/ExplorerSidebar'
 import { ExplorerTopBar } from './components/ExplorerTopBar'
@@ -146,6 +148,9 @@ function FileExplorerReady({
   const [sortColumn, setSortColumn] = useState<SortColumn>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
+  const band = useRef<{ x: number; y: number; base: Set<string>; moved: boolean; left: number; top: number } | null>(null)
+  const justBanded = useRef(false)
+  const [bandRect, setBandRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null)
   const anchorPath = useRef<string | null>(null)
   const typeAhead = useRef<{ text: string; timer: ReturnType<typeof setTimeout> | undefined }>({ text: '', timer: undefined })
@@ -453,6 +458,34 @@ function FileExplorerReady({
     }
   }
 
+  async function handleZip(path?: string | null) {
+    // Compress the whole selection when the clicked item is part of it, otherwise just the clicked item.
+    const clicked = path ?? Array.from(selectedPaths)[0]
+    if (!clicked) return
+    const targets = selectedPaths.has(clicked) ? Array.from(selectedPaths) : [clicked]
+    try {
+      pushToast('Compressing…')
+      const created = await zipEntries(targets, currentPath)
+      pushToast(`Created "${created.name}"`)
+      refresh()
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : typeof err === 'string' ? err : 'Compress failed.', 'danger')
+    }
+  }
+
+  async function handleUnzip(path?: string | null) {
+    const target = path ?? Array.from(selectedPaths)[0]
+    if (!target) return
+    try {
+      pushToast('Extracting…')
+      const created = await unzipEntry(target)
+      pushToast(`Extracted to "${created.name}"`)
+      refresh()
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : typeof err === 'string' ? err : 'Extract failed.', 'danger')
+    }
+  }
+
   async function handleCopyPath(path?: string | null) {
     const target = path ?? Array.from(selectedPaths)[0]
     if (!target) return
@@ -637,18 +670,54 @@ function FileExplorerReady({
         />
 
         <div
-          className="flex min-h-0 min-w-0 flex-1 flex-col"
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col"
           onContextMenu={(e) => {
             if ((e.target as HTMLElement).closest('[data-path]')) return
             e.preventDefault()
             openContextMenu(e, null)
           }}
+          onPointerDown={(e) => {
+            // Drag on empty space to select everything the box touches (hold Ctrl to add to the selection).
+            const t = e.target as HTMLElement
+            if (e.button !== 0 || t.closest('[data-path], button, input, [role=columnheader]')) return
+            const host = e.currentTarget
+            const box = host.getBoundingClientRect()
+            band.current = { x: e.clientX, y: e.clientY, base: e.ctrlKey || e.metaKey ? new Set(selectedPaths) : new Set<string>(), moved: false, left: box.left, top: box.top }
+            host.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            const b = band.current
+            if (!b) return
+            if (!b.moved && Math.hypot(e.clientX - b.x, e.clientY - b.y) < 5) return
+            b.moved = true
+            const x1 = Math.min(b.x, e.clientX)
+            const y1 = Math.min(b.y, e.clientY)
+            const x2 = Math.max(b.x, e.clientX)
+            const y2 = Math.max(b.y, e.clientY)
+            setBandRect({ x: x1 - b.left, y: y1 - b.top, w: x2 - x1, h: y2 - y1 })
+            const hit = new Set(b.base)
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-path]').forEach((el) => {
+              const r = el.getBoundingClientRect()
+              if (r.right >= x1 && r.left <= x2 && r.bottom >= y1 && r.top <= y2) hit.add(el.dataset.path as string)
+            })
+            setSelectedPaths(hit)
+          }}
+          onPointerUp={() => {
+            if (band.current?.moved) justBanded.current = true
+            band.current = null
+            setBandRect(null)
+          }}
           onClick={(e) => {
+            if (justBanded.current) {
+              justBanded.current = false
+              return
+            }
             if (!(e.target as HTMLElement).closest('[data-path]')) {
               setSelectedPaths(new Set())
             }
           }}
         >
+          {bandRect && <div className="pointer-events-none absolute z-30 rounded-[3px] border border-(--u-accent) bg-(--u-accent)/15" style={{ left: bandRect.x, top: bandRect.y, width: bandRect.w, height: bandRect.h }} />}
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPath}
@@ -729,6 +798,8 @@ function FileExplorerReady({
         onPinToQuickAccess={contextMenuEntry?.isDir ? () => pin(contextMenuEntry.path) : undefined}
         onProperties={() => handleProperties(contextMenu?.path)}
         onDuplicate={contextMenuEntry ? () => handleDuplicate(contextMenu?.path) : undefined}
+        onZip={contextMenuEntry ? () => handleZip(contextMenu?.path) : undefined}
+        onUnzip={contextMenuEntry && !contextMenuEntry.isDir && /\.zip$/i.test(contextMenuEntry.name) ? () => handleUnzip(contextMenu?.path) : undefined}
         onCopyPath={contextMenuEntry ? () => handleCopyPath(contextMenu?.path) : undefined}
       />
 

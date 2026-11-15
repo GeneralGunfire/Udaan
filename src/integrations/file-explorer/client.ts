@@ -102,6 +102,16 @@ export async function onTransferProgress(callback: (progress: TransferProgress) 
   return unlisten
 }
 
+export async function zipEntries(paths: string[], destDir: string): Promise<FileEntry> {
+  const raw = await invoke<RawDirEntry>('file_explorer_zip', { paths, destDir })
+  return fromRaw(raw)
+}
+
+export async function unzipEntry(path: string): Promise<FileEntry> {
+  const raw = await invoke<RawDirEntry>('file_explorer_unzip', { path })
+  return fromRaw(raw)
+}
+
 export async function duplicateEntry(path: string): Promise<FileEntry> {
   const raw = await invoke<RawDirEntry>('file_explorer_duplicate', { path })
   return fromRaw(raw)
