@@ -241,7 +241,7 @@ export function OmniFindView(_props: { onClose: () => void }) {
                     {run.error}
                   </p>
                   <p className="text-text-tertiary text-2xs leading-relaxed">
-                    The AI gateway tries several free providers in turn. Open Settings > AI to check them or add a free key, then run the research again.
+                    The AI gateway tries several free providers in turn. Open Settings, then AI, to check them or add a free key, then run the research again.
                   </p>
                 </div>
               )}
