@@ -61,6 +61,7 @@ export function useFloatingPosition(
   }: UseFloatingPositionOptions,
 ) {
   const [position, setPosition] = useState<FloatingPosition | null>(null)
+  const [retry, setRetry] = useState(0)
   const referenceRef = useRef(reference)
   referenceRef.current = reference
 
@@ -71,7 +72,13 @@ export function useFloatingPosition(
     }
     const floating = floatingRef.current
     const ref = referenceRef.current
-    if (!floating || !ref) return
+    if (!floating || !ref) {
+      // The menu or its trigger is not in the page yet (it mounts a moment after `enabled` flips). Giving up
+      // here left the menu parked at -9999px for good, so look again on the next frame, a few times.
+      if (retry >= 30) return
+      const id = requestAnimationFrame(() => setRetry((n) => n + 1))
+      return () => cancelAnimationFrame(id)
+    }
 
     async function update() {
       const floatingEl = floatingRef.current
@@ -98,7 +105,8 @@ export function useFloatingPosition(
         placement,
         strategy: 'fixed',
         middleware,
-      })
+      }).catch(() => null)
+      if (!result) return
       setPosition({
         x: result.x,
         y: result.y,
@@ -112,7 +120,7 @@ export function useFloatingPosition(
     // manually re-trigger positioning on every layout-affecting event.
     return autoUpdate(ref, floating, update)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, placement, sideOffset, viewportPadding, constrainHeight, floatingRef])
+  }, [enabled, placement, sideOffset, viewportPadding, constrainHeight, floatingRef, reference, retry])
 
   return position
 }
