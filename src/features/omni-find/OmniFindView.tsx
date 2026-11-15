@@ -231,7 +231,7 @@ export function OmniFindView(_props: { onClose: () => void }) {
 
               {run.phase === 'failed' && (
                 <div
-                  className="border-danger-border bg-danger-surface flex flex-col gap-1.5 rounded-lg border px-4 py-3"
+                  className="u-surface flex flex-col gap-1.5 rounded-lg px-4 py-3"
                   role="alert"
                 >
                   <p className="text-danger text-sm leading-relaxed font-medium">
@@ -241,9 +241,7 @@ export function OmniFindView(_props: { onClose: () => void }) {
                     {run.error}
                   </p>
                   <p className="text-text-tertiary text-2xs leading-relaxed">
-                    OmniFind needs the OmniRoute daemon running to reason over
-                    what it reads. Check its status in General Chat if this
-                    keeps happening.
+                    The AI gateway tries several free providers in turn. Open Settings > AI to check them or add a free key, then run the research again.
                   </p>
                 </div>
               )}
