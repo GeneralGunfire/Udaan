@@ -419,7 +419,7 @@ export function CalendarView() {
               {viewMode === 'month'
                 ? formatMonthYear(viewYear, viewMonth)
                 : viewMode === 'day'
-                  ? weekAnchor.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+                  ? weekAnchor.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
                   : viewMode === 'agenda'
                     ? 'Upcoming'
                     : formatMonthYear(weekAnchor.getFullYear(), weekAnchor.getMonth())}
