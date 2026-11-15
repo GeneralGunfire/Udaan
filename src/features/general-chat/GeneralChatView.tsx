@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useGeneralChat } from './hooks/useGeneralChat'
-import { useOmniRouteControl } from './hooks/useOmniRouteControl'
 import { MessageText } from '@/shared/components/MessageText'
 import { ThinkingIndicator } from '@/shared/components/ThinkingIndicator'
 import { SearchIcon, TrashIcon, CopyIcon } from '@/shared/icons'
@@ -35,7 +34,6 @@ const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
 /** Chat: a ChatGPT-style assistant with saved conversations, pictures in and out. */
 export function GeneralChatView() {
   const chat = useGeneralChat('omniroute')
-  const omni = useOmniRouteControl()
   const [draft, setDraft] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -95,14 +93,14 @@ export function GeneralChatView() {
               chat.newChat()
               inputRef.current?.focus()
             }}
-            className="flex h-10 w-full items-center gap-2 rounded-[10px] border border-[var(--border-hairline)] px-3 text-[13.5px] font-medium transition-colors hover:bg-(--os-hover)"
+            className="u-btn u-btn--tonal h-10 w-full justify-start gap-2 px-3 text-[13.5px] font-medium"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
             New chat
           </button>
-          <label className="mt-2 flex h-9 items-center gap-2 rounded-[9px] bg-(--os-hover) px-3">
+          <label className="u-search mt-2 h-9">
             <SearchIcon width={13} height={13} className="text-[var(--color-text-tertiary)]" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search chats" className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--color-text-tertiary)]" />
           </label>
@@ -118,7 +116,8 @@ export function GeneralChatView() {
                   role="button"
                   tabIndex={0}
                   onClick={() => chat.switchSession(s.id)}
-                  className={`group flex h-9 cursor-default items-center gap-2 rounded-[8px] px-3 text-[13px] transition-colors ${s.id === chat.sessionId ? 'bg-(--os-hover)' : 'hover:bg-(--os-hover)'}`}
+                  data-selected={s.id === chat.sessionId || undefined}
+                  className="u-row group h-9 gap-2 px-3 text-[13px]"
                 >
                   <span className="min-w-0 flex-1 truncate">{s.title}</span>
                   <button
@@ -138,8 +137,9 @@ export function GeneralChatView() {
           ))}
         </div>
         <div className="flex items-center gap-2 border-t border-[var(--border-hairline)] px-4 py-3 text-[12px] text-[var(--color-text-secondary)]">
-          <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          {omni.running ? 'AI ready' : 'AI ready · Claude'}
+          <span className="h-2 w-2 rounded-full bg-(--u-ok)" />
+          <span className="min-w-0 flex-1 truncate">{chat.provider ? `Answered by ${chat.provider}` : 'AI ready'}</span>
+          {chat.lastLatencyMs != null && <span className="tabular-nums text-(--u-ink-3)">{(chat.lastLatencyMs / 1000).toFixed(1)}s</span>}
         </div>
       </aside>
 
@@ -176,7 +176,7 @@ export function GeneralChatView() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 + i * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     onClick={() => send(s.prompt)}
-                    className="rounded-[14px] border border-[var(--border-hairline)] bg-(--os-hover) p-4 text-left transition-colors hover:bg-(--os-hover)"
+                    className="u-tile items-start p-4 text-left"
                   >
                     <p className="text-[14px] font-semibold">{s.title}</p>
                     <p className="mt-1 line-clamp-2 text-[12.5px] text-[var(--color-text-secondary)]">{s.prompt}</p>
@@ -232,7 +232,7 @@ export function GeneralChatView() {
 
         {/* ---------- composer ---------- */}
         <div className="shrink-0 px-6 pb-5">
-          <div className="mx-auto max-w-[760px] rounded-[20px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-2 shadow-[0_8px_30px_rgb(0_0_0/0.3)] transition-colors focus-within:border-[var(--border-hairline)]">
+          <div className="mx-auto max-w-[760px] rounded-[20px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-2 ">
             {images.length > 0 && (
               <div className="flex gap-2 px-2 pb-2 pt-1">
                 {images.map((p) => (
@@ -288,11 +288,11 @@ export function GeneralChatView() {
                 className="max-h-[220px] min-h-[36px] flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed outline-none placeholder:text-[var(--color-text-tertiary)]"
               />
               {chat.responding ? (
-                <button type="button" aria-label="Stop" onClick={chat.stop} className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black">
+                <button type="button" aria-label="Stop" onClick={chat.stop} className="u-btn u-btn--primary u-btn--icon u-btn--pill mb-0.5 h-9 w-9 shrink-0">
                   <span className="h-3 w-3 rounded-[3px] bg-[var(--color-text-primary)]" />
                 </button>
               ) : (
-                <button type="button" aria-label="Send" disabled={!draft.trim() && !images.length} onClick={() => send()} className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity disabled:opacity-25">
+                <button type="button" aria-label="Send" disabled={!draft.trim() && !images.length} onClick={() => send()} className="u-btn u-btn--primary u-btn--icon u-btn--pill mb-0.5 h-9 w-9 shrink-0 disabled:opacity-30">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 19V5M5 12l7-7 7 7" />
                   </svg>

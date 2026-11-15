@@ -84,35 +84,10 @@ const MAX_AGENT_STEPS = 10
  * genuinely failed.
  */
 function describeOmniRouteError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  if (raw.startsWith('Cannot reach OmniRoute')) return raw
+  const raw = (err instanceof Error ? err.message : String(err)).replace(/^Error: /, '')
+  return `I could not get an answer: ${raw.slice(0, 220)}
 
-  // The client's own retry-exhaustion messages are already short and
-  // don't carry a raw JSON body — pass those through unchanged.
-  if (/^OmniRoute chat request failed after \d+ attempts:/.test(raw)) {
-    return `${raw} Every provider OmniRoute tried failed — try again in a moment, or check omniroute's own logs if this keeps happening.`
-  }
-
-  // A single non-retried failure (`OmniRoute chat request failed: <status>
-  // <statusText> — <body>`) still carries the raw response body. Extract
-  // just the human-readable `error.message` field if the body parses as
-  // OmniRoute's own JSON error shape, so a Bearer-key auth failure reads
-  // as a sentence instead of `{"error":{"message":"...",...`.
-  const bodyMatch = raw.match(/^OmniRoute chat request failed: (\d+) [^—]*— (.+)$/s)
-  if (bodyMatch) {
-    const [, status, body] = bodyMatch
-    try {
-      const parsed = JSON.parse(body) as { error?: { message?: string } }
-      if (parsed.error?.message) {
-        return `OmniRoute (${status}): ${parsed.error.message} — try sending again, or restart OmniRoute if this keeps happening.`
-      }
-    } catch {
-      // Not JSON — fall through to the raw message below rather than
-      // guessing at a shape it doesn't have.
-    }
-  }
-
-  return `Something went wrong getting a reply: ${raw.replace(/^Error: /, "")} — try sending it again.`
+Open Settings > AI to check the providers, then send again.`
 }
 
 /**
@@ -126,6 +101,7 @@ export function useGeneralChat(mode: ModeId) {
   const [messages, setMessages] = useState<ChatMessageData[]>([])
   const [responding, setResponding] = useState(false)
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null)
+  const [provider, setProvider] = useState<string | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -380,12 +356,27 @@ export function useGeneralChat(mode: ModeId) {
           updateAssistant(assistantId, { steps: [] })
         }
 
+        // Show the answer as it is written (throttled so a fast stream does not re-render every token).
+        let streamed = ''
+        let lastPaint = 0
         const result = await omniRouteChat(
           messages,
           controller.signal,
-          { temperature: scheduleQuery ? SCHEDULE_QUERY_TEMPERATURE : undefined, images },
+          {
+            temperature: scheduleQuery ? SCHEDULE_QUERY_TEMPERATURE : undefined,
+            images,
+            onDelta: (d) => {
+              streamed += d
+              const t = performance.now()
+              if (t - lastPaint > 70) {
+                lastPaint = t
+                updateAssistant(assistantId, { text: streamed })
+              }
+            },
+          },
           scheduleAction && !images.length ? [...SCHEDULE_TOOLS] : undefined,
         )
+        setProvider(result.provider ?? null)
 
         if (result.toolCalls && result.toolCalls.length > 0) {
           const toolResults: string[] = []
@@ -524,6 +515,7 @@ export function useGeneralChat(mode: ModeId) {
     messages,
     responding,
     lastLatencyMs,
+    provider,
     loadingHistory,
     sessions,
     sessionId,
