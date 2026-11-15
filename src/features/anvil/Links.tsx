@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
-import { anvilLinkHistory, anvilLinkList, anvilLinkMeasure, count, reason, type HistoryPoint, type LinkInfo, type LinkResult } from './api'
+import { anvilLinkHistory, anvilLinkList, anvilLinkMeasure, count, forgedDraft, reason, type HistoryPoint, type LinkInfo, type LinkResult } from './api'
 
 const COLS = 'grid-cols-[minmax(0,2.2fr)_88px_88px_minmax(120px,1.2fr)_minmax(0,1.3fr)_96px]'
 const CONCURRENCY = 3
@@ -10,7 +10,7 @@ const CONCURRENCY = 3
  * The link checker: how many values in one source resolve in another, measured now, next to what DEXA Forged
  * says. Values are compared inside Udaan's memory and dropped; only counts are shown or kept.
  */
-export function Links() {
+export function Links({ onDrafted }: { onDrafted: () => void }) {
   const [links, setLinks] = useState<LinkInfo[] | null>(null)
   const [results, setResults] = useState<Record<string, LinkResult>>({})
   const [history, setHistory] = useState<Record<string, HistoryPoint[]>>({})
@@ -71,6 +71,32 @@ export function Links() {
     void loadHistory()
   }, [links, measureOne, loadHistory])
 
+  const [draftError, setDraftError] = useState<string | null>(null)
+  // A note about this run: counts and link names only. It waits on the Forged page for approval.
+  const draftNote = async () => {
+    if (!links) return
+    const done = links.filter((l) => results[l.id] && !results[l.id].error)
+    const lines = done.map((l) => {
+      const r = results[l.id]
+      return `${l.label}: measured ${count(r.resolved)} of ${count(r.values)} (${r.share.toFixed(1)}%); Forged says ${count(l.forgedResolved)} of ${count(l.forgedValues)}; ${r.agrees ? 'agrees' : 'differs'}`
+    })
+    const differs = done.filter((l) => !results[l.id].agrees).map((l) => l.label)
+    const notMeasured = links.filter((l) => results[l.id]?.error).map((l) => l.label)
+    try {
+      await forgedDraft(
+        'estate',
+        'Note',
+        `Link check: ${done.length - differs.length} of ${done.length} measured links agree with Forged`,
+        `Anvil re-measured the cross-source links on ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}. ${differs.length ? `These differ from Forged: ${differs.join('; ')}.` : 'All measured links agree with Forged.'}${notMeasured.length ? ` Not measured: ${notMeasured.join('; ')}.` : ''}`,
+        lines.join('\n'),
+      )
+      setDraftError(null)
+      onDrafted()
+    } catch (e) {
+      setDraftError(reason(e))
+    }
+  }
+
   const measured = Object.keys(results).length
   const agreeing = Object.values(results).filter((r) => !r.error && r.agrees).length
   const differing = Object.values(results).filter((r) => !r.error && !r.agrees).length
@@ -85,6 +111,11 @@ export function Links() {
             {error ?? (measured === 0 ? 'How many values in one source resolve in another, checked against DEXA Forged' : `${agreeing} agree with Forged · ${differing} differ${failed ? ` · ${failed} could not be measured` : ''}`)}
           </p>
         </div>
+        {measured > 0 && running.size === 0 && (
+          <Button variant="tinted" onClick={() => void draftNote()} title={draftError ?? 'Add a note about this run to the Forged list (nothing is sent)'}>
+            {draftError ? 'Could not draft' : 'Draft a note'}
+          </Button>
+        )}
         <Button variant="primary" disabled={!links || running.size > 0} onClick={() => void measureAll()}>
           {running.size > 0 ? `Measuring ${running.size}…` : measured ? 'Measure again' : 'Measure all'}
         </Button>

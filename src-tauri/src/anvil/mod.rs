@@ -15,6 +15,8 @@
 //! The source list below is topology (names, ports, services, files), measured by DEXA Forged on
 //! 2026-11-11. It holds no credentials and no data.
 
+pub(crate) mod backups;
+pub(crate) mod forged;
 pub(crate) mod links;
 pub(crate) mod query;
 pub(crate) mod schema;

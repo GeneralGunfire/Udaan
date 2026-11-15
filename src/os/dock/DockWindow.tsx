@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
-import { useImmersive } from '@/os/kernel/useImmersive'
+import { useCovered, useImmersive } from '@/os/kernel/useImmersive'
 import { motion, useAnimationControls } from 'framer-motion'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -305,14 +305,11 @@ export function DockWindow() {
   }, [])
   const [binCount, setBinCount] = useState(0)
 
-  // Something taking the whole screen (a lock screen, the screensaver, the TV) hides the dock at once, and it
-  // comes back when that ends. Without this a dock that is not auto-hiding stays "revealed" over the cover.
-  useEffect(() => {
-    setRevealed(fullscreen ? false : !autoHide)
-  }, [fullscreen, autoHide])
-
+  // A lock screen or the screensaver hides the dock and nothing else: it keeps its place and its reserved strip,
+  // so the desktop does not reflow when a lock comes or goes.
+  const covered = useCovered()
   const shouldHide = autoHide || fullscreen
-  const visible = !shouldHide || revealed
+  const visible = (!shouldHide || revealed) && !covered
   const visibleRef = useLatest(visible)
   const itemsRef = useLatest(items)
 

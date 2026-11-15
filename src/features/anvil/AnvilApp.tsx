@@ -5,6 +5,8 @@ import { Button } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
 import { anvilSources, count, size, type SourceStatus } from './api'
 import { Browser } from './Browser'
+import { Backups } from './Backups'
+import { Forged } from './Forged'
 import { Links } from './Links'
 import { Query } from './Query'
 
@@ -21,8 +23,8 @@ const RAIL: { id: View; label: string; ready: boolean }[] = [
   { id: 'browser', label: 'Browser', ready: true },
   { id: 'query', label: 'Query', ready: true },
   { id: 'links', label: 'Links', ready: true },
-  { id: 'backups', label: 'Backups', ready: false },
-  { id: 'forged', label: 'Forged', ready: false },
+  { id: 'backups', label: 'Backups', ready: true },
+  { id: 'forged', label: 'Forged', ready: true },
 ]
 
 const COLS = 'grid-cols-[minmax(0,2.1fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_88px_88px_104px_28px]'
@@ -171,7 +173,9 @@ function Console() {
           />
         )}
         {view === 'query' && <Query sources={sources} initialSource={handoff.source} initialSql={handoff.sql} />}
-        {view === 'links' && <Links />}
+        {view === 'links' && <Links onDrafted={() => setView('forged')} />}
+        {view === 'backups' && <Backups />}
+        {view === 'forged' && <Forged />}
       </main>
     </div>
   )

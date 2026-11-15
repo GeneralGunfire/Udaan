@@ -4,7 +4,7 @@ import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'r
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ButtonHTMLAttributes } from 'react'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
-import { useImmersive } from '@/os/kernel/useImmersive'
+import { useCovered, useImmersive } from '@/os/kernel/useImmersive'
 import { emit, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { desktopDir, documentDir, downloadDir, homeDir } from '@tauri-apps/api/path'
@@ -157,6 +157,10 @@ export function MenuBarWindow() {
   const foreground = useShell((s) => s.foreground)
   const immersive = useImmersive()
   const fullscreen = useShell((s) => s.fullscreen) || immersive
+  // A lock screen or the screensaver hides the bar but never gives its strip back (see `useCovered`).
+  const covered = useCovered()
+  const coveredRef = useRef(covered)
+  coveredRef.current = covered
   const front = useMemo(() => windows.find((w) => w.handle === foreground), [windows, foreground])
   const [lastFront, setLastFront] = useState<ShellWindow | undefined>(undefined)
   if (front && front !== lastFront) setLastFront(front)
@@ -210,6 +214,7 @@ export function MenuBarWindow() {
         // it however this window ends).
         await invoke('engine_edge_bind', { edge: 'top', windowPx: h, reservePx: h })
         if (cancelled) return
+        if (coveredRef.current) return
         await win.show()
         // Showing can nudge a window; binding is idempotent, so assert it once more.
         await invoke('engine_edge_bind', { edge: 'top', windowPx: h, reservePx: h })
@@ -224,6 +229,13 @@ export function MenuBarWindow() {
       offLayout()
     }
   }, [fullscreen])
+
+  // Only hides or shows the window; the reserved strip and position are left exactly as they are.
+  useEffect(() => {
+    const win = getCurrentWindow()
+    if (covered) void win.hide()
+    else if (!fullscreen) void win.show()
+  }, [covered, fullscreen])
 
   useEffect(() => {
     const refresh = () => void getUnreadCount().then(setUnread, () => {})
