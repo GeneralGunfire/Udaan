@@ -102,6 +102,9 @@ export class LiveInput {
     channel.onmessage = (buf) => node.port.postMessage({ type: 'pcm', buf }, [buf])
     await invoke('live_audio_start', { pid, sampleRate: this.ctx.sampleRate, sourceLevel: SOURCE_LEVELS[opts.level], onAudio: channel })
     this.pid = pid
+    // A worklet node that was connected in the same tick it was created is not always pulled by the
+    // audio thread (measured: no frames until it was reconnected). Connect it again once the tap is live.
+    this.route()
   }
 
   async stop(): Promise<void> {
