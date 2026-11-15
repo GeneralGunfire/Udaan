@@ -86,14 +86,7 @@ fn serve(sink: Arc<TcpSink>) -> Result<(u16, String), String> {
             let req = String::from_utf8_lossy(&buf[..n]);
             if req.starts_with("OPTIONS ") {
               // A CORS preflight (any extra request header triggers one): allow it.
-              let _ = s.write_all(b"HTTP/1.1 204 No Content
-Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET, OPTIONS
-Access-Control-Allow-Headers: *
-Access-Control-Max-Age: 600
-Connection: close
-
-");
+              let _ = s.write_all(b"HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Max-Age: 600\r\nConnection: close\r\n\r\n");
             } else if req.starts_with(&want) {
               let head = "HTTP/1.1 200 OK
 
