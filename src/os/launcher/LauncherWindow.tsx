@@ -84,6 +84,10 @@ export function LauncherWindow() {
   useEffect(() => {
     void emit('shell://cover', covering)
   }, [covering])
+  // Anvil drops every result and filter the moment Work locks.
+  useEffect(() => {
+    if (mode === 'work-lock') void emit('work://locked')
+  }, [mode])
   useEffect(() => {
     const un = listen('shell://cover-query', () => void emit('shell://cover', coveringRef.current))
     return () => void un.then((fn) => fn())

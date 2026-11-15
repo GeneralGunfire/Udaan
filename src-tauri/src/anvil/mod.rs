@@ -15,6 +15,9 @@
 //! The source list below is topology (names, ports, services, files), measured by DEXA Forged on
 //! 2026-11-11. It holds no credentials and no data.
 
+pub(crate) mod query;
+pub(crate) mod schema;
+
 use serde::Serialize;
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
@@ -24,31 +27,92 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 const NO_WINDOW: u32 = 0x0800_0000;
-const SQLCMD: &str = r"C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\SQLCMD.EXE";
-const PSQL: &str = r"C:\Program Files\PostgreSQL\16\bin\psql.exe";
-const FILES_DIR: &str = r"C:\Database\registries";
+pub(crate) const SQLCMD: &str = r"C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\SQLCMD.EXE";
+pub(crate) const PSQL: &str = r"C:\Program Files\PostgreSQL\16\bin\psql.exe";
+pub(crate) const FILES_DIR: &str = r"C:\Database\registries";
+/// Field separator for tool output: a control character that no data value contains.
+pub(crate) const SEP: char = '\u{1f}';
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum Engine {
+pub(crate) enum Engine {
   SqlServer,
   Postgres,
   Sqlite,
   Csv,
 }
 
-struct Def {
-  id: &'static str,
-  name: &'static str,
-  engine: Engine,
+pub(crate) struct Def {
+  pub(crate) id: &'static str,
+  pub(crate) name: &'static str,
+  pub(crate) engine: Engine,
   /// TCP port (0 for files).
-  port: u16,
+  pub(crate) port: u16,
   /// Windows service that runs it (empty for files).
-  service: &'static str,
+  pub(crate) service: &'static str,
   /// Database name, or file name for SQLite and CSV.
-  target: &'static str,
+  pub(crate) target: &'static str,
 }
 
-const SOURCES: [Def; 11] = [
+pub(crate) fn find(id: &str) -> Option<&'static Def> {
+  SOURCES.iter().find(|d| d.id == id)
+}
+
+/// A child process's stdout, read on a thread so a slow or endless tool can be stopped by size or time.
+/// Returns (stdout text, stderr text, stopped early because the size limit was reached).
+pub(crate) fn run_capped(cmd: &mut Command, limit: Duration, max_bytes: usize) -> Result<(String, String, bool), String> {
+  use std::sync::mpsc;
+  let mut child = cmd
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .creation_flags(NO_WINDOW)
+    .spawn()
+    .map_err(|e| format!("could not start: {e}"))?;
+  let mut out = child.stdout.take().ok_or("no output")?;
+  let mut err = child.stderr.take().ok_or("no output")?;
+  let (tx, rx) = mpsc::channel::<Vec<u8>>();
+  std::thread::spawn(move || {
+    let mut buf = [0u8; 16 * 1024];
+    while let Ok(n) = out.read(&mut buf) {
+      if n == 0 || tx.send(buf[..n].to_vec()).is_err() {
+        break;
+      }
+    }
+  });
+  let err_thread = std::thread::spawn(move || {
+    let mut s = Vec::new();
+    let _ = err.by_ref().take(64 * 1024).read_to_end(&mut s);
+    String::from_utf8_lossy(&s).to_string()
+  });
+  let started = Instant::now();
+  let mut data: Vec<u8> = Vec::new();
+  let mut capped = false;
+  loop {
+    let left = limit.checked_sub(started.elapsed()).unwrap_or_default();
+    if left.is_zero() {
+      let _ = child.kill();
+      let _ = child.wait();
+      return Err("timed out".into());
+    }
+    match rx.recv_timeout(left.min(Duration::from_millis(200))) {
+      Ok(chunk) => {
+        data.extend_from_slice(&chunk);
+        if data.len() >= max_bytes {
+          capped = true;
+          let _ = child.kill();
+          break;
+        }
+      }
+      Err(mpsc::RecvTimeoutError::Timeout) => continue,
+      Err(mpsc::RecvTimeoutError::Disconnected) => break,
+    }
+  }
+  let _ = child.wait();
+  let stderr = err_thread.join().unwrap_or_default();
+  Ok((String::from_utf8_lossy(&data).to_string(), stderr, capped))
+}
+
+pub(crate) const SOURCES: [Def; 11] = [
   Def { id: "private_hospital", name: "Private hospital", engine: Engine::SqlServer, port: 1433, service: "MSSQLSERVER", target: "private_hospital" },
   Def { id: "public_hospital", name: "Public hospital", engine: Engine::SqlServer, port: 1438, service: "MSSQL$PUBHOSPITAL", target: "public_hospital" },
   Def { id: "hprs", name: "HPRS patient registry", engine: Engine::SqlServer, port: 1436, service: "MSSQL$HPRS", target: "hprs_identity" },
@@ -137,7 +201,7 @@ fn run(cmd: &mut Command, limit: Duration) -> Result<String, String> {
 }
 
 /// Turns a tool's error text into a short, value-free reason.
-fn friendly(err: &str) -> String {
+pub(crate) fn friendly(err: &str) -> String {
   let e = err.to_lowercase();
   if e.contains("login failed") || e.contains("authentication failed") || e.contains("no password supplied") || e.contains("password") {
     "Login needed".into()
@@ -204,7 +268,7 @@ fn probe_sql_server(d: &Def, s: &mut SourceStatus) {
     + CAST(ISNULL((SELECT SUM(CAST(p.rows AS bigint)) FROM sys.partitions p JOIN sys.tables t ON t.object_id=p.object_id WHERE p.index_id IN (0,1)),0) AS varchar(30))";
   let server = format!("localhost,{}", d.port);
   let mut cmd = Command::new(if Path::new(SQLCMD).exists() { SQLCMD } else { "sqlcmd" });
-  cmd.args(["-E", "-S", &server, "-d", d.target, "-l", "5", "-t", "15", "-h", "-1", "-W", "-b", "-Q", q]);
+  cmd.args(["-E", "-S", &server, "-d", d.target, "-l", "10", "-t", "15", "-h", "-1", "-W", "-b", "-Q", q]);
   match run(&mut cmd, Duration::from_secs(25)) {
     Ok(out) => match split_fields(&out, 5) {
       Some(f) => {
