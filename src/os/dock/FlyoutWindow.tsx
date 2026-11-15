@@ -46,7 +46,12 @@ const MAX_HEIGHT = Math.round(window.screen.height * 0.7)
 type Kind = keyof typeof WIDTH
 
 /** The content's real height in screen px (zoom included), rounded up. */
-const heightOf = (el: HTMLElement | null, fallback: number) => Math.ceil(el?.getBoundingClientRect().height || fallback)
+const heightOf = (el: HTMLElement | null, fallback: number, card?: HTMLElement | null) => {
+  // The card is scaled while it animates in, which shrinks what getBoundingClientRect reports. Undo that
+  // scale (the card's drawn width over its layout width) so the window is sized to the finished card.
+  const k = card ? card.getBoundingClientRect().width / (card.offsetWidth || 1) : 1
+  return Math.ceil((el?.getBoundingClientRect().height || fallback) / (k || 1))
+}
 
 /**
  * The dock's flyouts (Quick Settings, Notifications) in their own window,
@@ -105,7 +110,7 @@ export function FlyoutWindow() {
       if (kind !== 'context-menu') {
         let last = -1
         for (let i = 0; i < 4 && !cancelled; i++) {
-          const now = heightOf(contentRef.current, 0)
+          const now = heightOf(contentRef.current, 0, cardRef.current)
           if (now === last) break
           last = now
           await new Promise((r) => setTimeout(r, 40))
@@ -129,12 +134,12 @@ export function FlyoutWindow() {
       } else if (isPoint) {
         // Context menu: top-left anchored exactly at the click point, like
         // a native right-click menu — not centred like the other panels.
-        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 300))
+        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 300, cardRef.current))
         h = Math.round(height * scale)
         // 'point-up' opens upward from the point (a menu on the dock sits above it, never over it).
         y = placement === 'point-up' ? Math.round(anchor.current.y * scale) - h : Math.round(anchor.current.y * scale)
       } else {
-        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 400))
+        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 400, cardRef.current))
         h = Math.round(height * scale)
         y = placement === 'below' ? Math.round(anchor.current.y * scale + 6 * scale) : Math.round(anchor.current.y * scale - h - GAP_ABOVE_DOCK * scale)
       }
@@ -178,7 +183,7 @@ export function FlyoutWindow() {
       timer = setTimeout(async () => {
         const win = getCurrentWindow()
         const scale = pxScale()
-        const height = Math.min(MAX_HEIGHT, heightOf(el, 0))
+        const height = Math.min(MAX_HEIGHT, heightOf(el, 0, cardRef.current))
         const h = Math.round(height * scale)
         const naturalWidth = WIDTH[kind]
         let w = Math.round(naturalWidth * scale)
