@@ -25,7 +25,7 @@ const W = 480
 const H = 270
 
 export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parentRef: React.RefObject<HTMLElement | null> }) {
-  const { wallpaperId } = useWallpaper()
+  const { wallpaperId, revision } = useWallpaper()
   const wp = useMemo(() => getWallpaper(wallpaperId), [wallpaperId])
   const [src, setSrc] = useState('')
   const [rect, setRect] = useState({ x: 0, y: 0 })
@@ -49,7 +49,7 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
     return () => {
       cancelled = true
     }
-  }, [wp.id, wp.src])
+  }, [wp.id, wp.src, revision])
 
   // Where the bar sits inside the window, so the slice can be offset back to the screen origin.
   useEffect(() => {

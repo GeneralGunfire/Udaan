@@ -33,6 +33,7 @@ const inTauri = () => '__TAURI_INTERNALS__' in window
  */
 export function WallpaperProvider({ children }: PropsWithChildren) {
   const [wallpaperId, setWallpaperIdState] = useState<string>(readStored)
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => e.key === STORAGE_KEY && setWallpaperIdState(readStored())
@@ -64,6 +65,7 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
     const un = listen<string>('wallpaper://changed', (e) => {
       if (!isValidWallpaperId(e.payload)) return
       setWallpaperIdState(e.payload)
+      setRevision((r) => r + 1)
       remember(e.payload)
     })
     return () => void un.then((fn) => fn())
@@ -78,5 +80,5 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
     remember(id)
   }, [])
 
-  return <WallpaperContext.Provider value={{ wallpaperId, setWallpaperId }}>{children}</WallpaperContext.Provider>
+  return <WallpaperContext.Provider value={{ wallpaperId, setWallpaperId, revision }}>{children}</WallpaperContext.Provider>
 }

@@ -13,7 +13,7 @@ import { fittedWallpaperSrc, getWallpaper } from '@/app/wallpapers'
  * wallpaper stays put when windows open, move or maximise over it.
  */
 export const Wallpaper = memo(function Wallpaper({ dim = 0 }: { dim?: number; covered?: boolean; animated?: boolean }) {
-  const { wallpaperId } = useWallpaper()
+  const { wallpaperId, revision } = useWallpaper()
   const wp = getWallpaper(wallpaperId)
   const [layers, setLayers] = useState<{ key: number; src: string }[]>([])
 
@@ -32,7 +32,7 @@ export const Wallpaper = memo(function Wallpaper({ dim = 0 }: { dim?: number; co
     return () => {
       cancelled = true
     }
-  }, [wp.id, wp.src])
+  }, [wp.id, wp.src, revision])
 
   return (
     <div className="u-wp-settle fixed -inset-1 overflow-hidden" style={{ background: wp.color ?? '#0b0f16' }}>

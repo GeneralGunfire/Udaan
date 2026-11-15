@@ -91,7 +91,7 @@ function PinChanger() {
 
 /** A miniature of what the saver looks like. The pictures use your actual wallpaper. */
 function SaverPreview({ id, hover }: { id: string; hover: boolean }) {
-  const { wallpaperId } = useWallpaper()
+  const { wallpaperId, revision } = useWallpaper()
   const [src, setSrc] = useState('')
   useEffect(() => {
     let off = false
@@ -99,7 +99,7 @@ function SaverPreview({ id, hover }: { id: string; hover: boolean }) {
     return () => {
       off = true
     }
-  }, [wallpaperId])
+  }, [wallpaperId, revision])
   const pic = (style?: React.CSSProperties) => (src ? <img src={src} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={style} /> : <span className="absolute inset-0 bg-(--u-wash-on)" />)
   if (id === 'aurora' || id === 'flow' || id === 'daylight') return <CinemaCanvas kind={id as CinemaKind} still={!hover} scale={0.25} fps={20} />
   if (id === 'clock')
