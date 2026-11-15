@@ -38,7 +38,7 @@ export function GlassSlice({ edge, parentRef }: { edge: 'top' | 'bottom'; parent
       let url = wp.src
       if (wp.id.startsWith('file:')) {
         try {
-          url = convertFileSrc(await invoke<string>('wallpaper_fit', { path: wp.id.slice(5), width: W, height: H }))
+          url = convertFileSrc(await invoke<string>('wallpaper_render', { path: wp.id.slice(5), width: W, height: H }))
         } catch {
           /* fall back to the original */
         }
