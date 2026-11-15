@@ -692,3 +692,70 @@ mod office_template_tests {
     assert!(zip.by_name("ppt/slides/slide1.xml").is_ok());
   }
 }
+
+
+/// The total size of a folder, worked out in the background, stopping at a cap so a huge tree cannot hang the app.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirSize {
+  pub bytes: u64,
+  pub files: u64,
+  pub capped: bool,
+}
+
+#[tauri::command]
+pub async fn file_explorer_dir_size(path: String) -> Result<DirSize, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    const FILE_CAP: u64 = 200_000;
+    let mut bytes = 0u64;
+    let mut files = 0u64;
+    let mut stack = vec![std::path::PathBuf::from(&path)];
+    while let Some(dir) = stack.pop() {
+      let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+      for e in rd.flatten() {
+        let Ok(m) = e.metadata() else { continue };
+        if m.is_dir() {
+          // Do not follow links out of the tree.
+          if !m.file_type().is_symlink() {
+            stack.push(e.path());
+          }
+        } else {
+          bytes += m.len();
+          files += 1;
+          if files >= FILE_CAP {
+            return DirSize { bytes, files, capped: true };
+          }
+        }
+      }
+    }
+    DirSize { bytes, files, capped: false }
+  })
+  .await
+  .map_err(|e| e.to_string())
+}
+
+/// Every drive: its name, where it is mounted, and how full it is.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveInfo {
+  pub name: String,
+  pub mount: String,
+  pub total_bytes: u64,
+  pub free_bytes: u64,
+  pub removable: bool,
+}
+
+#[tauri::command(async)]
+pub fn file_explorer_drives() -> Vec<DriveInfo> {
+  let disks = sysinfo::Disks::new_with_refreshed_list();
+  disks
+    .iter()
+    .map(|d| DriveInfo {
+      name: d.name().to_string_lossy().to_string(),
+      mount: d.mount_point().to_string_lossy().to_string(),
+      total_bytes: d.total_space(),
+      free_bytes: d.available_space(),
+      removable: d.is_removable(),
+    })
+    .collect()
+}

@@ -8,7 +8,7 @@ import { iconForKind } from '@/features/file-explorer/lib/iconForKind'
 import { type AppId } from '@/os/kernel/registry'
 import { openApp } from '@/os/kernel/shell'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
-import { AppTileContextMenu } from '@/os/ui/AppTileContextMenu'
+import { useAppMenu } from './start/appMenu'
 import { useShellMenu } from '@/os/ui/useShellMenu'
 import { Button } from '@/os/ui/controls'
 import { SearchIcon, SettingsIcon } from '@/shared/icons'
@@ -96,6 +96,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const openShellMenu = useShellMenu()
+  const appMenu = useAppMenu()
   const q = query.trim()
 
   useEffect(() => {
@@ -259,8 +260,9 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
               <Header title="Pinned" action="All apps" onAction={() => setView('all')} />
               <div className="grid grid-cols-7 gap-1">
                 {pins.map((p) => (
-                  <AppTileContextMenu key={pinKey(p)} action={{ path: p.kind === 'installed' ? `shell:AppsFolder\\${p.app.id}` : undefined, onOpen: () => finish(() => launchPin(p)), ...pinAction(p) }}>
-                    <button
+                  <button
+                      key={pinKey(p)}
+                      onContextMenu={(e) => appMenu(e, { path: p.kind === 'installed' ? `shell:AppsFolder\\${p.app.id}` : undefined, onOpen: () => finish(() => launchPin(p)), ...pinAction(p) })}
                       type="button"
                       className="u-tile"
                       draggable
@@ -280,7 +282,6 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
                       <PinIcon pin={p} size={40} />
                       <span className="w-full truncate text-center text-[12px] font-medium leading-tight">{pinName(p)}</span>
                     </button>
-                  </AppTileContextMenu>
                 ))}
               </div>
 

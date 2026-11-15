@@ -97,7 +97,7 @@ export const APP_COMPONENTS: { [Id in AppId]: ComponentType<any> } = {
   calendar: lazy(() => import('@/features/calendar/CalendarView').then((m) => ({ default: m.CalendarView }))),
   'omni-find': lazy(() => import('@/features/omni-find/OmniFindView').then((m) => ({ default: m.OmniFindView }))),
   studio: lazy(() => import('@/apps/studio').then((m) => ({ default: m.StudioApp }))),
-  'file-explorer': lazy(() => import('@/features/file-explorer/FileExplorerView').then((m) => ({ default: m.FileExplorerView }))),
+  'file-explorer': lazy(() => import('@/features/file-explorer/FilesApp').then((m) => ({ default: m.FilesApp }))),
   notes: lazy(() => import('@/features/notes/NotesView').then((m) => ({ default: m.NotesView }))),
   'cnc-mod-switcher': lazy(() => import('@/features/cnc-mod-switcher/CncModSwitcherView').then((m) => ({ default: m.CncModSwitcherView }))),
   // The player's audio graph lives in its provider, so it loads (and only

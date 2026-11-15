@@ -3,7 +3,7 @@ import { cn } from '@/shared/lib/cn'
 import { APP_DEFS, APP_IDS } from '@/os/kernel/registry'
 import { openApp } from '@/os/kernel/shell'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
-import { AppTileContextMenu } from '@/os/ui/AppTileContextMenu'
+import { useAppMenu } from './appMenu'
 import { Button, Segmented } from '@/os/ui/controls'
 import { SearchIcon } from '@/shared/icons'
 import { launchPin, type InstalledApp, type Pin } from './model'
@@ -31,6 +31,7 @@ export function AllApps({
   finish: (fn: () => unknown) => void
   onBack: () => void
 }) {
+  const appMenu = useAppMenu()
   const [filter, setFilter] = useState('')
   const [layout, setLayout] = useState<'grid' | 'list'>('grid')
   const scroller = useRef<HTMLDivElement>(null)
@@ -51,7 +52,7 @@ export function AllApps({
   const jump = (l: string) => scroller.current?.querySelector(`[data-letter="${l}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 
   const cell = (key: string, icon: ReactNode, name: string, run: () => void, pin: Pin, path?: string) => (
-    <AppTileContextMenu key={key} action={{ path, onOpen: run, ...pinAction(pin) }}>
+    <div key={key} onContextMenu={(e) => appMenu(e, { path, onOpen: run, ...pinAction(pin) })} className="contents">
       {layout === 'grid' ? (
         <button type="button" className="u-tile h-[104px] justify-center gap-2" onClick={run} title={name}>
           {icon}
@@ -63,7 +64,7 @@ export function AllApps({
           <span className="truncate text-[13px] font-medium">{name}</span>
         </button>
       )}
-    </AppTileContextMenu>
+    </div>
   )
   const gridCls = layout === 'grid' ? 'grid grid-cols-7 gap-1' : 'grid grid-cols-3 gap-x-1'
 

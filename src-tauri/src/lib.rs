@@ -325,6 +325,8 @@ pub fn run() {
       file_explorer::file_explorer_read_text_preview,
       file_explorer::file_explorer_open_with_system,
       file_explorer::file_explorer_quick_access,
+      file_explorer::file_explorer_dir_size,
+      file_explorer::file_explorer_drives,
       file_explorer::file_explorer_stat,
       installed_apps::installed_apps_detect,
       installed_apps::installed_apps_launch,

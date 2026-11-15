@@ -31,6 +31,9 @@ import { ClipboardStatusBar } from './components/ClipboardStatusBar'
 import { TransferProgressBar } from './components/TransferProgressBar'
 import { ToastStack } from './components/ToastStack'
 import { LoadingState, EmptyFolderState, ErrorState } from './components/ExplorerStates'
+import { PreviewPane } from './components/PreviewPane'
+import { FilesSubBar, type KindFilter } from './components/FilesSubBar'
+import { fileKind } from './lib/fileKind'
 import { useDirectoryListing } from './hooks/useDirectoryListing'
 import { useNavigationHistory } from './hooks/useNavigationHistory'
 import { usePinnedFolders } from './hooks/usePinnedFolders'
@@ -58,11 +61,13 @@ import type { QuickAccessLocation, ConflictMode } from '@/integrations/file-expl
  */
 interface FileExplorerViewProps {
   onClose: () => void
+  /** Reports the folder being shown, so a tab can name itself. */
+  onPathChange?: (path: string) => void
   /** Folder to open at, e.g. a folder double-clicked on the desktop. */
   initialPath?: string
 }
 
-export function FileExplorerView({ initialPath }: FileExplorerViewProps) {
+export function FileExplorerView({ initialPath, onPathChange }: FileExplorerViewProps) {
   const [homePath, setHomePath] = useState<string | null>(initialPath ?? null)
   const [quickAccess, setQuickAccess] = useState<QuickAccessLocation[]>([])
 
@@ -81,7 +86,7 @@ export function FileExplorerView({ initialPath }: FileExplorerViewProps) {
     )
   }
 
-  return <FileExplorerReady initialPath={homePath} requestedPath={initialPath} quickAccess={quickAccess} />
+  return <FileExplorerReady initialPath={homePath} requestedPath={initialPath} quickAccess={quickAccess} onPathChange={onPathChange} />
 }
 
 interface PendingTransfer {
@@ -96,10 +101,12 @@ function FileExplorerReady({
   initialPath,
   requestedPath,
   quickAccess,
+  onPathChange,
 }: {
   initialPath: string
   requestedPath: string | undefined
   quickAccess: QuickAccessLocation[]
+  onPathChange?: (path: string) => void
 }) {
   const { currentPath, canGoBack, canGoForward, navigateTo, goBack, goForward } = useNavigationHistory(initialPath)
 
@@ -111,7 +118,25 @@ function FileExplorerReady({
     lastRequested.current = requestedPath
     navigateTo(requestedPath)
   }, [requestedPath, navigateTo])
+  useEffect(() => onPathChange?.(currentPath), [currentPath, onPathChange])
   const { entries, loading, error, refresh } = useDirectoryListing(currentPath)
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [paneOpen, setPaneOpen] = useState(() => {
+    try {
+      return localStorage.getItem('files.pane') !== '0'
+    } catch {
+      return true
+    }
+  })
+  const togglePane = () =>
+    setPaneOpen((o) => {
+      try {
+        localStorage.setItem('files.pane', o ? '0' : '1')
+      } catch {
+        /* best effort */
+      }
+      return !o
+    })
   const { pinned, pin, unpin, reorder } = usePinnedFolders()
   const { canUndo, canRedo, push: pushUndo, undo, redo } = useUndoStack()
   const { active: activeTransfer, start: startTransfer, finish: finishTransfer } = useTransferProgress()
@@ -181,8 +206,9 @@ function FileExplorerReady({
 
   const visibleEntries = useMemo(() => {
     const base = searchResults ?? entries
-    return sortEntries(base, sortColumn, sortDirection)
-  }, [entries, searchResults, sortColumn, sortDirection])
+    const filtered = kindFilter === 'all' ? base : base.filter((e) => e.isDir || fileKind(e.extension, e.isDir) === kindFilter)
+    return sortEntries(filtered, sortColumn, sortDirection)
+  }, [entries, searchResults, sortColumn, sortDirection, kindFilter])
 
   const isSearchMode = searchResults !== null
 
@@ -596,6 +622,7 @@ function FileExplorerReady({
         onPaste={handlePaste}
       />
 
+      <FilesSubBar filter={kindFilter} onFilter={setKindFilter} shown={visibleEntries.length} total={(searchResults ?? entries).length} selectedCount={selectedPaths.size} paneOpen={paneOpen} onTogglePane={togglePane} />
       <div className="flex min-h-0 flex-1">
         <ExplorerSidebar
           quickAccess={quickAccess}
@@ -672,6 +699,11 @@ function FileExplorerReady({
             </motion.div>
           </AnimatePresence>
         </div>
+        {paneOpen && (
+          <aside className="u-scroll w-[280px] shrink-0 overflow-y-auto border-l border-(--u-edge) p-4">
+            <PreviewPane selected={visibleEntries.filter((e) => selectedPaths.has(e.path))} all={visibleEntries} folderPath={currentPath} />
+          </aside>
+        )}
       </div>
 
       <TransferProgressBar transfer={activeTransfer} />

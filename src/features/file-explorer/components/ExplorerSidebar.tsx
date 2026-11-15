@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { formatFileSize } from '../lib/fileKind'
 import { WindowCloseIcon, FolderIcon, PlusIcon } from '@/shared/icons'
 import { Button } from '@/shared/components/ui/button'
 import { cn } from '@/shared/lib/cn'
@@ -104,7 +106,49 @@ export function ExplorerSidebar({
           />
         ))}
       </nav>
+      <Drives currentPath={currentPath} onNavigate={onNavigate} />
     </aside>
+  )
+}
+
+interface Drive {
+  name: string
+  mount: string
+  totalBytes: number
+  freeBytes: number
+  removable: boolean
+}
+
+/** This PC: every drive with how full it is. */
+function Drives({ currentPath, onNavigate }: { currentPath: string; onNavigate: (path: string) => void }) {
+  const [drives, setDrives] = useState<Drive[]>([])
+  useEffect(() => {
+    void invoke<Drive[]>('file_explorer_drives').then(setDrives, () => {})
+  }, [])
+  if (!drives.length) return null
+  return (
+    <nav aria-label="Drives" className="flex flex-col gap-0.5 pb-2 pt-1">
+      <p className="u-label px-2.5 pb-1">This PC</p>
+      {drives.map((d) => {
+        const used = d.totalBytes ? 1 - d.freeBytes / d.totalBytes : 0
+        const active = currentPath.toLowerCase().startsWith(d.mount.toLowerCase())
+        return (
+          <button key={d.mount} type="button" data-selected={active || undefined} onClick={() => onNavigate(d.mount)} className="u-row h-auto flex-col items-stretch gap-1.5 px-2.5 py-2" title={`${formatFileSize(d.freeBytes)} free of ${formatFileSize(d.totalBytes)}`}>
+            <span className="flex items-center gap-2 text-[13px] font-medium">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <rect x="3" y="7" width="18" height="10" rx="2" />
+                <path d="M7 12h.01M17 12h-5" />
+              </svg>
+              <span className="truncate">{d.name ? `${d.name} (${d.mount.replace(/[\\/]$/, '')})` : d.mount}</span>
+            </span>
+            <span className="h-1.5 overflow-hidden rounded-full bg-(--u-wash-press)">
+              <span className="block h-full rounded-full" style={{ width: `${Math.round(used * 100)}%`, background: used > 0.9 ? 'var(--u-danger)' : 'var(--u-ink)' }} />
+            </span>
+            <span className="text-[11px] tabular-nums text-(--u-ink-3)">{formatFileSize(d.freeBytes)} free</span>
+          </button>
+        )
+      })}
+    </nav>
   )
 }
 
@@ -159,16 +203,7 @@ function SidebarItem({
         dragOver && 'bg-accent/15 ring-accent/50 rounded-lg ring-1',
       )}
     >
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'flex h-8 flex-1 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition-[background-color,color,box-shadow] duration-150',
-          active
-            ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]'
-            : 'text-text-secondary hover:bg-(--os-hover) hover:text-text-primary',
-        )}
-      >
+      <button type="button" onClick={onClick} data-selected={active || undefined} className="u-row h-8 min-w-0 flex-1 gap-2 px-2.5 text-[13px]">
         <FolderIcon width={16} height={16} className="shrink-0" />
         <span className="truncate">{location.name}</span>
       </button>
