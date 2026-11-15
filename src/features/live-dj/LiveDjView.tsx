@@ -20,7 +20,7 @@ const LATENCIES: { id: Latency; label: string; hint: string }[] = [
 ]
 
 const LEVELS: { id: SourceLevel; label: string; hint: string }[] = [
-  { id: 'off', label: 'Off', hint: 'Original about 25 dB down: you hear only the processed copy (no echo). A little more background noise' },
+  { id: 'off', label: 'Off', hint: 'Original about 25 dB down: you hear only the processed copy, so no echo or reverb. Recommended' },
   { id: 'quiet', label: 'Quiet', hint: 'Original about 16 dB down: the echo is hard to hear, a little more background noise' },
   { id: 'soft', label: 'Soft', hint: 'Original about 8 dB down: cleanest sound, the original stays audible as a faint echo' },
   { id: 'full', label: 'Full', hint: 'Original untouched and the cleanest signal: you hear it as well as the processed copy (layering/monitoring)' },
@@ -92,7 +92,7 @@ export function LiveDjView() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pickedPid, setPickedPid] = useState<number | null>(null)
-  const [level, setLevel] = useState<SourceLevel>('quiet')
+  const [level, setLevel] = useState<SourceLevel>('off')
   const [latency, setLatency] = useState<Latency>('balanced')
   const [fx, setFx] = useState<ParamValues>(DECK_DEFAULTS)
   const [bypass, setBypass] = useState(false)

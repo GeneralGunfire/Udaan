@@ -38,6 +38,7 @@ class LiveCapture extends AudioWorkletProcessor {
     this.fadeIn = 0
     this.underruns = 0
     this.calm = 0
+    this.warm = 0
     this.sinceReport = 0
     this.port.onmessage = (e) => {
       const d = e.data
@@ -56,6 +57,11 @@ class LiveCapture extends AudioWorkletProcessor {
       } else if (d.type === 'target') {
         this.baseTarget = Math.round(sampleRate * d.ms / 1000)
         this.target = this.baseTarget
+        // The first two seconds after a start are the page busy building itself: hiccups then are not a
+        // reason to grow the buffer (that made the delay stick at its maximum).
+        this.warm = Math.round(sampleRate * 2)
+        this.underruns = 0
+        this.calm = 0
       } else if (d.type === 'loop') {
         const m = Math.max(256, Math.min(Math.round(d.frames), Math.floor(this.cap / 4)))
         const X = Math.min(480, m >> 2)
@@ -73,6 +79,7 @@ class LiveCapture extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs) {
+    if (this.warm > 0) this.warm -= 128
     const out = outputs[0]
     const oL = out[0]
     const oR = out[1] || out[0]
@@ -120,9 +127,11 @@ class LiveCapture extends AudioWorkletProcessor {
         if (i0 + 2 >= this.w) {
           // Ran dry: go silent and refill, and ask for a little more cushion.
           this.primed = false
-          this.underruns++
-          this.target = Math.min(this.maxTarget, this.target + Math.round(sampleRate * 0.01))
-          this.calm = 0
+          if (this.warm <= 0) {
+            this.underruns++
+            this.target = Math.min(this.maxTarget, this.target + Math.round(sampleRate * 0.01))
+            this.calm = 0
+          }
           break
         }
         const f = this.r - i0
@@ -163,7 +172,7 @@ class LiveCapture extends AudioWorkletProcessor {
     if (this.sinceReport >= sampleRate / 2) {
       this.sinceReport = 0
       // Quiet for ~4 s: let the safety buffer shrink back toward its base so the delay does not stay inflated.
-      if (++this.calm >= 8 && this.target > this.baseTarget) this.target = Math.max(this.baseTarget, this.target - Math.round(sampleRate * 0.005))
+      if (++this.calm >= 4 && this.target > this.baseTarget) this.target = Math.max(this.baseTarget, this.target - Math.round(sampleRate * 0.01))
       this.port.postMessage({
         type: 'stats',
         fillMs: Math.max(0, ((this.w - this.r) / sampleRate) * 1000),
