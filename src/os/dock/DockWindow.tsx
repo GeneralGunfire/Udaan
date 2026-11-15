@@ -305,6 +305,12 @@ export function DockWindow() {
   }, [])
   const [binCount, setBinCount] = useState(0)
 
+  // Something taking the whole screen (a lock screen, the screensaver, the TV) hides the dock at once, and it
+  // comes back when that ends. Without this a dock that is not auto-hiding stays "revealed" over the cover.
+  useEffect(() => {
+    setRevealed(fullscreen ? false : !autoHide)
+  }, [fullscreen, autoHide])
+
   const shouldHide = autoHide || fullscreen
   const visible = !shouldHide || revealed
   const visibleRef = useLatest(visible)

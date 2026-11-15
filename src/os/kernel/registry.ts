@@ -28,6 +28,7 @@ export type AppId =
   | 'tv'
   | 'clipboard'
   | 'photos'
+  | 'anvil'
   | 'storage'
 
 export interface BaseAppProps {
@@ -48,6 +49,7 @@ export interface AppArgsMap {
   'news-brief': Record<string, never>
   tv: Record<string, never>
   'clipboard': Record<string, never>
+  anvil: Record<string, never>
   'photos': Record<string, never>
   'storage': Record<string, never>
   settings: { section?: 'personalization' | 'dock' | 'keyboard' | 'windows' | 'widgets' | 'quickstarts' | 'notifications' | 'sound' | 'system' }
@@ -76,6 +78,7 @@ export const APP_DEFS: Record<AppId, AppDef> = {
   'private-player': { name: 'Music', icon: HeadphonesIcon, size: { width: 1280, height: 820 }, minSize: { width: 820, height: 560 }, tint: '#fa586a' },
   'live-dj': { name: 'Live DJ', icon: DiscIcon, size: { width: 1180, height: 840 }, minSize: { width: 860, height: 600 }, tint: '#b5179e' },
   'news-brief': { name: 'News', icon: NewspaperIcon, size: { width: 1040, height: 780 }, minSize: { width: 620, height: 480 }, tint: '#6f7782' },
+  anvil: { name: 'Anvil', icon: LayersIcon, size: { width: 1180, height: 760 }, minSize: { width: 860, height: 520 }, tint: '#6b7686' },
   'clipboard': { name: 'Clipboard', icon: LayersIcon, size: { width: 820, height: 700 }, minSize: { width: 640, height: 480 }, tint: '#5e5ce6' },
   'photos': { name: 'Photos', icon: LayersIcon, size: { width: 1200, height: 820 }, minSize: { width: 640, height: 480 }, tint: '#ff9f0a' },
   'storage': { name: 'Storage', icon: LayersIcon, size: { width: 1000, height: 760 }, minSize: { width: 640, height: 480 }, tint: '#30d158' },
@@ -110,6 +113,7 @@ export const APP_COMPONENTS: { [Id in AppId]: ComponentType<any> } = {
     return { default: (props: any) => createElement(PlayerProvider, null, createElement(PrivatePlayerView, props)) }
   }),
   'live-dj': lazy(() => import('@/features/live-dj/LiveDjView').then((m) => ({ default: m.LiveDjView }))),
+  anvil: lazy(() => import('@/features/anvil/AnvilApp').then((m) => ({ default: m.AnvilApp }))),
   'news-brief': lazy(() => import('@/features/news-brief/NewsBriefView').then((m) => ({ default: m.NewsBriefView }))),
   'clipboard': lazy(() => import('@/os/apps/utilities/ClipboardApp').then((m) => ({ default: m.ClipboardApp }))),
   'photos': lazy(() => import('@/os/apps/utilities/PhotosApp').then((m) => ({ default: m.PhotosApp }))),

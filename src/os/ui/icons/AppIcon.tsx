@@ -368,6 +368,30 @@ const DRAWINGS: Record<AppId, Drawing> = {
 
 
   clipboard: (c) => (
+  anvil: (c) => (
+    <Plate c={c} from="#4a5568" to="#161a22" rim="#8794ab">
+      <defs>
+        <linearGradient id={c.id('steel')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.45" stopColor="#dbe2ee" />
+          <stop offset="1" stopColor="#a9b4c6" />
+        </linearGradient>
+      </defs>
+      <g style={{ filter: liftHeavy }}>
+        {/* A side-on anvil: tapered horn on the left, flat face, narrow waist, wide foot. */}
+        <path
+          d="M14 44C22 41.5 33 41 41 41H84V52H69C69 58 66 61 66 66L77 70V80H31V70L42 66C42 61 39 58 39 55C32 53 21 50 14 44Z"
+          fill={`url(#${c.id('steel')})`}
+        />
+        {/* The struck face catches the light. */}
+        <path d="M41 41H84V44H41Z" fill="#fff" />
+        {/* Sparks. */}
+        <circle cx="58" cy="29" r="2.6" fill="#ffb347" />
+        <circle cx="68" cy="22" r="1.9" fill="#ff8a3c" />
+        <circle cx="49" cy="23" r="1.5" fill="#ffd27a" />
+      </g>
+    </Plate>
+  ),
     <Plate c={c} from="#9b98ff" to="#3b2fc4" rim="#c7c5ff">
       <g style={{ filter: liftHeavy }}>
         <rect x="26" y="25" width="48" height="58" rx="8" fill="#fff" />

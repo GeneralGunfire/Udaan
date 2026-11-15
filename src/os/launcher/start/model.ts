@@ -51,7 +51,7 @@ export async function workStartPins(): Promise<Pin[]> {
     const app = apps.find((x) => re.test(x.name))
     return app ? [{ kind: 'installed', app }] : []
   })
-  return [{ kind: 'udaan', appId: 'file-explorer' }, { kind: 'udaan', appId: 'notes' }, ...tools]
+  return [{ kind: 'udaan', appId: 'file-explorer' }, { kind: 'udaan', appId: 'notes' }, ...tools, { kind: 'udaan', appId: 'anvil' }]
 }
 
 function valid(p: unknown): p is Pin {
@@ -159,7 +159,8 @@ let registered = false
 export function registerStartEntries() {
   if (registered) return
   registered = true
-  const apps = APP_IDS.map((id) => ({ id: `udaan:${id}`, kind: 'app', title: APP_DEFS[id].name, subtitle: 'Udaan', keywords: '', target: id }))
+  // Anvil belongs to Work: it is reached from Work's section of Start, never from Personal's search.
+  const apps = APP_IDS.filter((id) => id !== 'anvil').map((id) => ({ id: `udaan:${id}`, kind: 'app', title: APP_DEFS[id].name, subtitle: 'Udaan', keywords: '', target: id }))
   const settings = Object.entries(ACTIONS)
     .filter(([id]) => id.startsWith('setting:'))
     .map(([id, a]) => ({ id, kind: 'setting', title: a.title, subtitle: a.subtitle, keywords: a.keywords, target: id }))

@@ -1,4 +1,5 @@
 mod agent_workspace;
+mod anvil;
 mod scholar;
 mod ai_fallback;
 mod ai_gateway;
@@ -207,6 +208,8 @@ pub fn run() {
       notifications::notifications_push,
       engine::notify::notify_push,
       engine::notify::notify_list,
+      notes::notes_set_profile,
+      anvil::anvil_sources,
       notes::notes_set_profile,
       engine::notify::notify_unread_count,
       engine::notify::notify_mark_read,
