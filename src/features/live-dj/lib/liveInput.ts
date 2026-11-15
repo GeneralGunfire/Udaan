@@ -29,7 +29,7 @@ export const SOURCE_LEVELS: Record<SourceLevel, number> = { quiet: 0.3, soft: 0.
 export type Latency = 'low' | 'balanced' | 'stable'
 /** Jitter buffer per mode: the whole delay between the original app and
  * what you hear (capture ≈10 ms + this + output). */
-const TARGET_MS: Record<Latency, number> = { low: 40, balanced: 70, stable: 110 }
+const TARGET_MS: Record<Latency, number> = { low: 50, balanced: 90, stable: 150 }
 
 const loadedModules = new WeakSet<AudioContext>()
 

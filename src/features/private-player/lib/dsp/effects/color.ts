@@ -262,36 +262,45 @@ export class BitcrushEffect extends WetDryEffect {
   readonly id = 'bitcrush'
   readonly label = 'Crush'
   readonly params = [CRUSH] as const
-  private readonly proc: ScriptProcessorNode
+  private readonly shaper: WaveShaperNode
   private bits = 16
 
   constructor(ctx: AudioContext) {
     super(ctx)
-    this.proc = ctx.createScriptProcessor(2048, 2, 2)
-    this.proc.onaudioprocess = (e) => {
-      const step = Math.pow(0.5, this.bits)
-      for (let ch = 0; ch < e.inputBuffer.numberOfChannels; ch++) {
-        const input = e.inputBuffer.getChannelData(ch)
-        const output = e.outputBuffer.getChannelData(ch)
-        for (let i = 0; i < input.length; i++) {
-          output[i] = step * Math.floor(input[i] / step + 0.5)
-        }
-      }
+    // Quantising the amplitude is exactly a bit-depth reduction, and a WaveShaper does it on the audio
+    // thread. (This used to be a ScriptProcessorNode, which runs on the main thread and starved the live
+    // DJ stream into constant dropouts.)
+    this.shaper = ctx.createWaveShaper()
+    this.shaper.oversample = 'none'
+    this.setCurve(16)
+    this.wire(this.shaper, this.shaper)
+  }
+
+  private setCurve(bits: number) {
+    const N = 8193
+    const step = Math.pow(0.5, bits)
+    const curve = new Float32Array(N)
+    for (let i = 0; i < N; i++) {
+      const x = (i / (N - 1)) * 2 - 1
+      curve[i] = step * Math.floor(x / step + 0.5)
     }
-    this.wire(this.proc, this.proc)
+    this.shaper.curve = curve
   }
 
   apply(values: ParamValues, now: number): void {
     const amount = num(values, CRUSH)
     // 16 bits (transparent) down to 2 bits (heavily crushed).
-    this.bits = 16 - (amount / 100) * 14
+    const bits = Math.round((16 - (amount / 100) * 14) * 2) / 2
+    if (bits !== this.bits) {
+      this.bits = bits
+      this.setCurve(bits)
+    }
     this.setMix(amount / 100, now)
   }
 
   dispose(): void {
-    this.proc.onaudioprocess = null
     try {
-      this.proc.disconnect()
+      this.shaper.disconnect()
     } catch {
       // Already disconnected.
     }
