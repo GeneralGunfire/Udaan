@@ -16,7 +16,7 @@ onmessage = async (e) => {
   controller = new AbortController()
   let carry = new Uint8Array(0)
   try {
-    const res = await fetch(d.url, { signal: controller.signal, cache: 'no-store' })
+    const res = await fetch(d.url, { signal: controller.signal })
     const reader = res.body.getReader()
     for (;;) {
       const { value, done } = await reader.read()
