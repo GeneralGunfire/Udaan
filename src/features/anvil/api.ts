@@ -46,6 +46,39 @@ export interface QueryResult {
   elapsedMs: number
 }
 
+export interface LinkInfo {
+  id: string
+  label: string
+  from: string
+  to: string
+  how: string
+  forgedValues: number
+  forgedResolved: number
+}
+
+export interface LinkResult {
+  id: string
+  values: number
+  resolved: number
+  distinctValues: number
+  distinctResolved: number
+  share: number
+  agrees: boolean
+  error: string | null
+  measuredAtMs: number
+}
+
+export interface HistoryPoint {
+  id: string
+  atMs: number
+  values: number
+  resolved: number
+}
+
+export const anvilLinkList = () => invoke<LinkInfo[]>('anvil_link_list')
+export const anvilLinkMeasure = (id: string) => invoke<LinkResult>('anvil_link_measure', { id })
+export const anvilLinkHistory = () => invoke<HistoryPoint[]>('anvil_link_history')
+
 export const anvilSources = () => invoke<SourceStatus[]>('anvil_sources')
 export const anvilSchema = (source: string) => invoke<SchemaInfo>('anvil_schema', { source })
 export const anvilQuery = (source: string, sql: string) => invoke<QueryResult>('anvil_query', { source, sql })

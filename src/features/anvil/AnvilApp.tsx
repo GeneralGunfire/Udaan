@@ -5,6 +5,7 @@ import { Button } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
 import { anvilSources, count, size, type SourceStatus } from './api'
 import { Browser } from './Browser'
+import { Links } from './Links'
 import { Query } from './Query'
 
 /**
@@ -19,7 +20,7 @@ const RAIL: { id: View; label: string; ready: boolean }[] = [
   { id: 'sources', label: 'Sources', ready: true },
   { id: 'browser', label: 'Browser', ready: true },
   { id: 'query', label: 'Query', ready: true },
-  { id: 'links', label: 'Links', ready: false },
+  { id: 'links', label: 'Links', ready: true },
   { id: 'backups', label: 'Backups', ready: false },
   { id: 'forged', label: 'Forged', ready: false },
 ]
@@ -170,6 +171,7 @@ function Console() {
           />
         )}
         {view === 'query' && <Query sources={sources} initialSource={handoff.source} initialSql={handoff.sql} />}
+        {view === 'links' && <Links />}
       </main>
     </div>
   )

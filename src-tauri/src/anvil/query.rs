@@ -301,6 +301,12 @@ fn run_sqlite(d: &Def, clean: &str) -> Result<QueryResult, String> {
 
 /// A CSV file queried as a table: loaded into a throw-away in-memory database (the file is only read).
 fn run_csv(d: &Def, clean: &str) -> Result<QueryResult, String> {
+  let conn = csv_memory(d)?;
+  run_on_sqlite(&conn, clean)
+}
+
+/// The CSV file as an in-memory SQLite database with two identical TEXT tables: `data` and the file's name.
+pub(crate) fn csv_memory(d: &Def) -> Result<rusqlite::Connection, String> {
   let path = Path::new(FILES_DIR).join(d.target);
   let text = std::fs::read_to_string(&path).map_err(|_| "Could not open".to_string())?;
   let mut recs = parse_csv(&text, usize::MAX);
@@ -322,7 +328,7 @@ fn run_csv(d: &Def, clean: &str) -> Result<QueryResult, String> {
       ins.execute(rusqlite::params_from_iter(r.iter())).map_err(|e| e.to_string())?;
     }
   }
-  run_on_sqlite(&conn, clean)
+  Ok(conn)
 }
 
 /// Runs one validated, read-only query against one source.
