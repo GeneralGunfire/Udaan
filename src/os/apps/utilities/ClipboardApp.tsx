@@ -200,7 +200,7 @@ export function ClipboardApp(_props: { onClose: () => void }) {
   const link = flavour === 'link' ? (/^https?:/i.test(text.trim()) ? text.trim() : `https://${text.trim()}`) : null
 
   const filters: { value: Filter; label: ReactNode }[] = [
-    { value: 'all', label: `All ${counts.all}` },
+    { value: 'all', label: 'All' },
     { value: 'text', label: 'Text' },
     { value: 'link', label: 'Links' },
     { value: 'image', label: 'Images' },
@@ -209,7 +209,7 @@ export function ClipboardApp(_props: { onClose: () => void }) {
 
   return (
     <div className="flex h-full bg-(--u-bg) text-(--u-ink)">
-      <aside className="flex w-[330px] shrink-0 flex-col border-r border-(--u-edge)">
+      <aside className="flex w-[360px] shrink-0 flex-col border-r border-(--u-edge)">
         <div className="flex items-center gap-2 px-4 pb-2 pt-4">
           <div className="flex-1">
             <h1 className="text-[19px] font-semibold tracking-tight">Clipboard</h1>
@@ -293,7 +293,7 @@ export function ClipboardApp(_props: { onClose: () => void }) {
                   <p className="select-text font-mono text-[18px]">{text.trim()}</p>
                 </div>
               ) : (
-                <pre className={cn('select-text whitespace-pre-wrap break-words text-[14px] leading-[1.65]', (flavour === 'code' || flavour === 'number') && 'font-mono text-[13px]')}>{text}</pre>
+                <pre className={cn('select-text whitespace-pre-wrap break-words font-sans text-[14px] leading-[1.65]', (flavour === 'code' || flavour === 'number') && 'font-mono text-[13px]')}>{text}</pre>
               )}
             </div>
 
