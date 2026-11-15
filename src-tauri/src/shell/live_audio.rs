@@ -217,6 +217,8 @@ mod imp {
     let mut queue: VecDeque<u8> = VecDeque::with_capacity(rate as usize * 8 / 10);
     let mut applied = 1.0f32;
     let mut last_duck = std::time::Instant::now();
+    let clock_start = std::time::Instant::now();
+    let mut sent_frames: u64 = 0;
     while !stop.load(Ordering::Relaxed) {
       // The level can change while live (the board's "Original" control).
       // Apply the volume first, and only then use its gain, so the stream is
@@ -234,10 +236,11 @@ mod imp {
       if now_ms().saturating_sub(LAST_PING.load(Ordering::Relaxed)) > WATCHDOG.as_millis() as u64 {
         break;
       }
-      // Timeouts are normal: a silent app produces no packets.
-      if event.wait_for_event(200).is_err() {
-        continue;
-      }
+      // A silent app produces no packets at all. If that were passed on as "nothing", the player would
+      // run dry on every quiet moment and keep growing its safety buffer (measured: 500+ dropouts and
+      // 250 ms of delay on real music). So the stream follows the wall clock: when the source sends
+      // less than the clock says it should have, the gap is filled with silence.
+      let _ = event.wait_for_event(10);
       loop {
         match capture.get_next_packet_size() {
           Ok(Some(n)) if n > 0 => {
@@ -246,6 +249,16 @@ mod imp {
             }
           }
           _ => break,
+        }
+      }
+      sent_frames += (queue.len() / 8) as u64;
+      let due = (clock_start.elapsed().as_secs_f64() * rate as f64) as u64;
+      if queue.is_empty() {
+        if due > sent_frames + (rate as u64 / 100) {
+          // More than 10 ms behind the clock: send the missing time as silence (at most 100 ms at once).
+          let gap = (due - sent_frames).min(rate as u64 / 10);
+          queue.extend(std::iter::repeat(0u8).take(gap as usize * 8));
+          sent_frames += gap;
         }
       }
       if !queue.is_empty() {

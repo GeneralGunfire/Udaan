@@ -23,8 +23,8 @@ export interface LiveStats {
  * fixed noise floor that the restoring gain raises with it. These levels are
  * the useful range: quieter hides the original better but adds more noise.
  * (Windows applies the value squared: 0.3 is about -21 dB, 0.55 about -10 dB.) */
-export type SourceLevel = 'quiet' | 'soft' | 'full'
-export const SOURCE_LEVELS: Record<SourceLevel, number> = { quiet: 0.3, soft: 0.55, full: 1 }
+export type SourceLevel = 'off' | 'quiet' | 'soft' | 'full'
+export const SOURCE_LEVELS: Record<SourceLevel, number> = { off: 0.1, quiet: 0.3, soft: 0.55, full: 1 }
 
 export type Latency = 'low' | 'balanced' | 'stable'
 /** Jitter buffer per mode: the whole delay between the original app and

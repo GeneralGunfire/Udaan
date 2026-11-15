@@ -37,6 +37,7 @@ class LiveCapture extends AudioWorkletProcessor {
     this.loop = null // { S, m, X, p }
     this.fadeIn = 0
     this.underruns = 0
+    this.calm = 0
     this.sinceReport = 0
     this.port.onmessage = (e) => {
       const d = e.data
@@ -120,7 +121,8 @@ class LiveCapture extends AudioWorkletProcessor {
           // Ran dry: go silent and refill, and ask for a little more cushion.
           this.primed = false
           this.underruns++
-          this.target = Math.min(this.maxTarget, this.target + Math.round(sampleRate * 0.02))
+          this.target = Math.min(this.maxTarget, this.target + Math.round(sampleRate * 0.01))
+          this.calm = 0
           break
         }
         const f = this.r - i0
@@ -160,6 +162,8 @@ class LiveCapture extends AudioWorkletProcessor {
     this.sinceReport += n
     if (this.sinceReport >= sampleRate / 2) {
       this.sinceReport = 0
+      // Quiet for ~4 s: let the safety buffer shrink back toward its base so the delay does not stay inflated.
+      if (++this.calm >= 8 && this.target > this.baseTarget) this.target = Math.max(this.baseTarget, this.target - Math.round(sampleRate * 0.005))
       this.port.postMessage({
         type: 'stats',
         fillMs: Math.max(0, ((this.w - this.r) / sampleRate) * 1000),
