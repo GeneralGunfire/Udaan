@@ -407,10 +407,10 @@
     isolation: isolate;
     display: flex;
     align-items: center;
-    border-radius: 26px;
-    border: 1px solid var(--u-dock-edge, var(--u-edge-strong));
-    /* No outer shadow: the window is exactly the bar, so any shadow is cut off flat at the window edge and shows as a rectangle. */
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
+    border-radius: 22px;
+    /* No outline and no outer shadow: the window is exactly the bar, so a shadow is cut off flat at the window edge and shows as a rectangle, and a light outline reads as a white border. */
+    border: 0;
+    box-shadow: none;
   }
   :root { --u-m-dock: rgb(16 16 19 / 70%); }
   [data-theme='light'] { --u-m-dock: rgb(246 245 243 / 60%); }
@@ -422,7 +422,7 @@
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(to bottom, rgb(255 255 255 / 12%), transparent 26px), var(--u-m-dock);
+    background: var(--u-m-dock);
   }
   .u-dock::after {
     content: '';
@@ -444,7 +444,7 @@
     justify-content: center;
     padding-bottom: 6px;
     border: 0;
-    border-radius: 17px;
+    border-radius: 13px;
     background: transparent;
     transition: background-color 120ms ease-out;
   }
@@ -479,23 +479,24 @@
     transition: width 200ms var(--u-ease), background-color 160ms ease-out, opacity 160ms;
   }
   .u-dock__item[aria-pressed='true'] .u-dock__dot { background: var(--u-accent); }
-  .u-dock__sep { width: 1px; height: 28px; margin: 0 6px; flex-shrink: 0; background: var(--u-edge-strong); }
+  .u-dock__sep { width: 1px; height: 22px; margin: 0 5px; flex-shrink: 0; background: var(--u-edge-strong); }
   .u-dock__label {
     pointer-events: none;
     position: absolute;
     bottom: 100%;
     left: 50%;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     transform: translate(-50%, 3px);
     white-space: nowrap;
     opacity: 0;
-    padding: 5px 10px;
-    border-radius: 8px;
-    background: var(--u-m-solid-hi);
-    border: 1px solid var(--u-edge-strong);
-    box-shadow: var(--u-shadow-md);
+    padding: 3px 8px;
+    border-radius: 7px;
+    background: rgb(26 27 31 / 94%);
+    border: 0;
+    box-shadow: none;
     color: var(--u-ink);
-    font-size: 12px;
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+    font-size: 11.5px;
     font-weight: 500;
     transition: opacity 120ms ease-out, transform 140ms var(--u-ease);
   }
@@ -512,7 +513,7 @@
     isolation: isolate;
     color: var(--u-ink);
     background: var(--u-m-solid);
-    box-shadow: inset 0 -1px 0 var(--u-edge);
+    box-shadow: none;
   }
   [data-material='legacy'] .u-menubar,
   [data-material='modern'] .u-menubar { background: rgb(18 18 21 / 66%); }
@@ -742,5 +743,16 @@
 
 /* Shell windows are exactly as big as their card, so outer shadows would be clipped into a visible rectangle:
    popups, banners and menus are defined by a hairline edge instead. */
-.popup-host .os-panel-material, .popup-host .u-surface { box-shadow: inset 0 0 0 1px var(--os-border, var(--u-edge)) !important; }
+/* ONE POPUP STANDARD: the same material, edge, font and rhythm for every menu and panel. The edge is a faint DARK line (never a light one, which reads as a white outline). */
+.popup-host .os-panel-material, .popup-host .u-surface {
+  border: 0 !important;
+  background: rgb(27 28 32 / 95%) !important;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 38%) !important;
+}
+[data-theme='light'] .popup-host .os-panel-material, [data-theme='light'] .popup-host .u-surface { background: rgb(249 249 247 / 96%) !important; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%) !important; }
+.popup-host .os-sheen::before { display: none !important; }
+.popup-host { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; font-size: 12.5px; line-height: 1.35; -webkit-font-smoothing: antialiased; }
+.popup-host * { font-family: inherit !important; letter-spacing: normal !important; }
+/* Panels are drawn a notch smaller than their parts were designed for, so none of them is bulky. */
+.popup-host .popup-panel { zoom: 0.88; }
 .u-banner { box-shadow: inset 0 0 0 1px var(--u-edge) !important; }

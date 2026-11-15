@@ -578,8 +578,8 @@ function DockClock() {
       className="u-dock__clock"
       style={{ height: METRICS.slot }}
     >
-      <span className="text-[15px] font-semibold tabular-nums tracking-tight">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-      <span className="text-[11px] text-(--u-ink-3)">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+      <span className="text-[13px] font-semibold tabular-nums tracking-tight">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+      <span className="text-[10px] text-(--u-ink-3)">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
     </button>
   )
 }

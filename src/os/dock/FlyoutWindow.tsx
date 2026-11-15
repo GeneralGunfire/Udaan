@@ -31,19 +31,22 @@ const sheetMotion = {
 
 /**
  * THE POPUP STANDARD. Every popup is one of two things:
- *   a MENU   as wide as its longest label (150 to 280 px), as tall as its rows, never resized once open
- *   a PANEL  one of three widths: S 280, M 340, L 380; as tall as its content (at most 70% of the screen)
- * so a popup is never longer or wider than what it holds, and similar popups look alike.
+ *   a MENU   as wide as its longest label (190 to 260 px), as tall as its rows, never resized once open
+ *   a PANEL  one width, 320 px; as tall as its content (at most 70% of the screen)
+ * so a popup is never longer or wider than what it holds, and every popup looks like the same family.
  */
-const S = 280
-const M = 340
-const L = 380
-const WIDTH = { 'notifications-panel': M, calendar: S, layouts: L, network: S, sound: M, media: S, 'context-menu': 0 } as const
+const PANEL = 320
+const WIDTH = { 'notifications-panel': PANEL, calendar: PANEL, layouts: PANEL, network: PANEL, sound: PANEL, media: PANEL, 'context-menu': 0 } as const
+/** Corner radius of the card AND of the window's cut-out, so no square corner ever shows behind it. */
+const RADIUS = { menu: 9, panel: 12 } as const
 const GAP_ABOVE_DOCK = 10
 const EDGE = 8
 const MAX_HEIGHT = Math.round(window.screen.height * 0.7)
 
 type Kind = keyof typeof WIDTH
+
+/** The content's real height in screen px (zoom included), rounded up. */
+const heightOf = (el: HTMLElement | null, fallback: number) => Math.ceil(el?.getBoundingClientRect().height || fallback)
 
 /**
  * The dock's flyouts (Quick Settings, Notifications) in their own window,
@@ -102,7 +105,7 @@ export function FlyoutWindow() {
       if (kind !== 'context-menu') {
         let last = -1
         for (let i = 0; i < 4 && !cancelled; i++) {
-          const now = contentRef.current?.scrollHeight ?? 0
+          const now = heightOf(contentRef.current, 0)
           if (now === last) break
           last = now
           await new Promise((r) => setTimeout(r, 40))
@@ -111,7 +114,7 @@ export function FlyoutWindow() {
       const [scale, monitor] = [pxScale(), await currentMonitor()]
       if (cancelled) return
       const { placement } = anchor.current
-      const naturalWidth = kind === 'context-menu' ? (cardRef.current?.offsetWidth ?? 188) : Math.max(WIDTH[kind], contentRef.current?.scrollWidth ?? 0, cardRef.current?.scrollWidth ?? 0)
+      const naturalWidth = kind === 'context-menu' ? (cardRef.current?.offsetWidth ?? 190) : WIDTH[kind]
       const w = Math.round(naturalWidth * scale)
       const isPoint = placement === 'point' || placement === 'point-up'
       let x = isPoint ? Math.round(anchor.current.x * scale) : Math.round(anchor.current.x * scale - w / 2)
@@ -126,12 +129,12 @@ export function FlyoutWindow() {
       } else if (isPoint) {
         // Context menu: top-left anchored exactly at the click point, like
         // a native right-click menu — not centred like the other panels.
-        const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? 300) + 2
+        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 300))
         h = Math.round(height * scale)
         // 'point-up' opens upward from the point (a menu on the dock sits above it, never over it).
         y = placement === 'point-up' ? Math.round(anchor.current.y * scale) - h : Math.round(anchor.current.y * scale)
       } else {
-        const height = Math.min(MAX_HEIGHT, contentRef.current?.scrollHeight ?? 400) + 2
+        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 400))
         h = Math.round(height * scale)
         y = placement === 'below' ? Math.round(anchor.current.y * scale + 6 * scale) : Math.round(anchor.current.y * scale - h - GAP_ABOVE_DOCK * scale)
       }
@@ -147,7 +150,7 @@ export function FlyoutWindow() {
         }
       }
       await invoke('shell_set_window_rect', { x, y, w: finalW, h })
-      void invoke('engine_window_round', { radius: kind === 'context-menu' ? 10 : 16 }).catch(() => {})
+      void invoke('engine_window_round', { radius: kind === 'context-menu' ? RADIUS.menu : RADIUS.panel }).catch(() => {})
       await invoke('engine_popup_present')
       // Tell whoever asked that the popup is really up (a request sent before this window finished loading is lost, so they retry until they hear this).
       void emit('taskbar-popup:shown')
@@ -175,9 +178,9 @@ export function FlyoutWindow() {
       timer = setTimeout(async () => {
         const win = getCurrentWindow()
         const scale = pxScale()
-        const height = Math.min(MAX_HEIGHT, el.scrollHeight) + 2
+        const height = Math.min(MAX_HEIGHT, heightOf(el, 0))
         const h = Math.round(height * scale)
-        const naturalWidth = Math.max(WIDTH[kind], el.scrollWidth)
+        const naturalWidth = WIDTH[kind]
         let w = Math.round(naturalWidth * scale)
         const size = await win.innerSize()
         const monitor = await currentMonitor()
@@ -188,7 +191,7 @@ export function FlyoutWindow() {
         const pos = await win.outerPosition()
         const y = anchor.current.placement === 'above' ? pos.y + size.height - h : pos.y
         await invoke('shell_set_window_rect', { x: pos.x, y, w, h })
-        void invoke('engine_window_round', { radius: 16 }).catch(() => {})
+        void invoke('engine_window_round', { radius: RADIUS.panel }).catch(() => {})
       }, 70)
     })
     ro.observe(el)
@@ -229,12 +232,13 @@ export function FlyoutWindow() {
                   : flyoutFromBottom)}
             className={cn(
               'os-panel-material os-sheen text-(--os-text)',
-              kind === 'context-menu' ? 'overflow-hidden rounded-(--os-radius-overlay)' : 'max-h-full overflow-y-auto rounded-(--os-radius-overlay)',
+              kind === 'context-menu' ? 'overflow-hidden' : 'max-h-full overflow-y-auto',
             )}
             style={{
               width: kind === 'context-menu' ? 'max-content' : WIDTH[kind],
-              minWidth: kind === 'context-menu' ? 150 : undefined,
-              maxWidth: kind === 'context-menu' ? 280 : undefined,
+              minWidth: kind === 'context-menu' ? 190 : undefined,
+              maxWidth: kind === 'context-menu' ? 260 : undefined,
+              borderRadius: kind === 'context-menu' ? RADIUS.menu : RADIUS.panel,
               height: placement === 'sheet-right' ? '100%' : undefined,
               // Grow from the anchored edge. Scaling from the centre makes a
               // flyout look like it zoomed in from nowhere; scaling from the
@@ -243,7 +247,7 @@ export function FlyoutWindow() {
                 placement === 'sheet-right' ? 'right center' : placement === 'below' || placement === 'point' ? 'top center' : 'bottom center',
             }}
           >
-            <div ref={contentRef} className={kind === 'context-menu' ? 'p-1' : undefined}>
+            <div ref={contentRef} className={kind === 'context-menu' ? 'p-1' : 'popup-panel'}>
               {kind === 'network' ? (
                 <NetworkPanel />
               ) : kind === 'sound' ? (

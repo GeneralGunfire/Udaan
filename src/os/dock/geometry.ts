@@ -4,10 +4,10 @@
  * grows, shrinks or jumps.
  */
 export const DOCK = {
-  iconSize: 38,
-  slot: 50,
-  gap: 6,
-  pad: 7,
+  iconSize: 32,
+  slot: 42,
+  gap: 4,
+  pad: 5,
   margin: 5,
 } as const
 
@@ -18,7 +18,7 @@ export function dockMetrics() {
     barHeight,
     // Room for the hover lift and launch bounce above the bar.
     // Room above the bar for the hover lift and the name label.
-    windowHeight: barHeight + 56,
+    windowHeight: barHeight + 46,
     reserve: barHeight + DOCK.margin * 2,
   }
 }

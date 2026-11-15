@@ -76,10 +76,10 @@ export function ContextMenuList({ items, onSelect }: { items: FlyoutMenuItem[]; 
   }, [active, items, onSelect, selectable])
 
   return (
-    <div className="flex flex-col gap-px text-[12.5px]" role="menu">
+    <div className="flex flex-col text-[12.5px]" role="menu">
       {items.map((it, i) =>
         it.label === undefined ? (
-          <div key={i} className="mx-2 my-1 h-px bg-(--os-separator)" role="separator" />
+          <div key={i} className="mx-2.5 my-1 h-px bg-white/10" role="separator" />
         ) : (
           <button
             key={i}
@@ -89,8 +89,8 @@ export function ContextMenuList({ items, onSelect }: { items: FlyoutMenuItem[]; 
             onPointerEnter={() => !it.disabled && setActive(i)}
             onClick={() => it.id && onSelect(it.id)}
             className={cn(
-              'relative flex h-[26px] w-full cursor-default select-none items-center rounded-[7px] px-2.5 text-left outline-none transition-colors duration-75',
-              active === i && 'bg-(--os-hover)',
+              'relative flex h-7 w-full cursor-default select-none items-center rounded-[6px] px-2.5 text-left font-normal outline-none transition-colors duration-75',
+              active === i && 'bg-white/10',
               it.danger && 'text-(--color-danger)',
               it.disabled && 'pointer-events-none opacity-40',
             )}
