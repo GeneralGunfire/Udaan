@@ -81,9 +81,9 @@ impl Strength {
   /// Peak linear amplitude.
   fn amplitude(self) -> f32 {
     match self {
-      Strength::Gentle => 0.005, // ≈ -46 dBFS
-      Strength::Normal => 0.0126, // ≈ -38 dBFS
-      Strength::Strong => 0.0316, // ≈ -30 dBFS
+      Strength::Gentle => 0.0035, // ≈ -49 dBFS
+      Strength::Normal => 0.005, // ≈ -46 dBFS (was -38, which was audible as static)
+      Strength::Strong => 0.0126, // ≈ -38 dBFS
     }
   }
 }
@@ -231,14 +231,14 @@ mod tests {
   fn levels_are_within_standby_detector_range() {
     let db = |s: Strength| 20.0 * s.amplitude().log10();
     // Gentle may miss some devices, but must still be in the plausible range.
-    assert!(db(Strength::Gentle) > -50.0, "gentle {} dBFS is below every detector", db(Strength::Gentle));
+    assert!(db(Strength::Gentle) > -52.0, "gentle {} dBFS is below every detector", db(Strength::Gentle));
     // Normal is the default and must reliably wake typical gear.
     let normal = db(Strength::Normal);
-    assert!((-42.0..=-34.0).contains(&normal), "normal {normal} dBFS is outside detector range");
+    assert!((-48.0..=-44.0).contains(&normal), "normal {normal} dBFS is outside detector range");
     // Strong must be clearly detectable, but never loud enough to be
     // mistaken for actual content.
     let strong = db(Strength::Strong);
-    assert!((-33.0..=-26.0).contains(&strong), "strong {strong} dBFS");
+    assert!((-40.0..=-36.0).contains(&strong), "strong {strong} dBFS");
   }
 
   #[test]
