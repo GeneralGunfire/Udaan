@@ -1,3 +1,4 @@
+import { currentProfile, WORK_START_TOOLS } from '@/os/kernel/profile'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { launchApp } from '@/integrations/installed-apps/client'
@@ -37,10 +38,21 @@ export const pinName = (p: Pin) => (p.kind === 'udaan' ? APP_DEFS[p.appId].name 
 
 const KEY = 'udaan-start-pins-v3'
 const OLD_KEY = 'udaan-start-pinned-v2'
+const WORK_KEY = 'udaan-start-pins-work'
 
 const DEFAULT_PINS: Pin[] = (
   ['file-explorer', 'chat', 'calendar', 'notes', 'private-player', 'news-brief', 'omni-find', 'studio', 'tv', 'clipboard', 'photos', 'settings'] as AppId[]
 ).map((appId) => ({ kind: 'udaan', appId }))
+
+/** Work's section at the top of Start: its tools (whichever are installed), then Files and Notes. */
+export async function workStartPins(): Promise<Pin[]> {
+  const apps = await installedApps()
+  const tools = WORK_START_TOOLS.flatMap((re): Pin[] => {
+    const app = apps.find((x) => re.test(x.name))
+    return app ? [{ kind: 'installed', app }] : []
+  })
+  return [{ kind: 'udaan', appId: 'file-explorer' }, { kind: 'udaan', appId: 'notes' }, ...tools]
+}
 
 function valid(p: unknown): p is Pin {
   const x = p as Pin | null
@@ -50,6 +62,15 @@ function valid(p: unknown): p is Pin {
 
 /** Saved pins outlive the apps in them, so anything that no longer exists is dropped on load. */
 export function loadPins(): Pin[] {
+  // Work keeps its own Start pins (empty to begin with: its tools sit in the Work section above them).
+  if (currentProfile() === 'work') {
+    try {
+      const raw = localStorage.getItem(WORK_KEY)
+      return raw ? (JSON.parse(raw) as unknown[]).filter(valid) : []
+    } catch {
+      return []
+    }
+  }
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
@@ -71,7 +92,7 @@ export function loadPins(): Pin[] {
 
 export function savePins(pins: Pin[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(pins))
+    localStorage.setItem(currentProfile() === 'work' ? WORK_KEY : KEY, JSON.stringify(pins))
   } catch {
     /* best effort */
   }

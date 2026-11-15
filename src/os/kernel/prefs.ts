@@ -53,6 +53,8 @@ export interface Prefs {
   'ui.accent': string
   /** Solid surfaces instead of translucent glass. */
   'ui.opaque': boolean
+  /** The look of every shell surface: 'matte' (charcoal) or 'win11' (slate, Windows 11 style). */
+  'ui.materialStyle': 'matte' | 'win11'
   /** SHA-256 of the Udaan Lock PIN; empty = the built-in default. */
   'lock.pinHash': string
   'lock.pinLength': number
@@ -64,6 +66,14 @@ export interface Prefs {
   'apps.startup': string
   /** eco, balanced or performance. */
   'power.profile': string
+  /** Which profile the desktop is in: 'personal' or 'work'. Survives restarts (Work relocks on start). */
+  'profile.active': string
+  /** What each profile's wallpaper was when it was last left (a wallpaper id). */
+  'profile.wallpaper.personal': string
+  'profile.wallpaper.work': string
+  /** Work's own dock pins and widgets (JSON). Empty until Work is first entered. */
+  'work.dock.pins.v2': string
+  'work.desktop.widgets': string
 }
 
 export type CornerAction = 'none' | 'task-view' | 'start' | 'show-desktop' | 'notifications' | 'screensaver'
@@ -101,12 +111,18 @@ export const PREF_DEFAULTS: Prefs = {
   'notifications.muted': '[]',
   'ui.accent': '#3072f0',
   'ui.opaque': false,
+  'ui.materialStyle': 'matte',
   'lock.pinHash': '',
   'lock.pinLength': 4,
   'screensaver.scene': 'clock',
   'apps.warm': '["settings","file-explorer"]',
   'apps.startup': '[]',
   'power.profile': 'balanced',
+  'profile.active': 'personal',
+  'profile.wallpaper.personal': '',
+  'profile.wallpaper.work': '',
+  'work.dock.pins.v2': '',
+  'work.desktop.widgets': '[]',
 }
 
 export type PrefKey = keyof Prefs

@@ -86,6 +86,18 @@ fn read_clipboard(app: &AppHandle) -> Option<ClipItem> {
   None
 }
 
+/// Personal and Work keep separate clipboard history. Saves the one being left, then loads the other.
+#[tauri::command(async)]
+pub fn clip_set_profile(app: AppHandle, profile: String) {
+  persist_clips();
+  let Ok(dir) = data_dir(&app, "clipboard") else { return };
+  let file = dir.join(if profile == "work" { "history-work.json" } else { "history.json" });
+  let list = std::fs::read_to_string(&file).ok().and_then(|raw| serde_json::from_str::<Vec<ClipItem>>(&raw).ok()).unwrap_or_default();
+  *CLIPS.lock().unwrap() = list;
+  *CLIP_FILE.lock().unwrap() = Some(file);
+  let _ = app.emit("clipboard://changed", ());
+}
+
 /// Loads saved history and starts watching the clipboard.
 pub fn start_clipboard_watch(app: AppHandle) {
   if let Ok(dir) = data_dir(&app, "clipboard") {

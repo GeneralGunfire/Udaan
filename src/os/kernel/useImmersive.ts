@@ -12,10 +12,18 @@ export function setImmersive(on: boolean) {
  * the bars hidden. */
 export function useImmersive() {
   const [on, setOn] = useState(false)
+  const [covered, setCovered] = useState(false)
   const tvOpen = useShell((s) => s.windows.some((w) => w.appId === 'tv' && !w.isMinimized))
   useEffect(() => {
     const un = listen<boolean>('shell://immersive', (e) => setOn(!!e.payload))
-    return () => void un.then((f) => f())
+    // A lock screen or screensaver covers the whole screen: nothing of the shell may show over or beside it.
+    const unCover = listen<boolean>('shell://cover', (e) => setCovered(!!e.payload))
+    // A bar that starts after the cover went up asks the launcher to say again.
+    void emit('shell://cover-query')
+    return () => {
+      void un.then((f) => f())
+      void unCover.then((f) => f())
+    }
   }, [])
-  return on && tvOpen
+  return (on && tvOpen) || covered
 }

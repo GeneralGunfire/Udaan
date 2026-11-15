@@ -6,6 +6,7 @@ import { keepAwake } from '@/integrations/power-state'
 import { Wallpaper } from '@/os/desktop/Wallpaper'
 import { playSound } from '@/os/sound/sounds'
 import { usePref } from '@/os/kernel/prefs'
+import { useProfile } from '@/os/kernel/profile'
 import { CinemaCanvas, type CinemaKind } from '@/os/cinema/CinemaCanvas'
 import { SAVERS } from '@/os/cinema/scenes'
 import { fittedWallpaperSrc } from '@/app/wallpapers'
@@ -86,10 +87,12 @@ function MediaPill({ np }: { np: NowPlaying }) {
  * full-screen blurs and zooms are what made locking slow on this PC.
  */
 function Backdrop({ blur }: { blur: boolean }) {
+  // Work's studio wallpaper is nearly white, so the veil is deeper there to keep the white text readable.
+  const work = useProfile() === 'work'
   return (
     <>
       <Wallpaper />
-      <div aria-hidden className="absolute inset-0 transition-colors duration-150" style={{ background: blur ? 'rgb(0 0 0 / 0.62)' : 'rgb(0 0 0 / 0.22)' }} />
+      <div aria-hidden className="absolute inset-0 transition-colors duration-150" style={{ background: blur ? `rgb(0 0 0 / ${work ? 0.75 : 0.62})` : `rgb(0 0 0 / ${work ? 0.5 : 0.22})` }} />
     </>
   )
 }
@@ -360,7 +363,16 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
  *   shuffle   a different one each time
  */
 export function Screensaver({ onDismiss }: { onDismiss: () => void }) {
+  const work = useProfile() === 'work'
   const [scene] = usePref('screensaver.scene')
+  // Work always rests on its studio wallpaper, whatever scene Personal uses.
+  if (work) {
+    return (
+      <SaverShell onDismiss={onDismiss}>
+        <WorkSaver />
+      </SaverShell>
+    )
+  }
   const [shuffled] = useState(() => {
     const pool = SAVERS.filter((x) => x.id !== 'shuffle')
     return pool[Math.floor(Math.random() * pool.length)].id
@@ -400,6 +412,20 @@ function SaverShell({ onDismiss, children }: { onDismiss: () => void; children: 
     >
       {children}
     </motion.div>
+  )
+}
+
+/** Work's screensaver: the still studio wallpaper with the time above the logo. Nothing moves. */
+function WorkSaver() {
+  const now = useNow(1000)
+  return (
+    <>
+      <Wallpaper />
+      <div className="pointer-events-none absolute inset-x-0 top-[8vh] flex flex-col items-center" style={{ color: '#14213d' }}>
+        <p className="text-[15px] font-medium tracking-wide opacity-70">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        <p className="mt-1 text-[84px] font-semibold leading-none tracking-[-0.04em] tabular-nums">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
+      </div>
+    </>
   )
 }
 

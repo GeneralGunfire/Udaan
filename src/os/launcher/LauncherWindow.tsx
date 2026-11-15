@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { onLayoutChange } from '@/os/kernel/uiScale'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window'
 import { StartMenu } from './StartMenu'
 import { invoke } from '@tauri-apps/api/core'
 import { LockScreen, Screensaver } from './LockScreen'
+import { WorkLock } from './WorkLock'
+import { applyProfile, loadProfile, switchProfile, useProfile, WORK_IDLE_LOCK_MS } from '@/os/kernel/profile'
 import { playSound } from '@/os/sound/sounds'
 import { onHotkey, shell, subscribeShell, useShell } from '@/os/kernel/shell'
 import { Expose } from './Expose'
@@ -17,7 +19,7 @@ import { getPref, setPref, usePref, type CORNER_KEYS } from '@/os/kernel/prefs'
 type CornerKey = (typeof CORNER_KEYS)[number]
 import { unregisterAllThumbnails } from '@/integrations/taskbar/client'
 
-type Mode = 'idle' | 'launchpad' | 'screensaver' | 'expose' | 'wallpaper' | 'lock' | 'switcher' | 'tips'
+type Mode = 'idle' | 'launchpad' | 'screensaver' | 'expose' | 'wallpaper' | 'lock' | 'switcher' | 'tips' | 'work-lock' | 'veil'
 
 const EXIT_MS = 240
 const IDLE_POLL_MS = 5_000
@@ -35,6 +37,9 @@ export function LauncherWindow() {
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const fullscreen = useShell((s) => s.fullscreen)
   const [user, setUser] = useState('')
+  const profile = useProfile()
+  const profileRef = useRef(profile)
+  profileRef.current = profile
   const [gestureOrigin, setGestureOrigin] = useState<{ x: number; y: number } | null>(null)
   // How long Windows must be untouched before the screensaver starts. usePref listens for changes made
   // in Settings (a different window), so a new delay applies at once. The idle check below reads the ref.
@@ -72,11 +77,23 @@ export function LauncherWindow() {
     }
   }, [])
 
+  // The top bar and dock step aside for a lock screen or the screensaver (see useImmersive).
+  const covering = mode === 'lock' || mode === 'work-lock' || mode === 'screensaver'
+  const coveringRef = useRef(false)
+  coveringRef.current = covering
+  useEffect(() => {
+    void emit('shell://cover', covering)
+  }, [covering])
+  useEffect(() => {
+    const un = listen('shell://cover-query', () => void emit('shell://cover', coveringRef.current))
+    return () => void un.then((fn) => fn())
+  }, [])
+
   const lastSwitcherRequest = useRef(0)
 
   const present = useCallback(async (next: Exclude<Mode, 'idle'>) => {
     // Nothing but unlocking takes the place of the lock screen.
-    if (modeRef.current === 'lock' && next !== 'lock') return
+    if ((modeRef.current === 'lock' || modeRef.current === 'work-lock') && next !== 'lock' && next !== 'work-lock') return
     clearTimeout(hideTimer.current)
     // No live preview from a previous Exposé may survive into another surface.
     if (next !== 'expose') void unregisterAllThumbnails().catch(() => {})
@@ -93,7 +110,7 @@ export function LauncherWindow() {
   }, [])
 
   const dismiss = useCallback(() => {
-    if (modeRef.current === 'idle' || modeRef.current === 'lock') return
+    if (modeRef.current === 'idle' || modeRef.current === 'lock' || modeRef.current === 'work-lock') return
     modeRef.current = 'idle'
     setMode('idle')
     clearTimeout(hideTimer.current)
@@ -116,6 +133,37 @@ export function LauncherWindow() {
     modeRef.current = 'launchpad' // anything but 'lock', so dismiss runs
     dismiss()
   }, [dismiss])
+
+  // WORK. Opening it shows its own lock; the profile only changes once the password is right, behind the
+  // lock's full-screen cover. Going back to Personal covers the screen for one short veil while the desktop
+  // swaps. Work is always locked again on the way in.
+  const openWork = useCallback(() => void present('work-lock'), [present])
+  const unlockWork = useCallback(async () => {
+    if (profileRef.current !== 'work') await switchProfile('work')
+    modeRef.current = 'launchpad'
+    dismiss()
+  }, [dismiss])
+  const leaveWork = useCallback(async () => {
+    modeRef.current = 'launchpad'
+    await present('veil')
+    await switchProfile('personal')
+    dismiss()
+  }, [present, dismiss])
+  const backFromWorkLock = useCallback(() => {
+    if (profileRef.current === 'work') void leaveWork()
+    else {
+      modeRef.current = 'launchpad'
+      dismiss()
+    }
+  }, [leaveWork, dismiss])
+
+  // Udaan restarting while in Work comes back locked, and the Notes and Clipboard stores follow the profile.
+  useEffect(() => {
+    void loadProfile().then((p) => {
+      void applyProfile(p)
+      if (p === 'work') openWork()
+    })
+  }, [openWork])
 
   // Deliberately NO pre-warming of app windows: it used to create five
   // hidden full webviews (chat, files, calendar, notes, settings) ~8 s after
@@ -190,6 +238,8 @@ export function LauncherWindow() {
       listen('launcher:toggle', toggleLaunchpad),
       listen('launcher:screensaver', () => void present('screensaver')),
       listen('launcher:lock', lock),
+      listen('launcher:work', openWork),
+      listen('launcher:personal', () => void leaveWork()),
       listen('launcher:tips', () => void present('tips')),
       listen<{ x: number; y: number }>('gesture://start', (e) => {
         if (modeRef.current !== 'idle' && modeRef.current !== 'launchpad') return
@@ -203,7 +253,7 @@ export function LauncherWindow() {
       }),
     ]
     return () => subs.forEach((p) => void p.then((fn) => fn()))
-  }, [toggleLaunchpad, present, dismiss, lock])
+  }, [toggleLaunchpad, present, dismiss, lock, openWork, leaveWork])
 
   // Start's own menus (the power menu, a tile's right-click menu) are windows too: while one is open, Start
   // losing focus to it must not close Start.
@@ -230,9 +280,9 @@ export function LauncherWindow() {
     const un = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (!focused && popupOpen.current) return
       // Locked: stay in front. Alt+Tab or a click elsewhere comes straight back.
-      if (!focused && modeRef.current === 'lock') {
+      if (!focused && (modeRef.current === 'lock' || modeRef.current === 'work-lock')) {
         setTimeout(() => {
-          if (modeRef.current !== 'lock') return
+          if (modeRef.current !== 'lock' && modeRef.current !== 'work-lock') return
           void invoke('engine_raise_topmost').catch(() => {})
           void getCurrentWindow().setFocus()
         }, 60)
@@ -247,7 +297,16 @@ export function LauncherWindow() {
   // interrupts a full-screen app such as a game or a video.
   useEffect(() => {
     const timer = setInterval(async () => {
-      if (modeRef.current !== 'idle' || useShell.getState().fullscreen) return
+      if (useShell.getState().fullscreen) return
+      // Work locks itself after 3 idle minutes (even if the screensaver has already come on).
+      if (profileRef.current === 'work' && (modeRef.current === 'idle' || modeRef.current === 'screensaver')) {
+        try {
+          if ((await shell.idleMs()) >= WORK_IDLE_LOCK_MS) return void present('work-lock')
+        } catch {
+          /* not fatal */
+        }
+      }
+      if (modeRef.current !== 'idle') return
       try {
         if ((await shell.idleMs()) < idleSecondsRef.current * 1000) return
         // Watching TV, a show or music counts as being here.
@@ -271,6 +330,10 @@ export function LauncherWindow() {
       <AnimatePresence>{mode === 'tips' && <Tips onClose={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'switcher' && <Switcher3D origin={gestureOrigin} onDone={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'lock' && <LockScreen user={user} onUnlock={unlock} />}</AnimatePresence>
+      <AnimatePresence>{mode === 'work-lock' && <WorkLock inWork={profile === 'work'} onUnlock={unlockWork} onBack={backFromWorkLock} />}</AnimatePresence>
+      <AnimatePresence>
+        {mode === 'veil' && <motion.div className="fixed inset-0 z-[110] bg-[#0d1015]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} />}
+      </AnimatePresence>
       <AnimatePresence>{mode === 'expose' && expose && <Expose key={expose.handles?.join(',') ?? 'all'} title={expose.title} handles={expose.handles} onDone={dismiss} />}</AnimatePresence>
     </div>
   )

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useProfile } from '@/os/kernel/profile'
 import {
   listEvents as dbListEvents,
   createEvent as dbCreateEvent,
@@ -124,6 +125,9 @@ export function useEvents(): UseEventsResult {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Work keeps to events tagged "work"; Personal leaves them out. The stored events are never touched.
+  const profile = useProfile()
+  const visible = useMemo(() => events.filter((e) => (e.tag === 'work') === (profile === 'work')), [events, profile])
   const eventsRef = useRef(events)
   eventsRef.current = events
 
@@ -160,7 +164,8 @@ export function useEvents(): UseEventsResult {
   }, [refresh])
 
   const addEvent = useCallback(
-    (draft: EventDraft) => {
+    (given: EventDraft) => {
+      const draft: EventDraft = profile === 'work' ? { ...given, tag: 'work' } : given
       const tempId = crypto.randomUUID()
       const now = Date.now()
       // `done` is omitted from EventDraft by design (see types.ts) — a
@@ -177,7 +182,7 @@ export function useEvents(): UseEventsResult {
 
       return optimisticEvent
     },
-    [refresh],
+    [refresh, profile],
   )
 
   const updateEvent = useCallback(
@@ -247,9 +252,9 @@ export function useEvents(): UseEventsResult {
 
   const eventsByDate = useCallback(
     (isoDate: string) =>
-      events.filter((e) => e.date === isoDate).sort((a, b) => a.time.localeCompare(b.time)),
-    [events],
+      visible.filter((e) => e.date === isoDate).sort((a, b) => a.time.localeCompare(b.time)),
+    [visible],
   )
 
-  return { events, addEvent, updateEvent, deleteEvent, toggleEventDone, eventsByDate, isLoaded, loadError }
+  return { events: visible, addEvent, updateEvent, deleteEvent, toggleEventDone, eventsByDate, isLoaded, loadError }
 }

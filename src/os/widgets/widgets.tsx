@@ -4,6 +4,9 @@ import { weatherCodeToGlyph, weatherCodeToLabel } from '@/integrations/weather/w
 import { CATEGORY_COLOUR, useAgenda, useWeather } from '@/os/launcher/MyDay'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 import { getPref, setPref, usePref } from '@/os/kernel/prefs'
+import { loadProfile, useProfile } from '@/os/kernel/profile'
+
+const widgetsKey = (p: string) => (p === 'work' ? 'work.desktop.widgets' : 'desktop.widgets') as 'desktop.widgets'
 import { usePoll } from '@/os/kernel/poll'
 import { batteryStatus, type BatteryStatus } from '@/integrations/quick-settings/client'
 import { listNotes, readNoteBody, saveNoteBody, type NoteMeta } from '@/integrations/notes/client'
@@ -79,14 +82,15 @@ export function parseWidgets(json: string): PlacedWidget[] {
 }
 
 export function useWidgets() {
-  const [raw, setRaw] = usePref('desktop.widgets')
+  const [raw, setRaw] = usePref(widgetsKey(useProfile()))
   const widgets = useMemo(() => parseWidgets(raw), [raw])
   return [widgets, (next: PlacedWidget[]) => setRaw(JSON.stringify(next))] as const
 }
 
 /** Adds a widget in the first free slot down the right-hand side of the screen. */
 export async function addWidget(kind: WidgetKind) {
-  const list = parseWidgets(await getPref('desktop.widgets'))
+  const key = widgetsKey(await loadProfile())
+  const list = parseWidgets(await getPref(key))
   const { w, h } = WIDGET_CATALOG[kind]
   const gap = 16
   const right = window.screen.width - 24
@@ -104,7 +108,7 @@ export async function addWidget(kind: WidgetKind) {
       x -= 356 + gap
     }
   }
-  await setPref('desktop.widgets', JSON.stringify([...list, { id: `${kind}-${Date.now().toString(36)}`, kind, x, y }]))
+  await setPref(key, JSON.stringify([...list, { id: `${kind}-${Date.now().toString(36)}`, kind, x, y }]))
 }
 
 /**

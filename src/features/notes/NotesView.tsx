@@ -1,3 +1,5 @@
+import { listen } from '@tauri-apps/api/event'
+import { useProfile } from '@/os/kernel/profile'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
@@ -209,6 +211,7 @@ function Preview({ body, onToggle }: { body: string; onToggle: (line: number) =>
  * #tags, pinned notes, search across every note's text and export to a .md file.
  */
 export function NotesView(_props: NotesViewProps) {
+  const profile = useProfile()
   const [notes, setNotes] = useState<NoteMeta[]>([])
   const [bodies, setBodies] = useState<Record<string, string>>({})
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -294,6 +297,13 @@ export function NotesView(_props: NotesViewProps) {
       window.removeEventListener('beforeunload', onUnload)
       void flush()
     }
+  }, [flush, profile])
+
+  // Switching profile swaps the notes underneath: save what is open first (`changing`); the effect above
+  // then reloads from the other set once the profile has changed.
+  useEffect(() => {
+    const un = listen('profile://changing', () => void flush())
+    return () => void un.then((fn) => fn())
   }, [flush])
 
   const body = activeId ? (bodies[activeId] ?? '') : ''

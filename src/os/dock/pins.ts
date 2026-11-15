@@ -1,6 +1,8 @@
 import { emit, listen } from '@tauri-apps/api/event'
 import { getTaskbarPref, listPinnedApps, setPinnedApps, setTaskbarPref, type PinnedApp } from '@/integrations/taskbar-prefs/client'
 import { APP_DEFS, isAppId, type AppId } from '@/os/kernel/registry'
+import { getPref, setPref } from '@/os/kernel/prefs'
+import { currentProfile, loadProfile, WORK_DOCK_PROGRAMS } from '@/os/kernel/profile'
 
 /**
  * A dock pin: one of Udaan's apps, or a program. Programs are matched to
@@ -29,7 +31,24 @@ const DEFAULT_PINS: Pin[] = [
 const RETIRED_KEYS = new Set([exeKey('NortonBrowser.exe'), exeKey('claude.exe')])
 
 /** The programs that can't be unpinned. */
-export const isPermanent = (key: string) => DEFAULT_PINS.some((d) => d.key === key)
+export const isPermanent = (key: string) => currentProfile() === 'personal' && DEFAULT_PINS.some((d) => d.key === key)
+
+/** Work's dock: its own list, kept in a pref so it never touches the Personal pins. Nothing is permanent there. */
+const WORK_PINS: Pin[] = [
+  ...WORK_DOCK_PROGRAMS.map((p) => exePin(p.match, p.launch, p.name)),
+  { key: appKey('notes'), kind: 'app', appId: 'notes', name: APP_DEFS.notes.name },
+]
+
+async function loadWorkPins(): Promise<Pin[]> {
+  try {
+    const list = JSON.parse(await getPref('work.dock.pins.v2')) as Pin[]
+    if (Array.isArray(list) && list.length) return list.filter((p) => p && (p.kind === 'exe' || (p.kind === 'app' && isAppId(p.appId))))
+  } catch {
+    /* first time in Work, or unreadable: start from the defaults */
+  }
+  await setPref('work.dock.pins.v2', JSON.stringify(WORK_PINS))
+  return WORK_PINS
+}
 
 function fromRow(row: PinnedApp): Pin | null {
   if (row.kind === 'builtin') {
@@ -51,6 +70,7 @@ function toRow(pin: Pin, sortOrder: number): PinnedApp {
 }
 
 export async function loadPins(): Promise<Pin[]> {
+  if ((await loadProfile()) === 'work') return loadWorkPins()
   const initialized = (await getTaskbarPref(INIT_KEY).catch(() => null)) === 'true'
   if (!initialized) {
     await savePins(DEFAULT_PINS)
@@ -77,6 +97,11 @@ export async function loadPins(): Promise<Pin[]> {
 }
 
 export async function savePins(pins: Pin[]): Promise<void> {
+  if ((await loadProfile()) === 'work') {
+    await setPref('work.dock.pins.v2', JSON.stringify(pins))
+    await emit('dock://pins-changed')
+    return
+  }
   await setPinnedApps(pins.map(toRow))
   await emit('dock://pins-changed')
 }

@@ -9,6 +9,8 @@ import { type AppId } from '@/os/kernel/registry'
 import { openApp } from '@/os/kernel/shell'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { useAppMenu } from './start/appMenu'
+import { useProfile } from '@/os/kernel/profile'
+import dexaMark from './dexa-mark-white.png'
 import { useShellMenu } from '@/os/ui/useShellMenu'
 import { Button } from '@/os/ui/controls'
 import { SearchIcon, SettingsIcon } from '@/shared/icons'
@@ -25,6 +27,7 @@ import {
   registerStartEntries,
   savePins,
   search,
+  workStartPins,
   webSearch,
   type Hit,
   type InstalledApp,
@@ -87,7 +90,18 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'home' | 'all' | 'day'>('home')
   const [active, setActive] = useState(0)
+  const profile = useProfile()
   const [pins, setPins] = useState<Pin[]>(loadPins)
+  // Work's section sits above the normal Start; it is only built when Work is active.
+  const [workPins, setWorkPins] = useState<Pin[]>([])
+  useEffect(() => {
+    if (profile !== 'work') return setWorkPins([])
+    let live = true
+    void workStartPins().then((list) => live && setWorkPins(list))
+    return () => {
+      live = false
+    }
+  }, [profile])
   const [installed, setInstalled] = useState<InstalledApp[]>([])
   const [hits, setHits] = useState<Hit[]>([])
   const [recent, setRecent] = useState<Hit[]>([])
@@ -257,6 +271,19 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
             </div>
           ) : view === 'home' ? (
             <div className="px-5 pb-4">
+              {workPins.length > 0 && (
+                <>
+                  <Header title="Work" />
+                  <div className="grid grid-cols-7 gap-1 pb-1">
+                    {workPins.map((p) => (
+                      <button key={`work-${pinKey(p)}`} type="button" className="u-tile" onClick={() => finish(() => launchPin(p))}>
+                        <PinIcon pin={p} size={40} />
+                        <span className="w-full truncate text-center text-[12px] font-medium leading-tight">{pinName(p)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <Header title="Pinned" action="All apps" onAction={() => setView('all')} />
               <div className="grid grid-cols-7 gap-1">
                 {pins.map((p) => (
@@ -312,6 +339,22 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
             {user}
           </button>
           <div className="flex items-center gap-1">
+            <Button
+              variant="tinted"
+              className="gap-2 px-3"
+              aria-label={profile === 'work' ? 'Leave Work' : 'Open Work'}
+              onClick={() => finish(() => emit(profile === 'work' ? 'launcher:personal' : 'launcher:work'))}
+            >
+              {profile === 'work' ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20a7 7 0 0 1 14 0" />
+                </svg>
+              ) : (
+                <img src={dexaMark} alt="" draggable={false} className="h-[14px] w-auto" />
+              )}
+              {profile === 'work' ? 'Personal' : 'Work'}
+            </Button>
             <Button variant={view === 'day' ? 'primary' : 'tinted'} onClick={() => setView((v) => (v === 'day' ? 'home' : 'day'))} className="gap-2 px-3">
               My Day
             </Button>

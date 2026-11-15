@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react'
+import { loadProfile, workWallpaperId } from '@/os/kernel/profile'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { WallpaperContext } from '@/shared/hooks/useWallpaper'
@@ -34,6 +35,21 @@ const inTauri = () => '__TAURI_INTERNALS__' in window
 export function WallpaperProvider({ children }: PropsWithChildren) {
   const [wallpaperId, setWallpaperIdState] = useState<string>(readStored)
   const [revision, setRevision] = useState(0)
+  // Work has one fixed wallpaper of its own. While Work is active it is shown in place of whatever the
+  // engine (and its rotation) says, and Personal's wallpaper is never touched, so it is simply back after.
+  const [workId, setWorkId] = useState('')
+  const workIdRef = useRef('')
+  workIdRef.current = workId
+  useEffect(() => {
+    if (!inTauri()) return
+    const apply = async (p: string) => {
+      setWorkId(p === 'work' ? await workWallpaperId() : '')
+      setRevision((r) => r + 1)
+    }
+    void loadProfile().then(apply)
+    const un = listen<string>('profile://changed', (e) => void apply(e.payload))
+    return () => void un.then((fn) => fn())
+  }, [])
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => e.key === STORAGE_KEY && setWallpaperIdState(readStored())
@@ -72,6 +88,7 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
   }, [])
 
   const setWallpaperId = useCallback((id: string) => {
+    if (workIdRef.current) return
     if (id.startsWith('file:') && inTauri()) {
       void invoke('wallpaper_set', { id }).catch(() => {})
       return
@@ -80,5 +97,5 @@ export function WallpaperProvider({ children }: PropsWithChildren) {
     remember(id)
   }, [])
 
-  return <WallpaperContext.Provider value={{ wallpaperId, setWallpaperId, revision }}>{children}</WallpaperContext.Provider>
+  return <WallpaperContext.Provider value={{ wallpaperId: workId || wallpaperId, setWallpaperId, revision }}>{children}</WallpaperContext.Provider>
 }
