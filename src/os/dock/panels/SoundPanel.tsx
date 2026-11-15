@@ -178,7 +178,7 @@ function OutputMeter({ active, level }: { active: boolean; level: number }) {
         <span className="absolute inset-y-0 w-px bg-white/45" style={{ left: '28%' }} aria-hidden />
       </div>
       <span className="w-[62px] shrink-0 text-right text-[10.5px] tabular-nums text-[var(--os-text-faint)]">
-        {active ? `${[-46, -38, -30][level - 1] ?? -38} dBFS` : 'silent'}
+        {active ? `${[-49, -46, -38][level - 1] ?? -46} dBFS` : 'silent'}
       </span>
     </div>
   )
