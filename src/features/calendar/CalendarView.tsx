@@ -289,7 +289,7 @@ export function CalendarView() {
         genuinely different regions (nav vs. content), not decoration.
       */}
       <aside
-        className="relative z-10 flex w-[296px] shrink-0 flex-col gap-7 overflow-y-auto px-6 pb-6 pt-6"
+        className="relative z-10 flex w-[258px] shrink-0 flex-col gap-6 overflow-y-auto px-5 pb-6 pt-6"
         style={{
           borderRight: '1px solid color-mix(in srgb, var(--border-hairline) 70%, transparent)',
           background: wallpaper.src ? 'color-mix(in srgb, var(--surface-base) 55%, transparent)' : undefined,
@@ -387,7 +387,7 @@ export function CalendarView() {
         column stops growing past a sensible width and the leftover space
         on a wide window becomes margin, not a distorted grid.
       */}
-      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto px-9 py-7">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto px-6 py-6">
       <div className="flex min-h-0 w-full max-w-[920px] flex-col gap-5">
         {loadError && (
           <p className="text-danger shrink-0 text-[12px] font-medium">
@@ -395,7 +395,7 @@ export function CalendarView() {
           </p>
         )}
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <Button variant="ghost" size="pill-sm" onClick={goToday} className="text-[13px] font-medium">
             Today
           </Button>
@@ -414,7 +414,7 @@ export function CalendarView() {
               animate={{ opacity: 1, y: 0 }}
               exit={reducedMotion ? undefined : { opacity: 0, y: -8 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="flex-1 text-[26px] font-bold tracking-tight"
+              className="min-w-0 flex-1 truncate whitespace-nowrap text-[22px] font-bold tracking-tight"
             >
               {viewMode === 'month'
                 ? formatMonthYear(viewYear, viewMonth)
@@ -425,7 +425,7 @@ export function CalendarView() {
                     : formatMonthYear(weekAnchor.getFullYear(), weekAnchor.getMonth())}
             </motion.h1>
           </AnimatePresence>
-          <label className="u-search h-8 w-[170px]">
+          <label className="u-search h-8 w-[128px] shrink-0">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />

@@ -93,20 +93,20 @@ export function PhotosApp(_props: { onClose: () => void }) {
           <h1 className="text-[19px] font-semibold leading-tight tracking-tight">Photos</h1>
           <p className="text-[11.5px] text-(--u-ink-3)">{photos ? `${shown.length} pictures · ${kb(total)}` : 'Finding your pictures…'}</p>
         </div>
-        <label className="u-search h-9 w-[220px]">
+        <label className="u-search h-9 w-[150px] shrink-0">
           <SearchIcon width={14} height={14} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name" />
         </label>
         <div className="min-w-0 flex-1 overflow-x-auto">
           <Segmented value={folder} options={folders.map((f) => ({ value: f, label: f }))} onChange={setFolder} />
         </div>
-        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="u-field h-9 w-[132px]" aria-label="Sort pictures">
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="u-field h-9 w-[124px] shrink-0" aria-label="Sort pictures">
           <option value="new">Newest first</option>
           <option value="old">Oldest first</option>
           <option value="name">Name</option>
           <option value="big">Largest first</option>
         </select>
-        <div className="flex w-[130px] items-center gap-2 text-[11px] text-(--u-ink-3)" title="Thumbnail size">
+        <div className="flex w-[96px] shrink-0 items-center gap-1.5 text-[11px] text-(--u-ink-3)" title="Thumbnail size">
           <span>▫</span>
           <Slider value={size} min={110} max={300} step={10} aria-label="Thumbnail size" onChange={setSize} onCommit={(v) => localStorage.setItem('udaan.photos.size', String(v))} />
           <span className="text-[15px]">▣</span>
