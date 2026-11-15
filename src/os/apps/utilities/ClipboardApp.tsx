@@ -199,12 +199,17 @@ export function ClipboardApp(_props: { onClose: () => void }) {
   const text = current?.text ?? ''
   const link = flavour === 'link' ? (/^https?:/i.test(text.trim()) ? text.trim() : `https://${text.trim()}`) : null
 
+  const lab = (t: string, n: number) => (
+    <span>
+      {t} {n > 0 && <span className="opacity-55">{n}</span>}
+    </span>
+  )
   const filters: { value: Filter; label: ReactNode }[] = [
     { value: 'all', label: 'All' },
-    { value: 'text', label: 'Text' },
-    { value: 'link', label: 'Links' },
-    { value: 'image', label: 'Images' },
-    { value: 'pinned', label: 'Pinned' },
+    { value: 'text', label: lab('Text', counts.text) },
+    { value: 'link', label: lab('Links', counts.link) },
+    { value: 'image', label: lab('Images', counts.image) },
+    { value: 'pinned', label: lab('Pinned', counts.pinned) },
   ]
 
   return (
