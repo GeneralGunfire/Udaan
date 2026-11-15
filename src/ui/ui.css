@@ -409,7 +409,8 @@
     align-items: center;
     border-radius: 26px;
     border: 1px solid var(--u-dock-edge, var(--u-edge-strong));
-    box-shadow: 0 10px 30px -8px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 35%);
+    /* No outer shadow: the window is exactly the bar, so any shadow is cut off flat at the window edge and shows as a rectangle. */
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
   }
   :root { --u-m-dock: rgb(16 16 19 / 70%); }
   [data-theme='light'] { --u-m-dock: rgb(246 245 243 / 60%); }
@@ -698,7 +699,7 @@
 .popup-host *::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /* The dock clock is text, not a button-shaped box. */
-.u-dock__clock { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px; border: 0; background: transparent; color: var(--u-ink); line-height: 1.15; }
+.u-dock__clock { white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px; border: 0; background: transparent; color: var(--u-ink); line-height: 1.15; }
 .u-dock__clock:hover { background: transparent; }
 
 @layer components {
@@ -738,3 +739,8 @@
   transition-duration: 0.001ms !important;
 }
 [data-profile='eco'] .u-surface, [data-profile='eco'] .u-dock, [data-profile='eco'] .u-menubar, [data-profile='eco'] .u-widget { background: var(--u-m-solid) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* Shell windows are exactly as big as their card, so outer shadows would be clipped into a visible rectangle:
+   popups, banners and menus are defined by a hairline edge instead. */
+.popup-host .os-panel-material, .popup-host .u-surface { box-shadow: inset 0 0 0 1px var(--os-border, var(--u-edge)) !important; }
+.u-banner { box-shadow: inset 0 0 0 1px var(--u-edge) !important; }

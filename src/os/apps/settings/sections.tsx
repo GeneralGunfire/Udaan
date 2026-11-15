@@ -5,6 +5,8 @@ import { usePref } from '@/os/kernel/prefs'
 import { APP_DEFS, APP_IDS, type AppId } from '@/os/kernel/registry'
 import { usePoll } from '@/os/kernel/poll'
 import { changePin, loadPinConfig, resetPin } from '@/os/kernel/lockPin'
+import { launchApp } from '@/integrations/installed-apps/client'
+import { listProviders, setProvider, testProvider, type ProviderInfo } from '@/integrations/omniroute/client'
 import { Button, Field } from '@/os/ui/controls'
 import { cn } from '@/shared/lib/cn'
 import { CinemaCanvas, type CinemaKind } from '@/os/cinema/CinemaCanvas'
@@ -403,6 +405,70 @@ export function PrivacySection() {
             Clear
           </ActionButton>
         </Row>
+      </Group>
+    </Stack>
+  )
+}
+
+/* ── AI ────────────────────────────────────────────────────────── */
+
+const STATE_LABEL: Record<ProviderInfo['state'], string> = { ok: 'Working', resting: 'Resting after an error', failing: 'Failing', idle: 'Not used yet' }
+
+function ProviderRow({ p, onChange }: { p: ProviderInfo; onChange: () => void }) {
+  const [key, setKey] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const test = async () => {
+    setTesting(true)
+    setResult(null)
+    try {
+      const ms = await testProvider(p.id)
+      setResult({ ok: true, text: `Answered in ${(ms / 1000).toFixed(1)} s` })
+    } catch (e) {
+      setResult({ ok: false, text: String(e).replace(/^Every AI provider failed\. /, '').slice(0, 160) })
+    } finally {
+      setTesting(false)
+      onChange()
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2.5 px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <span className={cn('h-2 w-2 shrink-0 rounded-full', p.state === 'ok' ? 'bg-(--u-ok)' : p.state === 'failing' || p.state === 'resting' ? 'bg-(--u-danger)' : 'bg-(--u-ink-3)')} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-medium">{p.name}</p>
+          <p className="text-[11.5px] text-(--u-ink-3)">{p.needsKey && !p.hasKey ? 'Needs a free key' : STATE_LABEL[p.state]}{p.lastError ? `: ${p.lastError}` : ''}</p>
+        </div>
+        <ActionButton disabled={testing || (p.needsKey && !p.hasKey)} onClick={() => void test()}>
+          {testing ? 'Testing…' : 'Test'}
+        </ActionButton>
+        <Switch checked={p.enabled} onChange={(v) => void setProvider(p.id, { enabled: v }).then(onChange)} label={`Use ${p.name}`} />
+      </div>
+      {p.needsKey && (
+        <div className="flex items-center gap-2">
+          <Field type="password" autoComplete="off" placeholder={p.hasKey ? 'Key saved. Paste a new one to replace it' : 'Paste your free API key'} value={key} onChange={(e) => setKey(e.target.value)} />
+          <ActionButton disabled={!key.trim()} onClick={() => void setProvider(p.id, { key }).then(() => (setKey(''), onChange()))}>
+            Save
+          </ActionButton>
+          {p.signup && <ActionButton onClick={() => void launchApp(p.signup)}>Get a key</ActionButton>}
+        </div>
+      )}
+      {result && <p className={cn('text-[12px]', result.ok ? 'text-(--u-ok)' : 'text-(--u-danger)')}>{result.text}</p>}
+    </div>
+  )
+}
+
+export function AiSection() {
+  const [list, setList] = useState<ProviderInfo[]>([])
+  const load = () => void listProviders().then(setList, () => {})
+  useEffect(load, [])
+  return (
+    <Stack>
+      <Group title="How Udaan gets its answers" footer="Chat, OmniFind and the daily brief all use this list from top to bottom. If one fails, the next one answers, and a provider that failed rests for a while. The Claude CLI is never used, so it never spends your tokens. Keys stay on this PC.">
+        {list.length === 0 && <Row title="Loading…" />}
+        {list.map((p) => (
+          <ProviderRow key={p.id} p={p} onChange={load} />
+        ))}
       </Group>
     </Stack>
   )

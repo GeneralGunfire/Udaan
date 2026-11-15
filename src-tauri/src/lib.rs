@@ -1,6 +1,7 @@
 mod agent_workspace;
 mod scholar;
 mod ai_fallback;
+mod ai_gateway;
 mod asset_library;
 mod audio_library;
 mod boot_optimize;
@@ -152,7 +153,11 @@ pub fn run() {
       claude_code::claude_code_open_in_vscode,
       claude_code::claude_code_check_cli,
       omniroute::omniroute_start,
-      ai_fallback::ai_claude_complete,
+      ai_gateway::ai_chat,
+      ai_gateway::ai_providers,
+      ai_gateway::ai_provider_set,
+      ai_gateway::ai_provider_test,
+      ai_gateway::ai_last_provider,
       tv::tv_host_open,
       tv::tv_host_show,
       tv::tv_host_running,
@@ -496,6 +501,9 @@ pub fn run() {
       engine::stores::manage(app.handle(), "claude_code", claude_code::init(app.handle()));
       app.manage(engine::windowlist::ThumbnailRegistry::default());
       app.manage(omniroute::OmniRouteProcess::default());
+      ai_gateway::init(app.handle());
+      // Get OmniRoute ready in the background so the first question is not the one that waits for it.
+      tauri::async_runtime::spawn(ai_gateway::boot());
       engine::stores::manage(app.handle(), "general_chat", general_chat::init(app.handle()));
       engine::stores::manage(app.handle(), "template_library", template_library::init(app.handle()));
       engine::stores::manage(app.handle(), "client_tracker", client_tracker::init(app.handle()));

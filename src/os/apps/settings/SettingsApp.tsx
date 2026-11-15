@@ -19,14 +19,14 @@ import { createElement } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
 import { QuickstartsSection } from './QuickstartsSection'
-import { AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
+import { AiSection, AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
 import { ActionButton, Group, IconTile, KeyCaps, Row, SearchField, Segmented, Select, Stack, Switch } from './ui'
 import { LockGlyph, AppearanceGlyph, DockGlyph, GeneralGlyph, KeyboardGlyph, NotificationsGlyph, QuickstartsGlyph, SoundGlyph, WidgetsGlyph, WindowsGlyph } from './glyphs'
 import { getVersion } from '@tauri-apps/api/app'
 import { listNotifications } from '@/integrations/notifications/client'
 import { notificationSource } from '@/os/ui/NotificationIcon'
 
-type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock' | 'startup' | 'power' | 'privacy'
+type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock' | 'startup' | 'power' | 'privacy' | 'ai'
 
 interface NavItem {
   id: Section
@@ -50,6 +50,7 @@ const NAV: NavItem[][] = [
   [
     { id: 'lock', label: 'Lock Screen', icon: LockGlyph },
     { id: 'privacy', label: 'Privacy & Security', icon: LockGlyph },
+    { id: 'ai', label: 'AI', icon: QuickstartsGlyph },
     { id: 'windows', label: 'Windows & Hot Corners', icon: WindowsGlyph },
     { id: 'startup', label: 'Startup & Apps', icon: QuickstartsGlyph },
     { id: 'power', label: 'Power & Performance', icon: GeneralGlyph },
@@ -78,6 +79,7 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Motivation video', section: 'dock', keywords: 'focus pill youtube menu bar' },
   { title: 'Windows key', section: 'keyboard', keywords: 'win shortcut launcher start' },
   { title: 'Keyboard shortcuts', section: 'keyboard', keywords: 'keys hotkeys' },
+  { title: 'AI providers and keys', section: 'ai', keywords: 'chat omniroute groq gemini openrouter api key model free' },
   { title: 'Power profile', section: 'power', keywords: 'eco balanced performance battery animation blur' },
   { title: 'Open apps at startup', section: 'startup', keywords: 'autostart login warm instant' },
   { title: 'Clear history', section: 'privacy', keywords: 'privacy recent forget' },
@@ -582,6 +584,7 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
               {!searching && section === 'startup' && <StartupSection />}
               {!searching && section === 'power' && <PowerSection />}
               {!searching && section === 'privacy' && <PrivacySection />}
+              {!searching && section === 'ai' && <AiSection />}
             </motion.div>
           </AnimatePresence>
         </div>
