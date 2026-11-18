@@ -285,6 +285,7 @@ const ACCENTS = [
 export function AppearanceExtras() {
   const [accent, setAccent] = usePref('ui.accent')
   const [opaque, setOpaque] = usePref('ui.opaque')
+  const [matStyle, setMatStyle] = usePref('ui.materialStyle')
   const [motionOff, setMotionOff] = usePref('motion.off')
   return (
     <Stack>
@@ -295,7 +296,27 @@ export function AppearanceExtras() {
           ))}
         </div>
       </Group>
-      <Group title="Materials">
+      <Group title="Materials" footer="The style applies to the dock, top bar, Start, menus and panels together, so they always match.">
+        <div className="grid grid-cols-2 gap-3 px-4 py-4">
+          {(
+            [
+              { id: 'matte', name: 'Matte', blurb: 'Charcoal, near-solid, no outlines. The Udaan look.', bar: 'rgb(18 19 23 / 74%)', card: 'rgb(26 27 31 / 97%)', edge: 'none', r: 10 },
+              { id: 'win11', name: 'Windows 11', blurb: 'Cool slate tint, tighter corners and a hairline edge.', bar: 'rgb(27 33 49 / 72%)', card: 'rgb(33 38 53 / 91%)', edge: 'inset 0 0 0 1px rgb(255 255 255 / 9%)', r: 7 },
+            ] as const
+          ).map((m) => (
+            <button key={m.id} type="button" aria-pressed={matStyle === m.id} onClick={() => void setMatStyle(m.id)} className={cn('u-tile items-stretch gap-2 p-2 text-left', matStyle === m.id && 'bg-(--u-wash-on) shadow-[inset_0_0_0_2px_var(--u-accent)]')}>
+              <span className="relative block h-[84px] overflow-hidden rounded-[8px] bg-[linear-gradient(135deg,#2b3550,#18202f_60%,#33263f)]">
+                <span className="absolute inset-x-0 top-0 h-[9px]" style={{ background: m.bar }} />
+                <span className="absolute left-3 top-4 h-9 w-[46%]" style={{ background: m.card, boxShadow: m.edge, borderRadius: m.r + 2 }} />
+                <span className="absolute bottom-1.5 left-1/2 h-[11px] w-[44%] -translate-x-1/2" style={{ background: m.bar, borderRadius: m.id === 'win11' ? 4 : 7 }} />
+              </span>
+              <span className="px-0.5">
+                <span className="block text-[13px] font-medium">{m.name}</span>
+                <span className="block text-[11.5px] text-(--u-ink-3)">{m.blurb}</span>
+              </span>
+            </button>
+          ))}
+        </div>
         <Row title="Solid surfaces" description="Turns glass into solid charcoal. Lighter on a slow PC, and easier to read over busy wallpapers.">
           <Switch checked={opaque} onChange={(v) => void setOpaque(v)} label="Solid surfaces" />
         </Row>

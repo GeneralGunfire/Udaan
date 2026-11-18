@@ -28,10 +28,13 @@ static LAST_DOCK_EMIT: AtomicI32 = AtomicI32::new(0);
 /// Height of that band in physical px (set by the dock to its window height).
 static DOCK_BAND: AtomicI32 = AtomicI32::new(140);
 
-/// How close to the bottom edge the press must start, and how far up the
-/// drag must travel before the switcher opens (logical-ish px; physical here).
-const START_STRIP: i32 = 24;
-const ACTIVATE_RISE: i32 = 150;
+/// How close to the bottom edge the press must start (physical px).
+const START_STRIP: i32 = 32;
+/// How far up the drag must travel before the switcher opens, as a percent of the screen's height
+/// (Settings → Window Switcher; 50 is the middle of the screen). The needed distance is worked out
+/// from the monitor under the pointer when the press starts.
+static RISE_PERCENT: AtomicI32 = AtomicI32::new(50);
+static RISE_NEEDED: AtomicI32 = AtomicI32::new(150);
 
 #[derive(Clone, Serialize)]
 struct Point {
@@ -54,14 +57,19 @@ mod imp {
   use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
   fn monitor_bottom(p: POINT) -> i32 {
+    monitor_span(p).1
+  }
+
+  /// The top and bottom of the monitor under the point.
+  fn monitor_span(p: POINT) -> (i32, i32) {
     unsafe {
       let mon = MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST);
       let mut mi: MONITORINFO = std::mem::zeroed();
       mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
       if GetMonitorInfoW(mon, &mut mi) == 0 {
-        return i32::MAX;
+        return (0, i32::MAX);
       }
-      mi.rcMonitor.bottom
+      (mi.rcMonitor.top, mi.rcMonitor.bottom)
     }
   }
 
@@ -82,6 +90,9 @@ mod imp {
           WM_LBUTTONDOWN => {
             if p.y >= monitor_bottom(p) - START_STRIP && !crate::engine::tracker::last_is_fullscreen() {
               START_Y.store(p.y, Ordering::Relaxed);
+              let (top, bottom) = monitor_span(p);
+              let needed = ((bottom - top) as i64 * RISE_PERCENT.load(Ordering::Relaxed) as i64 / 100) as i32;
+              RISE_NEEDED.store(needed.max(120), Ordering::Relaxed);
               STATE.store(1, Ordering::Relaxed);
             } else {
               STATE.store(0, Ordering::Relaxed);
@@ -104,7 +115,7 @@ mod imp {
             false
           } => {}
           WM_MOUSEMOVE => match STATE.load(Ordering::Relaxed) {
-            1 if START_Y.load(Ordering::Relaxed) - p.y >= ACTIVATE_RISE => {
+            1 if START_Y.load(Ordering::Relaxed) - p.y >= RISE_NEEDED.load(Ordering::Relaxed) => {
               STATE.store(2, Ordering::Relaxed);
               emit("gesture://start", p.x, p.y);
             }
@@ -224,6 +235,18 @@ pub fn shell_set_dock_band(height_px: i32) {
 #[tauri::command]
 pub fn shell_set_gesture(enabled: bool) {
   ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+/// How far up the screen a drag must reach to open the switcher, as a percent of its height (25 to 70).
+#[tauri::command]
+pub fn shell_set_gesture_distance(percent: i32) {
+  RISE_PERCENT.store(percent.clamp(25, 70), Ordering::Relaxed);
+}
+
+/// The longest pause between the two Ctrl taps, in milliseconds (200 to 600).
+#[tauri::command]
+pub fn shell_set_ctrl_gap(ms: u32) {
+  crate::engine::keyboard::set_gap_ms(ms);
 }
 
 #[tauri::command]

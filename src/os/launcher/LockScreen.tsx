@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { coverMotion, useMotion } from '@/os/motion/config'
+import { pictureOf, useIdentity } from '@/os/kernel/identity'
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion'
 import { AnalogClock } from '@/os/ui/AnalogClock'
 import { invoke } from '@tauri-apps/api/core'
@@ -199,7 +201,11 @@ function ClockScreensaver({ onDismiss }: { onDismiss: () => void }) {
  * security boundary (Task Manager still ends it), so it keeps itself in
  * front and focused rather than fighting the OS.
  */
-export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => void }) {
+export function LockScreen({ user: systemUser, onUnlock }: { user: string; onUnlock: () => void }) {
+  const ident = useIdentity(systemUser)
+  const lockMotion = useMotion('lock')
+  const user = ident.name
+  const picture = pictureOf(ident.avatar)
   const now = useNow()
   const np = useNowPlaying()
   const [entering, setEntering] = useState(false)
@@ -210,7 +216,7 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
   }, [])
   const PIN_LENGTH = cfg.length
   const [wrong, setWrong] = useState(0)
-  const [unlocking, setUnlocking] = useState(false)
+  const [, setUnlocking] = useState(false)
   const shake = useAnimationControls()
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -263,11 +269,8 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
   return (
     <motion.div
       className="fixed inset-0 z-[110] cursor-default select-none overflow-hidden bg-black"
-      // A quick fade in; unlocking is immediate.
-      initial={{ opacity: 0 }}
-      animate={{ opacity: unlocking ? 0 : 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: unlocking ? 0.1 : 0.15 }}
+      {...coverMotion(lockMotion, lockMotion.style, 0.3)}
+      style={{ willChange: 'transform, opacity' }}
       onMouseDown={() => setEntering(true)}
     >
       <Backdrop blur={entering} />
@@ -291,7 +294,7 @@ export function LockScreen({ user, onUnlock }: { user: string; onUnlock: () => v
             transition={{ duration: 0.4, ease }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-[32px] font-light text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22),0_10px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl">{user.charAt(0).toUpperCase() || 'U'}</span>
+            {picture ? <img src={picture} alt="" draggable={false} className="h-20 w-20 rounded-full object-cover shadow-[0_10px_40px_rgb(0_0_0/0.35)]" /> : <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-[32px] font-light text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22),0_10px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl">{user.charAt(0).toUpperCase() || 'U'}</span>}
             <p className="mt-3 text-[18px] font-medium">{user || 'Udaan'}</p>
             <p className={`mt-0.5 text-[12.5px] ${wrong > 0 ? "text-[#ff8a80]" : "text-white/60"}`}>{wrong > 0 ? 'Incorrect PIN, try again' : 'Enter your Udaan PIN'}</p>
 

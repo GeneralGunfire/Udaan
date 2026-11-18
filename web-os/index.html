@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Udaan (browser preview)</title>
+    <style>
+      /* No color-scheme here: an iframe whose scheme differs from its parent's gets an opaque canvas. */
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+      #screen { position: fixed; inset: 0; overflow: hidden; background: #0b0f16; }
+      #screen iframe { position: absolute; border: 0; background: transparent; }
+      /* App windows are real OS windows in Udaan (square on Windows 10, a hairline and a soft shadow). */
+      #screen iframe.app-frame { box-shadow: 0 0 0 1px rgb(255 255 255 / .09), 0 22px 60px rgb(0 0 0 / .5); }
+      /* The preview's own controls: a small button in the corner and a panel above the screen. */
+      #panel-btn { position: fixed; left: 10px; bottom: 10px; z-index: 99998; font: 600 11px system-ui, sans-serif; color: #fff;
+        background: rgb(20 20 24 / .72); border: 1px solid rgb(255 255 255 / .18); border-radius: 999px; padding: 6px 12px; cursor: pointer; opacity: .55; }
+      #panel-btn:hover, #panel-btn.on { opacity: 1; }
+      #panel { position: fixed; left: 10px; bottom: 44px; z-index: 99998; width: 300px; max-height: calc(100vh - 70px); overflow: auto; display: none;
+        font: 12px/1.35 system-ui, sans-serif; color: #e8ebf0; background: rgb(18 19 23 / .94); border: 1px solid rgb(255 255 255 / .12); border-radius: 12px; padding: 12px 14px; }
+      #panel h5 { margin: 10px 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #9aa3b2; }
+      #panel h5:first-child { margin-top: 0; }
+      #panel .wps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      #panel .wp { height: 38px; border-radius: 7px; border: 2px solid transparent; background-size: cover; background-position: center; cursor: pointer; padding: 0; }
+      #panel .wp.sel, #panel .row button.sel { border-color: #5b8def; }
+      #panel .row { display: flex; gap: 6px; flex-wrap: wrap; }
+      #panel .row button { font: inherit; color: inherit; background: rgb(255 255 255 / .08); border: 2px solid transparent; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+      #panel label { display: grid; grid-template-columns: 84px 1fr 34px; align-items: center; gap: 8px; margin-top: 5px; }
+      #panel output { text-align: right; color: #9aa3b2; font-variant-numeric: tabular-nums; }
+      #panel .hint { margin-top: 10px; color: #7d8696; font-size: 11px; }
+      #dev { position: fixed; left: 8px; top: 40px; z-index: 99999; width: 360px; max-height: 70vh; overflow: auto; display: none;
+        font: 12px/1.4 ui-monospace, Consolas, monospace; background: rgb(0 0 0 / .86); color: #cde; padding: 10px; border-radius: 8px; }
+      #dev h4 { margin: 8px 0 4px; font-size: 12px; color: #fff; }
+      #dev div { white-space: pre-wrap; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <div id="screen"></div>
+    <div id="dev"></div>
+    <script type="module" src="./host.ts"></script>
+  </body>
+</html>

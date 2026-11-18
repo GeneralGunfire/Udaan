@@ -1,7 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { invoke } from '@tauri-apps/api/core'
-import { emit } from '@tauri-apps/api/event'
-import { openApp } from '@/os/kernel/shell'
 import { formatClock, useNowPlaying } from './useNowPlaying'
 import { Slider } from '@/os/ui/controls'
 import { springs } from '@/os/motion/systemMotion'
@@ -35,12 +33,6 @@ export function mediaCommand(command: 'play-pause' | 'next' | 'previous') {
 
 export function seekMedia(positionMs: number) {
   return invoke('shell_media_seek', { positionMs: Math.round(positionMs) }).catch(() => {})
-}
-
-/** Opens the Live DJ board on whatever is playing. */
-export function openLiveDj() {
-  void openApp('live-dj')
-  void emit('taskbar-popup:hide')
 }
 
 const PATHS = {
@@ -198,19 +190,6 @@ export function MediaPanel() {
         <Control label="Next" path={PATHS.next} disabled={!m.canNext} onClick={() => void mediaCommand('next')} />
       </div>
 
-      <motion.button
-        type="button"
-        onClick={openLiveDj}
-        whileTap={reduced ? undefined : { scale: 0.98 }}
-        className="flex items-center justify-center gap-2 rounded-[10px] bg-(--os-hover) py-2 text-[13px] font-medium transition-colors hover:bg-(--os-active)"
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="12" cy="12" r="8.5" />
-          <circle cx="12" cy="12" r="2.2" />
-          <path d="M12 3.5v3M20.5 12h-3" />
-        </svg>
-        Mix this live in the DJ board
-      </motion.button>
     </div>
   )
 }

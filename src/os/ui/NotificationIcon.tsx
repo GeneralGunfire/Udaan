@@ -111,7 +111,14 @@ export function NotificationIcon({ n, size = 22 }: { n: Notification; size?: num
   if (isAppId(n.sourceApp)) return <AppIcon appId={n.sourceApp} size={size} />
 
   // The app's real icon, extracted from the app itself.
-  if (src) return <img src={src} alt="" draggable={false} className="shrink-0 object-contain" style={{ width: size, height: size }} />
+  if (src) {
+    // Same plate and icon ratio as in Start, so every app is the same size whatever margin its own artwork has.
+    return (
+      <span className="flex shrink-0 items-center justify-center rounded-[22%] bg-white/[0.13] shadow-[inset_0_0_0_1px_rgb(255_255_255/.1),0_1px_2px_rgb(0_0_0/.25)]" style={{ width: size, height: size }}>
+        <img src={src} alt="" draggable={false} className="object-contain" style={{ width: size * 0.66, height: size * 0.66 }} />
+      </span>
+    )
+  }
 
   const [from, to] = tileColours(name)
   return (

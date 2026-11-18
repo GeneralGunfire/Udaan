@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { coverMotion, useMotion } from '@/os/motion/config'
 import { motion, useAnimationControls } from 'framer-motion'
 import { fittedWallpaperSrc } from '@/app/wallpapers'
 import { playSound } from '@/os/sound/sounds'
@@ -21,6 +22,7 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
   const [wrong, setWrong] = useState(false)
   const [busy, setBusy] = useState(false)
   const shake = useAnimationControls()
+  const lockMotion = useMotion('lock')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -69,9 +71,7 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
       aria-label="Work lock"
       className="fixed inset-0 z-[110] cursor-default select-none overflow-hidden"
       style={{ background: wallpaper.color, color: ink }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      {...coverMotion(lockMotion, lockMotion.style, 0.3)}
       transition={{ duration: 0.14 }}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !inWork) onBack()

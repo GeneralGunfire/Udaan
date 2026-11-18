@@ -22,6 +22,16 @@ pub fn init(app: &AppHandle) -> Result<ScheduleState, String> {
   Ok(ScheduleState { store })
 }
 
+/// A calendar (.ics) file's text, for import. Capped at 8 MB.
+#[tauri::command(async)]
+pub fn schedule_read_file(path: String) -> Result<String, String> {
+  let md = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+  if md.len() > 8 * 1024 * 1024 {
+    return Err("That file is larger than 8 MB.".into());
+  }
+  Ok(String::from_utf8_lossy(&std::fs::read(&path).map_err(|e| e.to_string())?).into_owned())
+}
+
 #[tauri::command(async)]
 pub fn schedule_list_events(state: State<ScheduleState>) -> Result<Vec<ScheduleEvent>, String> {
   state.store.list_events().map_err(|e| e.to_string())

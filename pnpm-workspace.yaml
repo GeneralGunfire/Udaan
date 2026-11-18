@@ -1,3 +1,11 @@
+allowBuilds:
+  # esbuild ships a prebuilt native binary and needs its install script
+  # to place it. Left unanswered, pnpm's pre-script dependency check exits
+  # non-zero and every `pnpm <script>` fails before it runs.
+  esbuild: true
+  # Transitive telemetry package, declined. The prompt string was left
+  # unanswered here before, which broke `pnpm <script>` the same way.
+  '@vaadin/vaadin-usage-statistics': false
 minimumReleaseAgeExclude:
   - '@rolldown/binding-darwin-x64@1.2.5'
   - '@rolldown/binding-linux-arm64-gnu@1.2.5'

@@ -28,6 +28,12 @@ pub struct ScheduleEvent {
   pub all_day: bool,
   /// Calendar event duration in minutes, when known.
   pub duration_minutes: Option<i64>,
+  /// A repeat rule as JSON (see features/calendar/lib/recurrence.ts), or none.
+  #[serde(default)]
+  pub recurrence: Option<String>,
+  /// Minutes before the start to remind, or none.
+  #[serde(default)]
+  pub reminder_minutes: Option<i64>,
 }
 
 pub struct Store {
@@ -58,6 +64,8 @@ impl Store {
     // rows are untouched (columns default to NULL/0).
     Self::add_column_if_missing(&conn, "schedule_events", "all_day", "INTEGER NOT NULL DEFAULT 0")?;
     Self::add_column_if_missing(&conn, "schedule_events", "duration_minutes", "INTEGER")?;
+    Self::add_column_if_missing(&conn, "schedule_events", "recurrence", "TEXT")?;
+    Self::add_column_if_missing(&conn, "schedule_events", "reminder_minutes", "INTEGER")?;
 
     Ok(Self { conn: Mutex::new(conn) })
   }
@@ -87,7 +95,7 @@ impl Store {
   pub fn list_events(&self) -> rusqlite::Result<Vec<ScheduleEvent>> {
     let conn = self.conn.lock().unwrap();
     let mut stmt = conn.prepare(
-      "SELECT id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes
+      "SELECT id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes, recurrence, reminder_minutes
        FROM schedule_events ORDER BY date ASC, start_time ASC",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -103,6 +111,8 @@ impl Store {
         created_at: row.get(8)?,
         all_day: row.get(9)?,
         duration_minutes: row.get(10)?,
+        recurrence: row.get(11)?,
+        reminder_minutes: row.get(12)?,
       })
     })?;
     rows.collect()
@@ -112,8 +122,8 @@ impl Store {
     let conn = self.conn.lock().unwrap();
     conn.execute(
       "INSERT INTO schedule_events
-        (id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        (id, title, date, start_time, end_time, description, category, status, created_at, all_day, duration_minutes, recurrence, reminder_minutes)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
       params![
         event.id,
         event.title,
@@ -126,6 +136,8 @@ impl Store {
         event.created_at,
         event.all_day,
         event.duration_minutes,
+        event.recurrence,
+        event.reminder_minutes,
       ],
     )?;
     Ok(())
@@ -136,7 +148,8 @@ impl Store {
     conn.execute(
       "UPDATE schedule_events SET
         title = ?2, date = ?3, start_time = ?4, end_time = ?5,
-        description = ?6, category = ?7, status = ?8, all_day = ?9, duration_minutes = ?10
+        description = ?6, category = ?7, status = ?8, all_day = ?9, duration_minutes = ?10,
+        recurrence = ?11, reminder_minutes = ?12
        WHERE id = ?1",
       params![
         event.id,
@@ -149,6 +162,8 @@ impl Store {
         event.status,
         event.all_day,
         event.duration_minutes,
+        event.recurrence,
+        event.reminder_minutes,
       ],
     )?;
     Ok(())
@@ -199,6 +214,8 @@ mod tests {
       created_at: "2026-08-21T00:00:00Z".into(),
       all_day: false,
       duration_minutes: Some(30),
+      recurrence: None,
+      reminder_minutes: None,
     };
     let event2 = ScheduleEvent {
       id: "test-evt-2".into(),
@@ -212,6 +229,8 @@ mod tests {
       created_at: "2026-08-21T00:00:01Z".into(),
       all_day: false,
       duration_minutes: None,
+      recurrence: None,
+      reminder_minutes: None,
     };
     let todo = ScheduleEvent {
       id: "test-todo-1".into(),
@@ -225,6 +244,8 @@ mod tests {
       created_at: "2026-08-21T00:00:02Z".into(),
       all_day: false,
       duration_minutes: None,
+      recurrence: None,
+      reminder_minutes: None,
     };
 
     store.create_event(&event1).expect("create event1");
@@ -324,6 +345,8 @@ mod tests {
       created_at: "2026-08-21T00:00:00Z".into(),
       all_day: true,
       duration_minutes: Some(1440),
+      recurrence: None,
+      reminder_minutes: None,
     };
     store.create_event(&new_event).expect("create post-migration event");
     let after_create = store.list_events().expect("list after create");

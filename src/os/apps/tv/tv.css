@@ -1,0 +1,4 @@
+/* One short fade when a page or the hero changes. Nothing here loops. */
+@keyframes tv-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.tv-fade { animation: tv-fade 220ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .tv-fade { animation: none; } }

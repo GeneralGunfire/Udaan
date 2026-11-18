@@ -47,12 +47,34 @@ export interface Prefs {
   'notifications.previews': boolean
   /** Seconds a banner stays up. */
   'notifications.duration': number
+  /** How the Notification Center opens: 'sheet' is the full height of the screen, 'popup' is a regular panel under the bell. */
+  'notifications.center': 'sheet' | 'popup'
   /** JSON array of app names whose banners are silenced (they still reach Notification Center). */
   'notifications.muted': string
   /** Accent colour for active and live states (hex). */
   'ui.accent': string
   /** Solid surfaces instead of translucent glass. */
   'ui.opaque': boolean
+  /** The live liquid-glass fill behind the dock and top bar (off: the plain material). */
+  'bars.liquid': boolean
+  /** JSON: the look and numbers for each bar (see os/ui/liquid/config). Empty = defaults. */
+  'bars.liquid.config': string
+  /** JSON: per-part animation style, speed and bounce (see os/motion/config). Empty = defaults. */
+  'motion.config': string
+  /** The name shown on Start and the lock screen. Empty = the Windows user name. */
+  'profile.name': string
+  /** Drag up from the bottom edge to open the window switcher. */
+  'switcher.drag': boolean
+  /** How far up the screen the drag must reach, as a percent of its height (25 to 70). */
+  'switcher.dragPercent': number
+  /** Double-tap Ctrl opens the window switcher. */
+  'switcher.ctrl': boolean
+  /** Longest pause between the two taps, in milliseconds (200 to 600). */
+  'switcher.ctrlGapMs': number
+  /** Card size in the switcher. */
+  'switcher.size': 'small' | 'medium' | 'large'
+  /** The profile picture as a small data URL. Empty = the initial letter. */
+  'profile.avatar': string
   /** The look of every shell surface: 'matte' (charcoal) or 'win11' (slate, Windows 11 style). */
   'ui.materialStyle': 'matte' | 'win11'
   /** SHA-256 of the Udaan Lock PIN; empty = the built-in default. */
@@ -108,9 +130,20 @@ export const PREF_DEFAULTS: Prefs = {
   'menubar.seconds': false,
   'notifications.previews': true,
   'notifications.duration': 6,
+  'notifications.center': 'sheet',
   'notifications.muted': '[]',
   'ui.accent': '#3072f0',
   'ui.opaque': false,
+  'bars.liquid': true,
+  'bars.liquid.config': '',
+  'motion.config': '',
+  'profile.name': '',
+  'switcher.drag': true,
+  'switcher.dragPercent': 50,
+  'switcher.ctrl': true,
+  'switcher.ctrlGapMs': 350,
+  'switcher.size': 'medium',
+  'profile.avatar': '',
   'ui.materialStyle': 'matte',
   'lock.pinHash': '',
   'lock.pinLength': 4,

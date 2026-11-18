@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { coverExitMs, coverMotion, useMotion } from '@/os/motion/config'
 import { onLayoutChange } from '@/os/kernel/uiScale'
 import { AnimatePresence, motion } from 'framer-motion'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -7,6 +8,7 @@ import { StartMenu } from './StartMenu'
 import { invoke } from '@tauri-apps/api/core'
 import { LockScreen, Screensaver } from './LockScreen'
 import { WorkLock } from './WorkLock'
+import { warmSwitcher } from './switcherCache'
 import { applyProfile, loadProfile, switchProfile, useProfile, WORK_IDLE_LOCK_MS } from '@/os/kernel/profile'
 import { playSound } from '@/os/sound/sounds'
 import { onHotkey, shell, subscribeShell, useShell } from '@/os/kernel/shell'
@@ -37,6 +39,14 @@ export function LauncherWindow() {
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const fullscreen = useShell((s) => s.fullscreen)
   const [user, setUser] = useState('')
+  const lockMo = useMotion('lock')
+  const profileMo = useMotion('profile')
+  const lockMoRef = useRef(lockMo)
+  lockMoRef.current = lockMo
+  const profileMoRef = useRef(profileMo)
+  profileMoRef.current = profileMo
+  // How long the next dismiss keeps the window up so a longer exit animation can finish.
+  const exitMsRef = useRef<number | undefined>(undefined)
   const profile = useProfile()
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -94,6 +104,23 @@ export function LauncherWindow() {
   }, [])
 
   const lastSwitcherRequest = useRef(0)
+  // Settings → Window Switcher: the Ctrl double-tap switch, and the drag gesture's switch and distance (told to the engine).
+  const [switcherCtrl] = usePref('switcher.ctrl')
+  const switcherCtrlRef = useRef(switcherCtrl)
+  switcherCtrlRef.current = switcherCtrl
+  const [switcherDrag] = usePref('switcher.drag')
+  const [dragPercent] = usePref('switcher.dragPercent')
+  const [ctrlGap] = usePref('switcher.ctrlGapMs')
+  useEffect(() => {
+    void invoke('shell_set_gesture', { enabled: switcherDrag }).catch(() => {})
+    void invoke('shell_set_gesture_distance', { percent: dragPercent }).catch(() => {})
+    void invoke('shell_set_ctrl_gap', { ms: ctrlGap }).catch(() => {})
+  }, [switcherDrag, dragPercent, ctrlGap])
+  // Keep the switcher's pictures fresh in the background so it opens already full.
+  const foreground = useShell((x) => x.foreground)
+  useEffect(() => {
+    if (modeRef.current === 'idle') warmSwitcher()
+  }, [foreground])
 
   const present = useCallback(async (next: Exclude<Mode, 'idle'>) => {
     // Nothing but unlocking takes the place of the lock screen.
@@ -119,10 +146,12 @@ export function LauncherWindow() {
     setMode('idle')
     clearTimeout(hideTimer.current)
     // Let the exit animation play before the window disappears.
+    const wait = exitMsRef.current ?? EXIT_MS
+    exitMsRef.current = undefined
     hideTimer.current = setTimeout(() => {
       void unregisterAllThumbnails().catch(() => {})
       void getCurrentWindow().hide()
-    }, EXIT_MS)
+    }, wait)
   }, [])
 
   const lock = useCallback(() => {
@@ -135,6 +164,7 @@ export function LauncherWindow() {
   const unlock = useCallback(() => {
     void setPref('lock.active', false)
     modeRef.current = 'launchpad' // anything but 'lock', so dismiss runs
+    exitMsRef.current = Math.max(EXIT_MS, coverExitMs(lockMoRef.current))
     dismiss()
   }, [dismiss])
 
@@ -145,12 +175,16 @@ export function LauncherWindow() {
   const unlockWork = useCallback(async () => {
     if (profileRef.current !== 'work') await switchProfile('work')
     modeRef.current = 'launchpad'
+    exitMsRef.current = Math.max(EXIT_MS, coverExitMs(lockMoRef.current))
     dismiss()
   }, [dismiss])
   const leaveWork = useCallback(async () => {
     modeRef.current = 'launchpad'
     await present('veil')
+    // Let the cover finish crossing the screen before the desktop underneath changes.
+    if (profileMoRef.current.on) await new Promise((r) => setTimeout(r, Math.round((0.5 / profileMoRef.current.k) * 1000) + 40))
     await switchProfile('personal')
+    exitMsRef.current = Math.max(EXIT_MS, coverExitMs(profileMoRef.current))
     dismiss()
   }, [present, dismiss])
   const backFromWorkLock = useCallback(() => {
@@ -228,6 +262,7 @@ export function LauncherWindow() {
           // doubleCtrl) can both report the same double-tap. Take the first
           // and ignore any other that follows within the time it takes a
           // person to tap again, or they would open and then close it.
+          if (!switcherCtrlRef.current) return
           const at = performance.now()
           if (at - lastSwitcherRequest.current < 700) return
           lastSwitcherRequest.current = at
@@ -336,7 +371,14 @@ export function LauncherWindow() {
       <AnimatePresence>{mode === 'lock' && <LockScreen user={user} onUnlock={unlock} />}</AnimatePresence>
       <AnimatePresence>{mode === 'work-lock' && <WorkLock inWork={profile === 'work'} onUnlock={unlockWork} onBack={backFromWorkLock} />}</AnimatePresence>
       <AnimatePresence>
-        {mode === 'veil' && <motion.div className="fixed inset-0 z-[110] bg-[#0d1015]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} />}
+        {mode === 'veil' && (
+          <motion.div className="fixed inset-0 z-[110] flex items-center justify-center bg-[radial-gradient(120%_90%_at_50%_30%,#16213a,#0a0e18)]" style={{ willChange: 'transform, opacity' }} {...coverMotion(profileMo, profileMo.style, 0.15)}>
+            <div className="flex flex-col items-center gap-5">
+              <img src="/logo/udaan-128.png" alt="" draggable={false} className="h-16 w-16 rounded-[18px] shadow-[0_8px_30px_rgb(0_0_0/.45)]" />
+              <p className="text-[15px] font-medium tracking-[0.18em] text-white/75">PERSONAL</p>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
       <AnimatePresence>{mode === 'expose' && expose && <Expose key={expose.handles?.join(',') ?? 'all'} title={expose.title} handles={expose.handles} onDone={dismiss} />}</AnimatePresence>
     </div>

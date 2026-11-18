@@ -13,6 +13,8 @@ interface RawScheduleEvent {
   created_at: string
   all_day: boolean
   duration_minutes: number | null
+  recurrence?: string | null
+  reminder_minutes?: number | null
 }
 
 function eventFromRaw(raw: RawScheduleEvent): ScheduleEvent {
@@ -28,6 +30,8 @@ function eventFromRaw(raw: RawScheduleEvent): ScheduleEvent {
     createdAt: raw.created_at,
     allDay: raw.all_day,
     durationMinutes: raw.duration_minutes ?? undefined,
+    recurrence: raw.recurrence ?? null,
+    reminderMinutes: raw.reminder_minutes ?? null,
   }
 }
 
@@ -44,6 +48,8 @@ function eventToRaw(event: ScheduleEvent): RawScheduleEvent {
     created_at: event.createdAt,
     all_day: event.allDay ?? false,
     duration_minutes: event.durationMinutes ?? null,
+    recurrence: event.recurrence ?? null,
+    reminder_minutes: event.reminderMinutes ?? null,
   }
 }
 
@@ -67,6 +73,8 @@ export async function createEvent(input: NewScheduleEvent): Promise<ScheduleEven
     createdAt: new Date().toISOString(),
     allDay: input.allDay,
     durationMinutes: input.durationMinutes,
+    recurrence: input.recurrence ?? null,
+    reminderMinutes: input.reminderMinutes ?? null,
   }
   await invoke('schedule_create_event', { event: eventToRaw(event) })
   return event

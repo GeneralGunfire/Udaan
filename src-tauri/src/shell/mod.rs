@@ -18,7 +18,7 @@ pub mod apps;
 pub mod session;
 pub mod corners;
 pub mod media;
-pub mod live_audio;
+pub mod audio_sessions;
 pub mod edge_light;
 pub mod procs;
 pub mod network;

@@ -1,0 +1,4 @@
+/* Only while a refresh or a rewrite is running. */
+@keyframes news-spin { to { transform: rotate(360deg); } }
+.news-spin { animation: news-spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .news-spin { animation: none; } }

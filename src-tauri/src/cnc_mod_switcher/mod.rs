@@ -14,6 +14,7 @@
 //! multi-gigabyte mod archives themselves, which is exactly why this is
 //! cheap. See `SwitchManifest`.
 
+pub mod health;
 mod precondition;
 mod volume;
 

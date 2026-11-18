@@ -9,6 +9,7 @@ import { TAG_CONFIG } from './lib/tags'
 import { EventModal } from './components/EventModal'
 import { DayEventsPanel } from './components/DayEventsPanel'
 import { CommandBar } from './components/CommandBar'
+import { CalendarFileMenu } from './components/CalendarFileMenu'
 import { useEvents } from './hooks/useEvents'
 import { getWeekDates, toISODate, formatMonthYear } from './lib/dateUtils'
 import { TAG_ORDER } from './lib/tags'
@@ -396,6 +397,7 @@ export function CalendarView() {
         )}
 
         <div className="flex shrink-0 items-center gap-2">
+          <CalendarFileMenu />
           <Button variant="ghost" size="pill-sm" onClick={goToday} className="text-[13px] font-medium">
             Today
           </Button>

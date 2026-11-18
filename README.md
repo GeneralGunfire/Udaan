@@ -1,74 +1,111 @@
-# AI Workstation
+# Udaan
 
-A personal, cross-platform desktop app that houses a Claude Code frontend,
-local AI model orchestration, a model router/dashboard, a task queue, a
-schedule app, and various custom tools — organized under four top-level
-categories: **School**, **Work**, **Creativity**, **General**.
+A personal Windows desktop workstation app: a chat assistant, a calendar,
+a file explorer, a document reader, and a small creative studio, all built
+as one native Tauri app with its own custom taskbar/shell experience.
 
-> Status: **General category is real and working.** Claude Code CLI
-> integration (spawn, stream, persist), local model orchestration (Ollama
-> chat + faster-whisper transcription), a working task queue (Sessions),
-> a schedule/calendar app, live model/system/integration dashboards, a
-> local account profile, and real notifications are all built and wired
-> up — see "What's built" below. School, Work, and Creativity are still
-> placeholder shells with no feature logic; MCP tooling and the mobile
-> companion app are not started.
+> Status: General Chat, Calendar, File Explorer, Document Reader, and
+> Studio are all real and working — see "What's built" below. There is no
+> placeholder-category shell left in the app; every visible destination
+> does something real.
 
-## Architecture decisions
+## Architecture
 
 ### Stack: Tauri v2 + React + TypeScript + Vite + Tailwind CSS v4
 
 | Concern                 | Choice                 | Why                                                                                                                                                                 |
 | ----------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell                   | **Tauri v2** (Rust)    | Small binaries, low idle CPU/RAM vs. Electron, and a real native process layer for spawning/managing Claude Code, llama.cpp, and other local subprocesses reliably. |
-| UI                      | **React + TypeScript** | Mainstream ecosystem for building a rich, custom, animated UI; TypeScript for compile-time safety as the app grows across four independent modules.                 |
+| Shell                   | **Tauri v2** (Rust)    | Small binaries, low idle CPU/RAM vs. Electron, and a real native process layer for subprocess/window management (OmniRoute, Claude Code CLI, the custom taskbar).  |
+| UI                      | **React + TypeScript** | Rich, custom, animated UI; TypeScript for compile-time safety across a growing native surface.                                                                     |
 | Build tool              | **Vite**               | Fast HMR, first-class Tauri integration.                                                                                                                            |
 | Styling / design tokens | **Tailwind CSS v4**    | Utility-first, maps cleanly onto a CSS-custom-property token system (see below); v4's `@theme` directive lets tokens double as Tailwind's config.                   |
-| Package manager         | **pnpm**               | Fast, disk-efficient; workspace-ready if any part of this ever needs to split into separate packages.                                                               |
+| Package manager         | **pnpm**               | Fast, disk-efficient.                                                                                                                                               |
 
 **Why not Electron:** Electron bundles a full Chromium + Node runtime per
-app; for a workstation-class app meant to run local model inference and
-manage subprocesses continuously in the background, that overhead is
-directly at odds with "fast and smooth." Tauri uses the OS's native
-webview and a Rust backend, which is both lighter and better suited to
-process supervision.
+app; for a workstation-class app that manages subprocesses and a custom
+taskbar continuously in the background, that overhead is directly at odds
+with "fast and smooth." Tauri uses the OS's native webview and a Rust
+backend instead.
 
-**Mobile companion (future):** the plan is a Rust-backed local HTTP/WebSocket
-API exposed by the Tauri backend, which a separate mobile client (React
-Native, or Tauri's own mobile target) talks to remotely. Not built yet —
-noted here so the eventual API layer isn't designed as an afterthought.
+### App shell: two permanent tabs + full-screen overlays
+
+The main window has exactly two permanently-mounted destinations, switched
+via the sidebar (`src/shared/components/Sidebar.tsx`) and toggled with
+CSS `hidden` rather than mount/unmount (`src/app/App.tsx`) — this avoids
+re-fetching chat history or losing scroll position on every tab switch:
+
+- **General Chat** (`src/features/general-chat/`) — the default view.
+- **Calendar** (`src/features/calendar/`) — SQLite-backed events/todos.
+
+Everything else — **Studio** (a small audio/instrument playground),
+**File Explorer**, and **Document Reader** — is lazy-loaded and mounted
+as a full-screen overlay on top of the two-tab panel, opened on demand
+(e.g. from the Launchpad or a "open with" action) and unmounted when
+closed. None of them has its own route/window; they're conditionally
+rendered `absolute inset-0` layers inside `App.tsx`.
+
+Udaan also runs its own custom taskbar (a separate always-on-top Tauri
+window, `src/features/taskbar/`) that can replace the Windows taskbar
+entirely, plus a Launchpad (Start-menu-style app grid) and an idle-
+triggered clock screensaver.
+
+### AI backend: OmniRoute only, no accounts
+
+General Chat's sole AI backend is **OmniRoute**, a local multi-provider
+proxy reachable at `http://localhost:20128`, running against its no-auth
+free-tier backends (`opencode`, `felo-web`) — no provider account, paid
+API key, or OAuth login is connected to it, by deliberate constraint.
+Ollama-based local chat (and the voice input that ran through the same
+runtime) was fully removed in an earlier pass; there is no local-model
+chat path left in the app today.
 
 ### Folder structure
 
 ```
 src/
-  app/              # App shell: root component, category registry, routing-level state
-  features/         # One folder per top-level category, fully isolated
-    school/
-    work/
-    creativity/
-    general/
+  app/              # App shell: root component (App.tsx), sidebar-view state, apps registry
+  apps/             # Studio (audio/instrument playground) — its own overlay app
+  features/         # One folder per feature, isolated from its siblings
+    general-chat/   # Default tab — OmniRoute chat, SQLite session history
+    calendar/       # Default tab — SQLite events/todos
+    file-explorer/  # Full-screen overlay, opened on demand
+    document-reader/# Full-screen overlay — renders .txt/.md/.docx/.pdf
+    taskbar/        # Separate always-on-top window
+    screensaver/     # Idle-triggered clock overlay
+    splash/         # Startup splash screen
   shared/           # Cross-cutting, reusable code
-    components/     # Design-system components (GlassPanel, Sidebar, ...)
+    components/     # Design-system components (Sidebar, TopBar, Launchpad, ...)
     hooks/
     lib/
-  integrations/      # Claude Code CLI, local model (Ollama/whisper), weather
-                     # (Open-Meteo), schedule data, and system-health —
-                     # isolated per-integration, exposing narrow typed
-                     # interfaces to features/. All real, not stubs.
+  integrations/     # Typed, narrow wrappers around Tauri commands: omniroute,
+                     # schedule, weather (Open-Meteo), general-chat persistence,
+                     # file-explorer, document-reader, installed-apps, etc.
   styles/
     tokens.css       # Design tokens as CSS custom properties (source of truth)
     theme.css        # Tailwind v4 @theme mapping + global base styles
 
-src-tauri/          # Rust backend (Tauri). Subprocess management, local
-                     # filesystem access, and future native APIs live here.
+src-tauri/          # Rust backend (Tauri). One module per feature under
+                     # src/ (general_chat, file_explorer, document_reader,
+                     # schedule, omniroute, taskbar, ...), each owning its
+                     # own SQLite store where it needs persistence.
 ```
 
 **Rule of thumb:** `features/*` modules should never import from each
-other, and should never reach into `src-tauri` or subprocess APIs
-directly — everything native goes through `integrations/`, which exposes
-a typed, narrow interface. This keeps each category swappable/removable
-and keeps the native surface area auditable in one place.
+other, and should never reach into `src-tauri` directly — everything
+native goes through `integrations/`, which exposes a typed, narrow
+interface. This keeps each feature swappable/removable and keeps the
+native surface area auditable in one place.
+
+### Persistence: SQLite throughout, not in-memory
+
+Every feature that needs to remember something across restarts owns a
+SQLite database file under the app's data directory (`app_data_dir()`),
+opened via a shared `configure_connection()` helper (`src-tauri/src/db.rs`)
+that sets WAL mode and a busy timeout. General Chat, Calendar/Schedule,
+Document Reader (recent files + reading position), Claude Code task
+history, and the template library all persist this way — there is no
+feature left relying on in-memory-only or localStorage-only state for
+data that should survive a restart.
 
 ### Design tokens
 
@@ -79,34 +116,22 @@ mapped into Tailwind's `@theme` in
 [`src/styles/theme.css`](src/styles/theme.css) so both plain CSS and
 Tailwind utilities read from the same source of truth.
 
-Each of the four categories has its own accent color
-(`--color-accent-school`, `--color-accent-work`,
-`--color-accent-creativity`, `--color-accent-general`) used sparingly for
-wayfinding (e.g. the sidebar's active-item indicator), not as a full
-theme swap.
-
-Background images (abstract art) are expected to be supplied later and
-layered behind the glass surfaces per-window; the glass tokens
-(`--color-glass-*`, `--blur-panel`, `--blur-sidebar`) are tuned to sit on
-top of a busy image without becoming unreadable.
+Background images (wallpapers) are user-selectable via a wallpaper
+picker, persisted, and rendered full-bleed behind the glass UI
+(`src/shared/components/AmbientBackground.tsx`).
 
 ### Tooling
 
-- **Linting:** [oxlint](https://oxc.rs) (already Vite's default in this
-  template) — fast, zero-config Rust-based linter with React/TS rule sets.
-- **Formatting:** Prettier + `prettier-plugin-tailwindcss` (sorts utility
-  classes automatically).
-- **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs
-  lint, format-check, and a frontend build on every push/PR. It does
-  **not** yet build the Tauri/Rust binary — that needs a platform matrix
-  and system dependencies (WebView2, MSVC Build Tools, etc.) and will be
-  added once there's an actual native surface worth gating on.
+- **Linting:** [oxlint](https://oxc.rs) — fast, zero-config Rust-based linter with React/TS rule sets.
+- **Formatting:** Prettier + `prettier-plugin-tailwindcss` (sorts utility classes automatically).
+- **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs lint, format-check, and a frontend build on every push/PR. It does **not** build the Tauri/Rust binary — that needs a platform matrix and system dependencies (WebView2, MSVC Build Tools, etc.).
 
 ## Getting started
 
-Prerequisites: [pnpm](https://pnpm.io), [Rust](https://rustup.rs), and
-Tauri's platform prerequisites (on Windows: MSVC C++ Build Tools +
-WebView2 — see [Tauri's setup guide](https://v2.tauri.app/start/prerequisites/)).
+Prerequisites: [pnpm](https://pnpm.io), [Rust](https://rustup.rs), Tauri's
+platform prerequisites (on Windows: MSVC C++ Build Tools + WebView2 — see
+[Tauri's setup guide](https://v2.tauri.app/start/prerequisites/)), and
+OmniRoute running locally at `localhost:20128` for General Chat to work.
 
 ```bash
 pnpm install       # install JS/TS dependencies
@@ -120,59 +145,21 @@ pnpm format         # format
 
 ## What's built
 
-Real, working, not mock data (all under the **General** category, plus
-supporting `integrations/`):
-
-- **Claude Code integration** (`src/integrations/claude-code/`,
-  `src-tauri/src/claude_code/`) — submits headless `claude` CLI runs,
-  streams stdout/stderr live over a Tauri event, persists task history to
-  SQLite, opens a task's working directory in VS Code, and can check the
-  CLI itself is installed/resolvable (`claude --version`).
-- **Task Queue** (General → Task Queue, `src/features/sessions/`) — the
-  real UI for the above: submit tasks, watch live output, browse history.
-- **Local model integration** (`src/integrations/local-model/`) — chat
-  completion via a local Ollama daemon (`qwen2.5:1.5b` by default) and
-  speech-to-text via a bundled faster-whisper (`transcribe.py`), reachable
-  from Rust commands for zero-network transcription.
-- **General Chat router** (`src/features/general-chat/`) — routes each
-  message to either the local model or a Claude Code task based on a mode
-  heuristic, with a live session panel and streaming message bubbles.
-  This wiring is complete; there is no per-request telemetry/aggregation
-  yet (see the Model Dashboard's "Router stats" placeholder).
-- **Model Dashboard** (General → Model Dashboard) — live Ollama
-  reachability + loaded-model info, live Claude Code task counts by
-  status.
-- **System Health** (General → System Health) — real RAM/disk usage via a
-  Rust `sysinfo`-backed command, plus live Ollama and Claude CLI checks.
-- **Integrations status** (General → Integrations) — a live
-  connected/error check per integration, run on demand.
-- **Account** (General → Account) — a local-only profile (name +
-  preference notes) in localStorage. No auth, no account server, no
-  sync — this is a single-user local app by design.
-- **Notifications** (General → Notification) — real entries generated
-  from Claude Code task completions, with a live unread-count badge.
-- **Schedule / Calendar** (`src/integrations/schedule/`,
-  `src/features/schedule/`, `src/features/calendar/`) — a real UI over a
-  typed in-memory event/todo data module. **No persistence yet** — data
-  resets on reload; this is placeholder *data*, not placeholder logic.
-- **Weather** (`src/integrations/weather/`) — live Open-Meteo forecast,
-  no API key required.
-- **Wallpaper system** (`src/shared/components/AmbientBackground.tsx`,
-  `src/shared/hooks/useWallpaper.ts`, `src/app/wallpapers.ts`) — real,
-  working: user-selectable background art (WallpaperPicker), persisted
-  choice, rendered full-bleed behind the glass UI.
+- **General Chat** (`src/features/general-chat/`, `src-tauri/src/general_chat/`) — chat over OmniRoute, SQLite-backed session history, tool-calling support for Schedule actions, and a small cross-session key-fact memory store.
+- **Calendar** (`src/features/calendar/`, `src-tauri/src/schedule/`) — SQLite-backed events/todos, shared with General Chat's schedule-assistant queries via one `schedule_events` table.
+- **File Explorer** (`src/features/file-explorer/`, `src-tauri/src/file_explorer/`) — directory browsing, search, file operations (copy/move/rename/delete-to-trash/restore), previews and thumbnails, "open with," drag-drop.
+- **Document Reader** (`src/features/document-reader/`, `src-tauri/src/document_reader/`) — renders `.txt`/`.md`/`.docx`/`.pdf`, remembers recent files and reading position, includes local neural TTS (Piper) playback.
+- **Studio** (`src/apps/studio/`) — an audio/instrument playground (piano, drums, guitar, and other sampled instruments) via Tone.js.
+- **Udaan taskbar + Launchpad** (`src/features/taskbar/`, `src/shared/components/Launchpad.tsx`) — a custom always-on-top taskbar that can replace the Windows taskbar, plus a Start-menu-style app launcher for installed Windows apps.
+- **Weather** (`src/integrations/weather/`) — live Open-Meteo forecast, no API key required.
+- **Wallpaper system** (`src/shared/components/AmbientBackground.tsx`, `src/shared/hooks/useWallpaper.ts`) — user-selectable background art, persisted, rendered behind the glass UI.
+- **Screensaver** (`src/features/screensaver/`) — idle-triggered and manually-triggered full-screen clock.
 
 ## What's not built yet
 
-Intentionally out of scope so far — tracked here so it's not forgotten,
-not because it's undecided:
+Intentionally out of scope so far — tracked here so it's not forgotten:
 
-- Any real feature logic inside School / Work / Creativity (still
-  placeholder shells — General is the only category with working
-  features so far)
-- Schedule/Calendar persistence (currently in-memory, resets on reload)
-- MCP tool connectors
-- Router-level telemetry/aggregation (per-request routing already works;
-  there's just no stats view over it yet)
-- Mobile companion app and its remote API
-- Tauri capabilities/permissions hardening (currently default-generated)
+- An agentic tool-calling loop in General Chat (file read/write, run commands) is in active development, sandboxed to a dedicated workspace directory — see the most recent session report for status.
+- Shell/command execution as an agent tool — deferred behind file-tool hardening, needs its own security-focused design pass.
+- MCP tool connectors.
+- A mobile companion app and its remote API.

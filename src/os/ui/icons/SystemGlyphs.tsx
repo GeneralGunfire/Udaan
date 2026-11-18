@@ -12,7 +12,11 @@ export function StartGlyph({ size }: { size: number }) {
  * so it sits in the dock as one of the family.
  */
 export function StartTile({ size }: { size: number }) {
-  return <img src="/logo/udaan.png" alt="" aria-hidden draggable={false} width={size} height={size} style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgb(0 0 0 / 0.35))' }} />
+  return (
+    <span style={{ display: 'inline-flex', color: 'var(--u-ink)', filter: 'drop-shadow(0 1px 2px rgb(0 0 0 / 0.35))' }}>
+      <UdaanMark size={size} />
+    </span>
+  )
 }
 
 export function TrashGlyph({ size, full }: { size: number; full: boolean }) {

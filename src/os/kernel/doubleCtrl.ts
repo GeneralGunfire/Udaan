@@ -1,4 +1,5 @@
 import { emit } from '@tauri-apps/api/event'
+import { getPref, onPrefChanged } from './prefs'
 
 /**
  * Double-tap Ctrl, detected inside a Udaan window.
@@ -23,9 +24,17 @@ import { emit } from '@tauri-apps/api/event'
  */
 
 const MAX_HOLD_MS = 220
-const MAX_GAP_MS = 350
+/** Longest pause between the two taps. Settings → Window Switcher changes it. */
+let MAX_GAP_MS = 350
+let ENABLED = true
 
 export function installDoubleCtrl(): void {
+  void getPref('switcher.ctrlGapMs').then((v) => (MAX_GAP_MS = v))
+  void getPref('switcher.ctrl').then((v) => (ENABLED = v))
+  void onPrefChanged((key, value) => {
+    if (key === 'switcher.ctrlGapMs') MAX_GAP_MS = value as number
+    else if (key === 'switcher.ctrl') ENABLED = value as boolean
+  })
   let pressedAt = 0
   /** The current press was spoiled by another key, a click or a modifier. */
   let dirty = false
@@ -63,7 +72,7 @@ export function installDoubleCtrl(): void {
       }
       if (firstUpAt && pressedAt - firstUpAt <= MAX_GAP_MS) {
         firstUpAt = 0
-        void emit('shell://hotkey', { id: 'switcher-ctrl' })
+        if (ENABLED) void emit('shell://hotkey', { id: 'switcher-ctrl' })
       } else {
         firstUpAt = t
       }

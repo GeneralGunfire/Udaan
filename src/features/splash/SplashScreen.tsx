@@ -1,7 +1,6 @@
 import { useEffect, useState, type PropsWithChildren } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DEFAULT_WALLPAPER_ID, fittedWallpaperSrc, isValidWallpaperId } from '@/app/wallpapers'
-import { CinemaCanvas } from '@/os/cinema/CinemaCanvas'
 import { activateShell, showDock } from '@/os/kernel/session'
 import { runBootOptimize, onBootOptimizeProgress } from '@/integrations/boot-optimize/client'
 import { listOpenWindows } from '@/integrations/taskbar/client'
@@ -17,15 +16,15 @@ const SLOW_HINT_MS = 4000
 /** Floor so a stage (and its status text) stays on screen long enough to actually read, even when the
  *  underlying work resolves near-instantly — a fast machine could otherwise blow through all three
  *  stages in well under a second, which is what "too short, didn't get to see what it was doing" was about. */
-const MIN_STAGE_MS = 900
+const MIN_STAGE_MS = 1300
 /** Overall floor for the whole boot sequence (stages 1-3 combined), independent of the per-stage
  *  floor above — real work is genuinely done well within this on a fast machine, but the splash
  *  should still hold for the full duration rather than exit early once that work finishes. */
-const MIN_BOOT_MS = 6500
+const MIN_BOOT_MS = 10_000
 /** How long the logo holds fully stopped, centered, before sliding into the reveal position. */
 const HOLD_BEFORE_SLIDE_MS = 300
 /** How long the wordmark reveal holds before the whole splash dissolves into the app. */
-const HOLD_AFTER_REVEAL_MS = 1000
+const HOLD_AFTER_REVEAL_MS = 1500
 
 /** The wallpaper the desktop will show, rendered (or decoded) ahead of time. */
 function currentWallpaperId(): string {
@@ -113,9 +112,9 @@ type Stage = 1 | 2 | 3
 type Phase = 'boot' | 'stopping' | 'reveal' | 'exiting' | 'done'
 
 const STAGE_LABEL: Record<Stage, string> = {
-  1: 'Setting up your desktop...',
-  2: 'Optimizing your PC...',
-  3: 'Loading Udaan...',
+  1: 'Preparing your desktop',
+  2: 'Optimising performance',
+  3: 'Loading Udaan',
 }
 
 /**
@@ -267,26 +266,13 @@ export function SplashScreen({ children }: PropsWithChildren) {
       })
       if (cancelled) return
 
-      // Real work is genuinely done at this point on most machines — this
-      // trailing hold is purely so the splash's full 20s runtime is spent
-      // visibly "doing something" rather than the logo sitting frozen on
-      // Stage 3's label once there's nothing left to wait on. Cycles back
-      // through all three stage labels so the spin always has fresh text
-      // under it for the remainder of the hold.
-      const bootElapsed = Date.now() - bootStartedAt
-      const remaining = MIN_BOOT_MS - bootElapsed
+      // The real work is usually done well before the splash has had its full, unhurried moment; hold on the
+      // last stage's label for the rest of it rather than cycling the labels back to the start.
+      const remaining = MIN_BOOT_MS - (Date.now() - bootStartedAt)
       if (remaining > 0) {
+        setStage(3)
         setSubStatus(null)
-        const cycleStages: Stage[] = [1, 2, 3]
-        let cycleIdx = 0
-        const cycleMs = 1400
-        const cycleTimer = window.setInterval(() => {
-          if (cancelled) return
-          cycleIdx = (cycleIdx + 1) % cycleStages.length
-          setStage(cycleStages[cycleIdx])
-        }, cycleMs)
         await new Promise((resolve) => window.setTimeout(resolve, remaining))
-        window.clearInterval(cycleTimer)
       }
       if (cancelled) return
 
@@ -345,81 +331,70 @@ export function SplashScreen({ children }: PropsWithChildren) {
 
   const visible = phase !== 'done'
   const stopped = phase !== 'boot'
-  const progress = stopped ? 1 : (stage - 1) / 3 + 0.12
   const statusText = errorHint ?? subStatus ?? STAGE_LABEL[stage]
-  const finale = phase === 'reveal' || phase === 'exiting'
+  const ease = [0.16, 1, 0.3, 1] as const
 
   return (
     <>
       <AnimatePresence>
         {visible && (
           <motion.div
-            className="fixed inset-0 z-[9999] overflow-hidden bg-[#03040a]"
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-[#0a0b0d]"
             initial={{ opacity: 1 }}
-            // The finale: the whole picture pushes toward you and dissolves, so the desktop arrives
-            // from behind it rather than the boot screen simply switching off.
-            exit={{ opacity: 0, scale: 1.14, filter: 'blur(10px)', transition: { duration: 1.2, ease: [0.5, 0, 0.15, 1] } }}
+            // Out: a slow, plain fade, so the desktop simply arrives behind it.
+            exit={{ opacity: 0, transition: { duration: 1.1, ease: [0.4, 0, 0.2, 1] } }}
             role="presentation"
             aria-hidden="true"
           >
-            {/* The scene: slow ribbons of light, fading in out of the dark. */}
-            <motion.div className="absolute inset-0" initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 0.62, scale: 1 }} transition={{ duration: 3.2, ease: [0.16, 1, 0.3, 1] }}>
-              <CinemaCanvas kind="aurora" scale={0.4} fps={24} />
-            </motion.div>
-            <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 48%, transparent 30%, rgb(0 0 0 / 0.78) 100%)' }} />
-
-            <div className="relative flex h-full flex-col items-center justify-center">
-              {/* The anamorphic streak: a thin line of light that opens across the screen. */}
-              <motion.span
-                aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[2px] w-[min(78vw,860px)] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                style={{ background: 'linear-gradient(90deg, transparent, rgb(150 200 255 / 0.9) 30%, #fff 50%, rgb(255 190 120 / 0.9) 70%, transparent)', boxShadow: '0 0 30px 4px rgb(120 170 255 / 0.35)' }}
-                initial={{ scaleX: 0, opacity: 0 }}
-                animate={{ scaleX: [0, 1, 1], opacity: [0, 1, 0] }}
-                transition={{ delay: 0.5, duration: 2.4, times: [0, 0.4, 1], ease: [0.16, 1, 0.3, 1] }}
+            <div className="flex flex-col items-center">
+              {/* The mark: white on charcoal, one slow fade, nothing else moving. */}
+              <motion.img
+                src="/logo/udaan.png"
+                alt=""
+                draggable={false}
+                width={92}
+                height={92}
+                className="select-none"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 1.8, ease }}
               />
+              <motion.p
+                className="mt-9 text-[14px] font-light uppercase text-white/90"
+                style={{ fontFamily: "Montserrat, 'Segoe UI', sans-serif" }}
+                initial={{ opacity: 0, letterSpacing: '0.75em' }}
+                animate={{ opacity: 1, letterSpacing: '0.56em' }}
+                transition={{ delay: 1.4, duration: 2.4, ease }}
+              >
+                Udaan
+              </motion.p>
 
-              <motion.div className="flex flex-col items-center" animate={{ scale: finale ? 1.18 : 1, y: finale ? -4 : 0 }} transition={{ duration: 1.1, ease: [0.5, 0, 0.15, 1] }}>
-                {/* The mark resolves out of blur, as a lens pulls focus. */}
-                <motion.img
-                  src="/logo/udaan.png"
-                  alt=""
-                  draggable={false}
-                  width={132}
-                  height={132}
-                  className="select-none"
-                  initial={{ opacity: 0, scale: 0.82, filter: 'blur(22px)' }}
-                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                  transition={{ delay: 0.7, duration: 2.1, ease: [0.16, 1, 0.3, 1] }}
+              {/* One hairline carries the progress: a single linear fill across the whole boot, then it completes. */}
+              <motion.div className="mt-12 h-px w-[160px] overflow-hidden rounded-full bg-white/10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1.2 }}>
+                <motion.div
+                  className="h-full w-full origin-left bg-white/75"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: stopped ? 1 : 0.94 }}
+                  transition={stopped ? { duration: 0.6, ease: [0.4, 0, 0.2, 1] } : { delay: 2, duration: Math.max(1, MIN_BOOT_MS / 1000 - 2), ease: 'linear' }}
                 />
-                <motion.p
-                  className="mt-7 text-[30px] font-extralight uppercase text-white"
-                  initial={{ opacity: 0, letterSpacing: '0.9em', y: 8 }}
-                  animate={{ opacity: 1, letterSpacing: '0.46em', y: 0 }}
-                  transition={{ delay: 1.5, duration: 2.6, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  Udaan
-                </motion.p>
               </motion.div>
 
-              <div className="absolute bottom-[11vh] flex h-5 items-center justify-center">
+              <div className="mt-5 flex h-4 items-center justify-center">
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.p key={stopped ? 'done' : statusText} className="text-[12px] font-light uppercase tracking-[0.3em] text-white/40" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.35 }}>
+                  <motion.p
+                    key={stopped ? 'done' : statusText}
+                    className="text-[12px] font-light tracking-[0.12em] text-white/40"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
                     {stopped ? '' : statusText}
-                    {!stopped && slowHint ? ' (taking longer than usual)' : ''}
+                    {!stopped && slowHint ? ', taking a little longer' : ''}
                   </motion.p>
                 </AnimatePresence>
               </div>
             </div>
-
-            {/* One hairline along the bottom edge carries the real progress, in the logo's colours. */}
-            <motion.div
-              className="absolute bottom-0 left-0 h-[2px] origin-left"
-              style={{ width: '100%', background: 'linear-gradient(90deg, #3072f0, #00c8ff 45%, #ff8c28)' }}
-              initial={{ scaleX: 0.02 }}
-              animate={{ scaleX: Math.min(1, progress), opacity: stopped ? 0 : 1 }}
-              transition={{ scaleX: { duration: 1.1, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.8 } }}
-            />
           </motion.div>
         )}
       </AnimatePresence>

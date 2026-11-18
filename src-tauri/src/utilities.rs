@@ -33,6 +33,12 @@ pub struct ClipItem {
   pub image_path: Option<String>,
   pub pinned: bool,
   pub at: u64,
+  /// What kind of secret this looks like ("Card number", "API key"...), when it looks like one.
+  #[serde(default)]
+  pub sensitive: Option<String>,
+  /// Sensitive items can be set to disappear on their own; milliseconds since epoch.
+  #[serde(default)]
+  pub expires_at: Option<u64>,
 }
 
 const CLIP_MAX: usize = 200;
@@ -49,7 +55,18 @@ fn persist_clips() {
   }
 }
 
-fn push_clip(app: &AppHandle, item: ClipItem) {
+fn push_clip(app: &AppHandle, mut item: ClipItem) {
+  if item.sensitive.is_some() {
+    let (skip, expire_secs) = *CLIP_OPTS.lock().unwrap();
+    if skip {
+      // Never kept: not in the list, not on disk.
+      let _ = app.emit("clipboard://skipped", item.sensitive.clone());
+      return;
+    }
+    if expire_secs > 0 {
+      item.expires_at = Some(now_ms() + expire_secs * 1000);
+    }
+  }
   {
     let mut list = CLIPS.lock().unwrap();
     // Copying the same text again just moves it to the top.
@@ -73,7 +90,7 @@ fn read_clipboard(app: &AppHandle) -> Option<ClipItem> {
   use clipboard_win::{formats, get_clipboard};
   if let Ok(text) = clipboard_win::get_clipboard_string() {
     if !text.trim().is_empty() && text.len() < 200_000 {
-      return Some(ClipItem { id: format!("c{}", now_ms()), kind: "text".into(), text: Some(text), image_path: None, pinned: false, at: now_ms() });
+      return Some(ClipItem { id: format!("c{}", now_ms()), kind: "text".into(), sensitive: sensitive_kind(&text).map(String::from), text: Some(text), image_path: None, pinned: false, at: now_ms(), expires_at: None });
     }
   }
   if let Ok(bmp) = get_clipboard::<Vec<u8>, _>(formats::Bitmap) {
@@ -81,7 +98,7 @@ fn read_clipboard(app: &AppHandle) -> Option<ClipItem> {
     let dir = data_dir(app, "clipboard").ok()?;
     let path = dir.join(format!("{}.png", now_ms()));
     img.save(&path).ok()?;
-    return Some(ClipItem { id: format!("c{}", now_ms()), kind: "image".into(), text: None, image_path: Some(path.to_string_lossy().into_owned()), pinned: false, at: now_ms() });
+    return Some(ClipItem { id: format!("c{}", now_ms()), kind: "image".into(), text: None, image_path: Some(path.to_string_lossy().into_owned()), pinned: false, at: now_ms(), sensitive: None, expires_at: None });
   }
   None
 }
@@ -100,6 +117,7 @@ pub fn clip_set_profile(app: AppHandle, profile: String) {
 
 /// Loads saved history and starts watching the clipboard.
 pub fn start_clipboard_watch(app: AppHandle) {
+  load_clip_options(&app);
   if let Ok(dir) = data_dir(&app, "clipboard") {
     let file = dir.join("history.json");
     if let Ok(raw) = std::fs::read_to_string(&file) {
@@ -153,7 +171,8 @@ pub fn start_clipboard_watch(app: AppHandle) {
 }
 
 #[tauri::command(async)]
-pub fn clip_history_list() -> Vec<ClipItem> {
+pub fn clip_history_list(app: AppHandle) -> Vec<ClipItem> {
+  prune_expired(&app);
   CLIPS.lock().unwrap().clone()
 }
 
@@ -206,6 +225,178 @@ pub fn clip_history_delete(app: AppHandle, id: Option<String>) {
   }
   persist_clips();
   let _ = app.emit("clipboard://changed", ());
+}
+
+// ===================================================================
+// Sensitive data, options, snippets, OCR
+// ===================================================================
+
+/// (skip sensitive items entirely, seconds until a kept sensitive item disappears; 0 = never)
+static CLIP_OPTS: Mutex<(bool, u64)> = Mutex::new((false, 0));
+
+fn luhn(digits: &[u8]) -> bool {
+  let (mut sum, mut alt) = (0u32, false);
+  for &d in digits.iter().rev() {
+    let mut n = (d - b'0') as u32;
+    if alt {
+      n *= 2;
+      if n > 9 {
+        n -= 9;
+      }
+    }
+    sum += n;
+    alt = !alt;
+  }
+  sum % 10 == 0
+}
+
+/// Whether copied text looks like something that should not sit in a history: a card number, a private key,
+/// a login token, an API key, or a password. Conservative about what it calls a secret, because a false alarm
+/// only masks an item, but it should never miss the obvious ones.
+fn sensitive_kind(text: &str) -> Option<&'static str> {
+  let t = text.trim();
+  if t.is_empty() || t.len() > 20_000 {
+    return None;
+  }
+  if t.contains("-----BEGIN") && t.contains("PRIVATE KEY") {
+    return Some("Private key");
+  }
+  let digits: Vec<u8> = t.bytes().filter(|b| b.is_ascii_digit()).collect();
+  if (13..=19).contains(&digits.len()) && t.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == '-') && luhn(&digits) {
+    return Some("Card number");
+  }
+  let single = !t.contains(char::is_whitespace);
+  if single {
+    let parts: Vec<&str> = t.split('.').collect();
+    if parts.len() == 3 && t.starts_with("eyJ") && parts.iter().all(|p| p.len() > 8 && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')) {
+      return Some("Login token");
+    }
+    const PREFIX: &[&str] = &["sk-", "sk_live_", "sk_test_", "pk_live_", "ghp_", "gho_", "github_pat_", "xoxb-", "xoxp-", "AKIA", "AIza", "glpat-", "npm_", "hf_"];
+    if t.len() >= 20 && PREFIX.iter().any(|p| t.starts_with(p)) {
+      return Some("API key");
+    }
+  }
+  let lower = t.to_lowercase();
+  if t.len() < 400 {
+    for key in ["password", "passwd", "pwd", "secret", "api_key", "apikey", "api-key", "access_token", "auth_token"] {
+      if let Some(i) = lower.find(key) {
+        let rest = lower[i + key.len()..].trim_start();
+        if rest.starts_with(':') || rest.starts_with('=') {
+          return Some("Password or secret");
+        }
+      }
+    }
+    if lower.contains("bearer ") && t.len() > 20 {
+      return Some("Login token");
+    }
+  }
+  if single && (24..=128).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_+/=".contains(&b)) {
+    let up = t.bytes().filter(|b| b.is_ascii_uppercase()).count();
+    let lo = t.bytes().filter(|b| b.is_ascii_lowercase()).count();
+    let di = t.bytes().filter(|b| b.is_ascii_digit()).count();
+    if up >= 4 && lo >= 4 && di >= 4 {
+      return Some("Possible secret");
+    }
+  }
+  None
+}
+
+fn prune_expired(app: &AppHandle) {
+  let now = now_ms();
+  let changed = {
+    let mut list = CLIPS.lock().unwrap();
+    let before = list.len();
+    list.retain(|c| c.expires_at.map(|e| e > now).unwrap_or(true));
+    list.len() != before
+  };
+  if changed {
+    persist_clips();
+    let _ = app.emit("clipboard://changed", ());
+  }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipOptions {
+  pub skip_sensitive: bool,
+  pub expire_secs: u64,
+}
+
+fn options_file(app: &AppHandle) -> Option<PathBuf> {
+  data_dir(app, "clipboard").ok().map(|d| d.join("options.json"))
+}
+
+fn load_clip_options(app: &AppHandle) {
+  if let Some(raw) = options_file(app).and_then(|f| std::fs::read_to_string(f).ok()) {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+      *CLIP_OPTS.lock().unwrap() = (v["skipSensitive"].as_bool().unwrap_or(false), v["expireSecs"].as_u64().unwrap_or(0));
+    }
+  }
+}
+
+#[tauri::command(async)]
+pub fn clip_get_options() -> ClipOptions {
+  let (skip_sensitive, expire_secs) = *CLIP_OPTS.lock().unwrap();
+  ClipOptions { skip_sensitive, expire_secs }
+}
+
+#[tauri::command(async)]
+pub fn clip_set_options(app: AppHandle, skip_sensitive: bool, expire_secs: u64) {
+  *CLIP_OPTS.lock().unwrap() = (skip_sensitive, expire_secs);
+  if let Some(f) = options_file(&app) {
+    let _ = std::fs::write(f, serde_json::json!({ "skipSensitive": skip_sensitive, "expireSecs": expire_secs }).to_string());
+  }
+}
+
+/// Saved snippets: one JSON text the frontend owns.
+#[tauri::command(async)]
+pub fn clip_snippets_get(app: AppHandle) -> Result<String, String> {
+  let f = data_dir(&app, "clipboard")?.join("snippets.json");
+  Ok(std::fs::read_to_string(f).unwrap_or_default())
+}
+
+#[tauri::command(async)]
+pub fn clip_snippets_set(app: AppHandle, json: String) -> Result<(), String> {
+  serde_json::from_str::<serde_json::Value>(&json).map_err(|e| e.to_string())?;
+  let f = data_dir(&app, "clipboard")?.join("snippets.json");
+  let tmp = f.with_extension("tmp");
+  std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
+  std::fs::rename(&tmp, &f).map_err(|e| e.to_string())
+}
+
+/// Reads the text out of a copied image with Windows' own OCR (offline, using the languages installed for the account).
+#[cfg(windows)]
+fn ocr_file(path: &str) -> Result<String, String> {
+  use windows::core::HSTRING;
+  use windows::Graphics::Imaging::BitmapDecoder;
+  use windows::Media::Ocr::OcrEngine;
+  use windows::Storage::{FileAccessMode, StorageFile};
+  let e = |x: windows::core::Error| x.message().to_string();
+  let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(path)).map_err(e)?.get().map_err(e)?;
+  let stream = file.OpenAsync(FileAccessMode::Read).map_err(e)?.get().map_err(e)?;
+  let decoder = BitmapDecoder::CreateAsync(&stream).map_err(e)?.get().map_err(e)?;
+  let bitmap = decoder.GetSoftwareBitmapAsync().map_err(e)?.get().map_err(e)?;
+  let engine = OcrEngine::TryCreateFromUserProfileLanguages().map_err(|_| "No text-recognition language is installed. Add one in Windows Settings, Time & language.".to_string())?;
+  let result = engine.RecognizeAsync(&bitmap).map_err(e)?.get().map_err(e)?;
+  Ok(result.Text().map_err(e)?.to_string())
+}
+
+#[tauri::command]
+pub async fn clip_ocr(id: String) -> Result<String, String> {
+  let path = CLIPS.lock().unwrap().iter().find(|c| c.id == id).and_then(|c| c.image_path.clone()).ok_or("That image is no longer in the history.")?;
+  tauri::async_runtime::spawn_blocking(move || {
+    #[cfg(windows)]
+    {
+      ocr_file(&path)
+    }
+    #[cfg(not(windows))]
+    {
+      let _ = path;
+      Err("Text recognition is only available on Windows.".to_string())
+    }
+  })
+  .await
+  .map_err(|e| e.to_string())?
 }
 
 // ===================================================================

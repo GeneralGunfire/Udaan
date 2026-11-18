@@ -15,6 +15,7 @@ import { Scrubber } from './Scrubber'
 import { VolumeControl } from './VolumeControl'
 import { SoundBars } from './SoundBars'
 import { DjEffectsPanel } from './DjEffectsPanel'
+import { LyricsPanel } from './LyricsPanel'
 import { usePlayer } from '../lib/PlayerContext'
 
 interface NowPlayingViewProps {
@@ -35,6 +36,7 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
   const track = player.current
   const isFavorite = track ? player.favorites.has(track.path) : false
   const [djOpen, setDjOpen] = useState(false)
+  const [lyricsOpen, setLyricsOpen] = useState(false)
 
   return (
     <div className="relative flex h-full w-full flex-col" style={{ backgroundColor: 'var(--surface-base)' }}>
@@ -48,6 +50,15 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
         </button>
         <span className="text-text-tertiary text-xs font-medium tracking-wide uppercase">Now Playing</span>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLyricsOpen((v) => !v)}
+            disabled={!track}
+            title="Lyrics"
+            className={`hover:bg-(--os-hover) flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 ${lyricsOpen ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text-primary'}`}
+          >
+            Lyrics
+          </button>
           <button
             type="button"
             onClick={() => setDjOpen(true)}
@@ -73,7 +84,13 @@ export function NowPlayingView({ onCollapse }: NowPlayingViewProps) {
 
       {djOpen && <DjEffectsPanel onClose={() => setDjOpen(false)} />}
 
-      {!djOpen && (
+      {!djOpen && lyricsOpen && (
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col px-10">
+          <LyricsPanel path={track?.path ?? null} currentTime={player.currentTime} duration={player.duration} onSeek={player.seek} />
+        </div>
+      )}
+
+      {!djOpen && !lyricsOpen && (
         <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-10">
           <SoundBars
             analyser={player.analyser}

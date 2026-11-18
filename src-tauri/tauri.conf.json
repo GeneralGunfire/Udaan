@@ -134,7 +134,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: asset: http://asset.localhost; media-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:20128 http://127.0.0.1:* https://api.open-meteo.com https://raw.githubusercontent.com https://tonejs.github.io asset: http://asset.localhost; frame-src http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+      "csp": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: asset: http://asset.localhost; media-src 'self' data: blob: asset: http://asset.localhost https://*.itunes.apple.com https://*.apple.com https://*.mzstatic.com; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:20128 https://api.open-meteo.com https://raw.githubusercontent.com https://tonejs.github.io asset: http://asset.localhost; frame-src http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
       "assetProtocol": {
         "enable": true,
         "scope": [

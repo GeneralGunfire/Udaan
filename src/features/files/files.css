@@ -1,0 +1,7 @@
+/* Only runs while a job with unknown length is in progress. */
+@keyframes files-indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.files-indeterminate { animation: files-indeterminate 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .files-indeterminate { animation: none; width: 100%; opacity: .5; } }

@@ -2,17 +2,19 @@ import * as CM from '@radix-ui/react-context-menu'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { CheckIcon, ChevronRightIcon } from '@/shared/icons'
+import { Surface } from '@/os/ui/pop/Surface'
 
 export const ContextMenu = CM.Root
 export const ContextMenuTrigger = CM.Trigger
 
-const panel =
-  'u-surface z-[60] min-w-[220px] rounded-[18px] p-1 text-[13px] text-(--os-text) outline-none ' +
-  'data-[state=open]:animate-[os-menu-in_140ms_cubic-bezier(0,0,0,1)]'
+// The desktop's right-click menu wears the same card as every other menu (see os/ui/pop): dark glass, accent highlight.
+// The desktop's right-click menu is the same liquid-glass card as every other menu (os/ui/pop): the Radix element only
+// positions it, the card itself is a Surface, so the "Popups" glass settings in Settings control it too.
+const panel = 'z-[60] min-w-[236px] text-[13px] text-[#faf8f4] outline-none data-[state=open]:animate-[os-menu-in_140ms_cubic-bezier(0,0,0,1)]'
 
 const item =
-  'relative flex h-8 cursor-default select-none items-center gap-2.5 rounded-[var(--os-radius-control)] px-2.5 outline-none ' +
-  'data-[highlighted]:bg-(--os-hover) data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+  'relative flex h-[30px] cursor-default select-none items-center gap-2.5 rounded-[9px] px-2.5 outline-none ' +
+  'data-[highlighted]:bg-(--u-accent,#3072f0) data-[highlighted]:text-white data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>
 
@@ -24,7 +26,7 @@ export function ContextMenuContent({ children, className }: { children: ReactNod
   return (
     <CM.Portal>
       <CM.Content collisionPadding={8} className={cn(panel, className)}>
-        {children}
+        <Surface radius={14} className="p-1.5" style={{ minWidth: 236 }}>{children}</Surface>
       </CM.Content>
     </CM.Portal>
   )
@@ -46,10 +48,10 @@ export function ContextMenuItem({
   children: ReactNode
 }) {
   return (
-    <CM.Item disabled={disabled} onSelect={onSelect} className={cn(item, danger && 'text-[var(--color-danger)]')}>
+    <CM.Item disabled={disabled} onSelect={onSelect} className={cn(item, danger && 'text-[#ff8b82] data-[highlighted]:bg-[#d9453c] data-[highlighted]:text-white')}>
       <Leading icon={icon} />
       <span className="flex-1 truncate">{children}</span>
-      {shortcut && <span className="pl-6 text-[12px] text-(--os-text-dim)">{shortcut}</span>}
+      {shortcut && <span className="pl-6 text-[12px] opacity-55">{shortcut}</span>}
     </CM.Item>
   )
 }
@@ -103,14 +105,14 @@ export function ContextMenuRadioGroup<T extends string>({
 export function ContextMenuSub({ icon, label, children }: { icon?: Icon; label: string; children: ReactNode }) {
   return (
     <CM.Sub>
-      <CM.SubTrigger className={cn(item, 'data-[state=open]:bg-(--os-hover)')}>
+      <CM.SubTrigger className={cn(item, 'data-[state=open]:bg-white/10')}>
         <Leading icon={icon} />
         <span className="flex-1">{label}</span>
         <ChevronRightIcon className="h-3.5 w-3.5 opacity-60" />
       </CM.SubTrigger>
       <CM.Portal>
         <CM.SubContent sideOffset={4} collisionPadding={8} className={panel}>
-          {children}
+          <Surface radius={14} className="p-1.5" style={{ minWidth: 236 }}>{children}</Surface>
         </CM.SubContent>
       </CM.Portal>
     </CM.Sub>
@@ -118,9 +120,9 @@ export function ContextMenuSub({ icon, label, children }: { icon?: Icon; label: 
 }
 
 export function ContextMenuSeparator() {
-  return <CM.Separator className="mx-2 my-1 h-px bg-(--os-separator)" />
+  return <CM.Separator className="mx-2 my-1 h-px bg-white/10" />
 }
 
 export function ContextMenuLabel({ children }: { children: ReactNode }) {
-  return <CM.Label className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-(--os-text-dim)">{children}</CM.Label>
+  return <CM.Label className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">{children}</CM.Label>
 }

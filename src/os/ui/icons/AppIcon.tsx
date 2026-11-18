@@ -230,34 +230,6 @@ const DRAWINGS: Record<AppId, Drawing> = {
     )
   },
 
-  'live-dj': (c) => (
-    <Plate c={c} from="#d24cf0" to="#5b1192" rim="#f0a6ff">
-      <defs>
-        <radialGradient id={c.id('vinyl')} cx="0.38" cy="0.32" r="0.75">
-          <stop offset="0" stopColor="#3a2347" />
-          <stop offset="1" stopColor="#140a1c" />
-        </radialGradient>
-      </defs>
-      <g style={{ filter: liftHeavy }}>
-        <circle cx="50" cy="50" r="29" fill={`url(#${c.id('vinyl')})`} />
-        {/* Grooves. Spaced unevenly, as a record's are. */}
-        <g fill="none" stroke="#fff" strokeOpacity="0.14" strokeWidth="1.2">
-          <circle cx="50" cy="50" r="24" />
-          <circle cx="50" cy="50" r="20.5" />
-          <circle cx="50" cy="50" r="16.5" />
-        </g>
-        {/* Sheen sweeping across the disc, as light does on vinyl. */}
-        <path d="M27 36a29 29 0 0 1 40-8l-4 6a22 22 0 0 0-30 6Z" fill="#fff" opacity="0.14" />
-        <circle cx="50" cy="50" r="10" fill="#ff5ac8" />
-        <circle cx="50" cy="50" r="2.6" fill="#140a1c" />
-      </g>
-      {/* Tonearm, crossing the rim as a real one does. */}
-      <g style={{ filter: lift }}>
-        <path d="M76 20 60 42" stroke="#f3eaff" strokeWidth="3.6" strokeLinecap="round" />
-        <circle cx="77" cy="19" r="4.5" fill="#f3eaff" />
-      </g>
-    </Plate>
-  ),
 
   'private-player': (c) => (
     <Plate c={c} from="#ff6b80" to="#d4003c" rim="#ffb3c0">
@@ -314,13 +286,21 @@ const DRAWINGS: Record<AppId, Drawing> = {
   ),
 
   'omni-find': (c) => (
-    <Plate c={c} from="#a88cff" to="#4a23d4" rim="#cbb8ff">
+    <Plate c={c} from="#2c5bb8" to="#0c1735" rim="#8db0ff">
+      <defs>
+        <linearGradient id={c.id('lens')} x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.08" />
+        </linearGradient>
+      </defs>
       <g style={{ filter: liftHeavy }}>
-        <circle cx="45" cy="44" r="19" fill="#fff" fillOpacity="0.18" />
-        <circle cx="45" cy="44" r="19" fill="none" stroke="#fff" strokeWidth="7.5" />
-        <path d="M58.5 58.5 75 75" stroke="#fff" strokeWidth="9" strokeLinecap="round" />
-        {/* The spark: this is the "intelligent" search, not plain find. */}
-        <path d="M45 32.5l2.6 7.4 7.4 2.6-7.4 2.6-2.6 7.4-2.6-7.4-7.4-2.6 7.4-2.6Z" fill="#fff" />
+        {/* The lens: a glass disc with a thin, even rim. */}
+        <circle cx="44" cy="43" r="20" fill={`url(#${c.id('lens')})`} />
+        <circle cx="44" cy="43" r="20" fill="none" stroke="#fff" strokeWidth="6" />
+        {/* The handle, tapering into the rim. */}
+        <path d="M59 58 77 76" stroke="#fff" strokeWidth="9" strokeLinecap="round" />
+        {/* One clean four-point spark: this finds and reads, not just looks. */}
+        <path d="M44 31.5c.9 6.4 3.1 8.6 9.5 9.5-6.4.9-8.6 3.1-9.5 9.5-.9-6.4-3.1-8.6-9.5-9.5 6.4-.9 8.6-3.1 9.5-9.5Z" fill="#cfe0ff" />
       </g>
     </Plate>
   ),
@@ -391,27 +371,11 @@ const DRAWINGS: Record<AppId, Drawing> = {
         <circle cx="36" cy="65" r="2.7" fill="#9aa6ba" />
         <g strokeLinecap="round" strokeWidth="4.2">
           <path d="M44 43h20" stroke="#3072f0" />
-  anvil: (c) => (
-    <Plate c={c} from="#434d5f" to="#12161d" rim="#6f7b90">
-      <defs>
-        <linearGradient id={c.id('steel')} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f4f6fa" />
-          <stop offset="1" stopColor="#aeb8c8" />
-        </linearGradient>
-      </defs>
-      <g style={{ filter: liftHeavy }} transform="translate(50 50) scale(1.08) translate(-48 -53)">
-        {/* A plain geometric anvil: wedge horn, flat face, narrow waist, flared foot. One colour, no ornament. */}
-        <path d="M12 40L26 34H84V44H70L66 52V60H78L84 72H30L36 60H46V52L42 44H26Z" fill={`url(#${c.id('steel')})`} />
-        <path d="M26 34H84V36.2H26Z" fill="#fff" />
-      </g>
-    </Plate>
-  ),
           <path d="M44 54h20M44 65h12" stroke="#b4bece" />
         </g>
       </g>
     </Plate>
   ),
-
 
   photos: (c) => (
     <Plate c={c} from="#ffd166" to="#f07800" rim="#ffe3a8">
@@ -427,17 +391,33 @@ const DRAWINGS: Record<AppId, Drawing> = {
     </Plate>
   ),
 
+  anvil: (c) => (
+    <Plate c={c} from="#6e8fff" to="#233a9e" rim="#a6bbff">
+      <g style={{ filter: liftHeavy }} fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round">
+        {/* One confident letter A built from two strokes: precise, calm, no ornament. */}
+        <path d="M30 71L50 29L70 71" strokeWidth="8.5" />
+        <path d="M39.500 58H60.500" strokeWidth="7" />
+      </g>
+    </Plate>
+  ),
   storage: (c) => (
-    <Plate c={c} from="#5fe37b" to="#07802f" rim="#a6f5b8">
+    <Plate c={c} from="#566478" to="#1c2430" rim="#a5b5cb">
+      <defs>
+        <linearGradient id={c.id('unit')} x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#d5dce8" />
+        </linearGradient>
+      </defs>
       <g style={{ filter: liftHeavy }}>
-        {/* Three platters, so it reads as capacity rather than one drum. */}
-        <path d="M27 62v6c0 4.6 10.3 8.3 23 8.3s23-3.7 23-8.3v-6" fill="#fff" fillOpacity="0.55" />
-        <ellipse cx="50" cy="62" rx="23" ry="8.3" fill="#fff" fillOpacity="0.8" />
-        <path d="M27 46v6c0 4.6 10.3 8.3 23 8.3s23-3.7 23-8.3v-6" fill="#fff" fillOpacity="0.7" />
-        <ellipse cx="50" cy="46" rx="23" ry="8.3" fill="#fff" fillOpacity="0.9" />
-        <path d="M27 30v6c0 4.6 10.3 8.3 23 8.3s23-3.7 23-8.3v-6" fill="#fff" fillOpacity="0.85" />
-        <ellipse cx="50" cy="30" rx="23" ry="8.3" fill="#fff" />
-        <circle cx="64" cy="30" r="2.6" fill="#07802f" opacity="0.5" />
+        {/* How full: a ring, read at a glance. */}
+        <circle cx="50" cy="35" r="14" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="6.5" />
+        <circle cx="50" cy="35" r="14" fill="none" stroke="#6ea4ff" strokeWidth="6.5" strokeLinecap="round" pathLength="1" strokeDasharray="0.64 0.36" transform="rotate(-90 50 35)" />
+        {/* The drive: a flat unit with vents and an activity light. */}
+        <rect x="23" y="58" width="54" height="21" rx="6.5" fill={`url(#${c.id('unit')})`} />
+        <g stroke="#9aa7bb" strokeWidth="2.6" strokeLinecap="round">
+          <path d="M31 65.5h14M31 71.5h14" />
+        </g>
+        <circle cx="68" cy="68.5" r="3" fill="#3072f0" />
       </g>
     </Plate>
   ),

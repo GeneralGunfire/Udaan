@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type SVGProps } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { emit } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -19,14 +19,18 @@ import { createElement } from 'react'
 import { Button } from '@/shared/components/ui/button'
 import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
 import { QuickstartsSection } from './QuickstartsSection'
+import { LiquidGlassSettings } from './LiquidSection'
+import { ProfileGroup } from './ProfileGroup'
+import { AnimationsSettings } from './AnimationsSection'
+import { SwitcherSettings } from './SwitcherSection'
 import { AiSection, AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
-import { ActionButton, Group, IconTile, KeyCaps, Row, SearchField, Segmented, Select, Stack, Switch } from './ui'
+import { ActionButton, Group, IconTile, KeyCaps, Row, Segmented, Select, Stack, Switch } from './ui'
 import { LockGlyph, AppearanceGlyph, DockGlyph, GeneralGlyph, KeyboardGlyph, NotificationsGlyph, QuickstartsGlyph, SoundGlyph, WidgetsGlyph, WindowsGlyph } from './glyphs'
 import { getVersion } from '@tauri-apps/api/app'
 import { listNotifications } from '@/integrations/notifications/client'
 import { notificationSource } from '@/os/ui/NotificationIcon'
 
-type Section = 'personalization' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock' | 'startup' | 'power' | 'privacy' | 'ai'
+type Section = 'personalization' | 'animations' | 'switcher' | 'dock' | 'widgets' | 'quickstarts' | 'keyboard' | 'windows' | 'notifications' | 'sound' | 'system' | 'lock' | 'startup' | 'power' | 'privacy' | 'ai'
 
 interface NavItem {
   id: Section
@@ -38,6 +42,7 @@ interface NavItem {
 const NAV: NavItem[][] = [
   [
     { id: 'personalization', label: 'Appearance & Wallpaper', icon: AppearanceGlyph },
+    { id: 'animations', label: 'Animations', icon: WindowsGlyph },
     { id: 'dock', label: 'Desktop & Dock', icon: DockGlyph },
     { id: 'widgets', label: 'Widgets', icon: WidgetsGlyph },
     { id: 'quickstarts', label: 'Quickstarts', icon: QuickstartsGlyph },
@@ -46,6 +51,7 @@ const NAV: NavItem[][] = [
     { id: 'notifications', label: 'Notifications & Focus', icon: NotificationsGlyph },
     { id: 'sound', label: 'Sound', icon: SoundGlyph },
     { id: 'keyboard', label: 'Keyboard', icon: KeyboardGlyph },
+    { id: 'switcher', label: 'Window Switcher', icon: WindowsGlyph },
   ],
   [
     { id: 'lock', label: 'Lock Screen', icon: LockGlyph },
@@ -73,6 +79,7 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Widgets', section: 'widgets', keywords: 'desktop clock weather' },
   { title: 'Do not disturb', section: 'notifications', keywords: 'focus banners mute' },
   { title: 'Notification Center', section: 'notifications', keywords: 'alerts missed' },
+  { title: 'Notification Center style', section: 'notifications', keywords: 'sheet full height popup size small regular panel' },
   { title: 'Banner duration and previews', section: 'notifications', keywords: 'banner message preview seconds' },
   { title: 'Mute an app', section: 'notifications', keywords: 'silence allow notifications from' },
   { title: '24-hour clock and seconds', section: 'dock', keywords: 'menu bar time format' },
@@ -87,6 +94,8 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Screensaver', section: 'lock', keywords: 'idle clock saver' },
   { title: 'Accent colour', section: 'personalization', keywords: 'colour color blue theme highlight' },
   { title: 'Solid surfaces', section: 'personalization', keywords: 'transparency glass blur opaque' },
+  { title: 'Liquid glass', section: 'personalization', keywords: 'dock top bar menu bar background liquid chrome water frost translucent animated' },
+  { title: 'Dock and top bar look', section: 'personalization', keywords: 'chrome water frost solidity detail speed ripple edge freeze motion reset' },
   { title: 'CPU and memory', section: 'system', keywords: 'performance processor ram usage' },
   { title: 'Hot corners', section: 'windows', keywords: 'screen corner mission control' },
   { title: 'Always maximize new windows', section: 'windows', keywords: 'fullscreen zoom' },
@@ -94,6 +103,21 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Recycle Bin', section: 'system', keywords: 'trash empty storage' },
   { title: 'Windows shell', section: 'system', keywords: 'explorer replace restore' },
   { title: 'About Udaan', section: 'system', keywords: 'version' },
+  { title: 'Window switcher', section: 'switcher', keywords: '3d carousel alt tab task view windows cards' },
+  { title: 'Drag up from the bottom to switch windows', section: 'switcher', keywords: 'gesture bottom edge swipe middle distance' },
+  { title: 'Double-tap Ctrl', section: 'switcher', keywords: 'control key switcher tap speed shortcut' },
+  { title: 'Switcher card size', section: 'switcher', keywords: 'small medium large cards' },
+  { title: 'Animations', section: 'animations', keywords: 'motion effects transitions speed style bounce reduce' },
+  { title: 'Lock screen animation', section: 'animations', keywords: 'curtain rise iris fade unlock lock motion' },
+  { title: 'Profile switch animation', section: 'animations', keywords: 'personal work sweep cover transition' },
+  { title: 'Start menu animation', section: 'animations', keywords: 'start grow drop fade open close launcher' },
+  { title: 'App open and close animation', section: 'animations', keywords: 'window zoom rise shrink sink open close minimize' },
+  { title: 'Menu and popup animation', section: 'animations', keywords: 'right click context menu popup spring fade' },
+  { title: 'Banner animation', section: 'animations', keywords: 'notification slide drop fade toast' },
+  { title: 'Animation speed and bounce', section: 'animations', keywords: 'faster slower overall spring overshoot' },
+  { title: 'Right-click menu glass', section: 'personalization', keywords: 'context menu popups panel glass solidity' },
+  { title: 'Profile name', section: 'system', keywords: 'rename display name account user' },
+  { title: 'Profile picture', section: 'system', keywords: 'avatar photo image account user change' },
 ]
 
 function PrefToggleRow({ title, description, pref, onApply }: { title: string; description: string; pref: BoolPrefKey; onApply?: (v: boolean) => Promise<unknown> }) {
@@ -125,6 +149,7 @@ function Personalization() {
   return (
     <div className="flex flex-col gap-6">
       <WallpaperBrowser />
+      <LiquidGlassSettings />
       <AppearanceExtras />
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold">Colours</h3>
@@ -411,6 +436,7 @@ function MutedApps() {
 
 function NotificationsSection() {
   const [duration, setDuration] = usePref('notifications.duration')
+  const [center, setCenter] = usePref('notifications.center')
   return (
     <Stack>
       <Group title="Focus">
@@ -424,6 +450,9 @@ function NotificationsSection() {
       </Group>
       <MutedApps />
       <Group title="Notification Center">
+        <Row stack title="How it opens" description="A full-height sheet down the right of the screen, or a regular popup under the bell like the other panels.">
+          <Segmented value={center} options={[{ value: 'sheet', label: 'Full height' }, { value: 'popup', label: 'Regular popup' }]} onChange={(v) => void setCenter(v)} />
+        </Row>
         <Row title="Notification Center" description="See everything you've missed, grouped by app.">
           <ActionButton onClick={() => void emit('dock:open-notifications')}>Open</ActionButton>
         </Row>
@@ -467,6 +496,7 @@ function SystemSection() {
   }, [])
   return (
     <Stack>
+      <ProfileGroup />
       <Group title="About">
         <Row title="Udaan">
           <span className="text-[13px] text-[var(--color-text-secondary)]">{version ? `Version ${version}` : ''}</span>
@@ -505,9 +535,21 @@ function SystemSection() {
   )
 }
 
+function searchHits(query: string) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  return SEARCH_INDEX.filter((e) => {
+    const hay = `${e.title} ${e.keywords ?? ''} ${SECTIONS.find((x) => x.id === e.section)?.label ?? ''}`.toLowerCase()
+    return words.every((w) => hay.includes(w))
+  })
+}
+
 function SearchResults({ query, onPick }: { query: string; onPick: (s: Section) => void }) {
   const q = query.trim().toLowerCase()
-  const hits = SEARCH_INDEX.filter((e) => `${e.title} ${e.keywords ?? ''}`.toLowerCase().includes(q))
+  const words = q.split(/\s+/).filter(Boolean)
+  const hits = SEARCH_INDEX.filter((e) => {
+    const hay = `${e.title} ${e.keywords ?? ''} ${SECTIONS.find((x) => x.id === e.section)?.label ?? ''}`.toLowerCase()
+    return words.every((w) => hay.includes(w))
+  })
   if (!hits.length) return <p className="text-[13px] text-[var(--color-text-secondary)]">No results for “{query}”.</p>
   return (
     <Group>
@@ -533,6 +575,20 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
   }
   const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]
   const searching = query.trim().length > 0
+  const searchRef = useRef<HTMLInputElement>(null)
+  // Ctrl+F or / jumps to the search bar from anywhere in Settings.
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
+      if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && !typing)) {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
   const pick = (id: Section) => {
     setSection(id)
     setQuery('')
@@ -550,7 +606,6 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
   return (
     <div className="flex h-full">
       <nav onKeyDown={onNavKey} className="u-scroll flex w-[244px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-(--u-edge) bg-(--u-wash-hover) p-3">
-        <SearchField value={query} onChange={setQuery} />
         {NAV.map((group, gi) => (
           <div key={gi} className="flex flex-col gap-0.5">
             {group.map(({ id, label, icon }) => {
@@ -567,11 +622,37 @@ export function SettingsApp({ section: initial }: { onClose: () => void; section
       </nav>
       <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto max-w-[680px]">
+          <label className="u-search mb-5 h-11 gap-2.5 px-4">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 opacity-50" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setQuery('')
+                else if (e.key === 'Enter') {
+                  const first = searchHits(query)[0]
+                  if (first) pick(first.section)
+                }
+              }}
+              placeholder="Search settings"
+              aria-label="Search settings"
+              spellCheck={false}
+              className="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-(--u-ink-3) [&::-webkit-search-cancel-button]:hidden"
+            />
+            {!searching && <kbd className="rounded-[6px] bg-(--u-wash-on) px-1.5 text-[11px] leading-[20px] text-(--u-ink-3) shadow-[inset_0_0_0_1px_var(--u-edge)]">Ctrl F</kbd>}
+          </label>
           <h1 className="mb-6 text-[28px] font-light tracking-tight">{searching ? 'Search' : current.label}</h1>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={searching ? 'search' : section} {...(reduced ? { initial: false, animate: {} } : contentEnter)}>
               {searching && <SearchResults query={query} onPick={pick} />}
               {!searching && section === 'personalization' && <Personalization />}
+              {!searching && section === 'animations' && <AnimationsSettings />}
+              {!searching && section === 'switcher' && <SwitcherSettings />}
               {!searching && section === 'dock' && <DockSection />}
               {!searching && section === 'widgets' && <WidgetsSection />}
               {!searching && section === 'quickstarts' && <QuickstartsSection />}

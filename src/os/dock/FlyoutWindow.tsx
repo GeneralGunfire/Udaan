@@ -1,83 +1,90 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { cn } from '@/shared/lib/cn'
 import { pxScale } from '@/os/kernel/uiScale'
-import { AnimatePresence, motion } from 'framer-motion'
 import { emit, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window'
-import { prefersReducedMotion } from '@/shared/lib/motion'
-import { curve, dur, flyoutFromBottom, flyoutFromTop, flyoutMotionReduced } from '@/os/motion/systemMotion'
-import { NetworkPanel } from './panels/NetworkPanel'
-import { SoundPanel } from './panels/SoundPanel'
-import { MediaPanel } from './panels/MediaPanel'
-import { CalendarPanel } from './panels/CalendarPanel'
-import { LayoutsPanel } from './panels/LayoutsPanel'
-import { NotificationsPanel } from './NotificationsPanel'
+import { availableMonitors, currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
+import { CalendarConnected, LayoutsConnected, MediaConnected, NetworkConnected, NotificationsConnected, SoundConnected } from './popups/Connected'
 import { ContextMenuList } from './ContextMenuList'
 import type { FlyoutMenuItem, FlyoutPlacement, ShowTaskbarPopupPayload } from './taskbarPopupTypes'
 
 /**
- * A sheet sliding in from the right edge of the screen.
+ * THE POPUP WINDOW. One transparent OS window that shows whichever popup was asked for: a top-bar panel, the
+ * Notification Center, or a context menu. It is placed, sized and shown from here, never by the caller.
  *
- * Springs rather than a tween, because a sheet is large enough that a
- * linear arrival reads as mechanical. The exit stays a tween: an exit that
- * overshoots reads as indecision.
+ * PLACEMENT (all in logical pixels; the window is set in physical pixels at the very end):
+ *   below       a menu-bar panel. Hangs under its button, centred on it, kept clear of the dock.
+ *   above       a dock panel. Sits above its button, centred, kept clear of the menu bar.
+ *   sheet-right the Notification Center: the full height of the work area, flush to the right edge.
+ *   point       a context menu. Its top-left corner is the pointer; if there is no room to the right it opens to the
+ *               left of the pointer, and if there is no room below it opens upward.
+ *   point-up    a context menu from the dock: opens upward from the pointer.
+ * A card never leaves the screen, never covers the menu bar or the dock, and if it is taller than the room it
+ * scrolls instead of overflowing.
+ *
+ * The window is the card plus a PAD-wide transparent margin, so the card's shadow is never cut off flat at the window
+ * edge. A menu with sub-menus reserves room for them to open beside it, on the side with more space.
  */
-const sheetMotion = {
-  initial: { opacity: 0, x: 48 },
-  animate: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 440, damping: 38, mass: 0.9 } },
-  exit: { opacity: 0, x: 40, transition: { duration: dur.fast, ease: curve.accelerate } },
-}
 
-/**
- * THE POPUP STANDARD. Every popup is one of two things:
- *   a MENU   as wide as its longest label (190 to 260 px), as tall as its rows, never resized once open
- *   a PANEL  one width, 320 px; as tall as its content (at most 70% of the screen)
- * so a popup is never longer or wider than what it holds, and every popup looks like the same family.
- */
-const PANEL = 320
-const WIDTH = { 'notifications-panel': PANEL, calendar: PANEL, layouts: PANEL, network: PANEL, sound: PANEL, media: PANEL, 'context-menu': 0 } as const
-/** Corner radius of the card AND of the window's cut-out, so no square corner ever shows behind it. */
-const RADIUS = { menu: 9, panel: 12 } as const
-const GAP_ABOVE_DOCK = 10
+const PAD = 14
+const PANEL_W = 340
+const SHEET_W = 392
+const MENU_W = 236
+const SUB_OVERLAP = 6
 const EDGE = 8
-const MAX_HEIGHT = Math.round(window.screen.height * 0.7)
+const TOP_BAR = 34
+const DOCK_ZONE = 76
+const GAP = 6
 
+const WIDTH = { 'notifications-panel': PANEL_W, calendar: PANEL_W, layouts: PANEL_W, network: PANEL_W, sound: PANEL_W, media: PANEL_W, 'context-menu': MENU_W } as const
 type Kind = keyof typeof WIDTH
 
-/** The content's real height in screen px (zoom included), rounded up. */
-const heightOf = (el: HTMLElement | null, fallback: number, card?: HTMLElement | null) => {
-  // The card is scaled while it animates in, which shrinks what getBoundingClientRect reports. Undo that
-  // scale (the card's drawn width over its layout width) so the window is sized to the finished card.
-  const k = card ? card.getBoundingClientRect().width / (card.offsetWidth || 1) : 1
-  return Math.ceil((el?.getBoundingClientRect().height || fallback) / (k || 1))
+/** Heights of a menu's rows in px (see Menu.tsx): a row, a separator, a section label. */
+const rowH = (it: FlyoutMenuItem) => (it.header ? 31 : it.label === undefined ? 9 : 30)
+const listH = (items: FlyoutMenuItem[]) => 12 + items.reduce((h, it) => h + rowH(it), 0)
+
+/** How tall the card is, and how tall its sub-menus make the window (a sub-menu opens beside its item and may hang lower). */
+function menuExtent(items: FlyoutMenuItem[]): { card: number; window: number; depth: number } {
+  const card = listH(items)
+  let win = card
+  let depth = 0
+  items.forEach((it, i) => {
+    if (!it.items) return
+    const top = items.slice(0, i).reduce((h, x) => h + rowH(x), 0)
+    const sub = menuExtent(it.items)
+    win = Math.max(win, top + sub.window)
+    depth = Math.max(depth, 1 + sub.depth)
+  })
+  return { card, window: win, depth }
 }
 
-/**
- * The dock's flyouts (Quick Settings, Notifications) in their own window,
- * hidden (so receiving no input) unless one is open. Win11 behaviour:
- * slides up from the dock, dismisses on click-away, Escape, or re-click.
- */
+interface Box {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export function FlyoutWindow() {
   const [kind, setKind] = useState<Kind | null>(null)
   const [placement, setPlacement] = useState<FlyoutPlacement>('above')
   const [menuItems, setMenuItems] = useState<FlyoutMenuItem[]>([])
+  const [cap, setCap] = useState<number | null>(null)
+  const [side, setSide] = useState<'right' | 'left'>('right')
   const anchor = useRef<{ x: number; y: number; placement: FlyoutPlacement }>({ x: 0, y: 0, placement: 'above' })
-  const cardRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const openRef = useRef(false)
+  const last = useRef<Box | null>(null)
   // Bumped on every show request, so asking for a menu while another is open re-places it.
   const [seq, setSeq] = useState(0)
-  const reduced = prefersReducedMotion()
 
   const hide = useCallback(() => {
     if (!openRef.current) return
     openRef.current = false
+    last.current = null
     setKind(null)
     void invoke('engine_popup_watch', { on: false }).catch(() => {})
     void emit('taskbar-popup:hidden')
-    // Gone at once: the compositor's blur belongs to the window, so waiting for a fade-out would leave a
-    // blurred rectangle on screen after the card has already left.
+    // Gone at once, so nothing is left on screen while the card would still be fading.
     void invoke('engine_popup_dismiss').catch(() => {})
   }, [])
 
@@ -88,8 +95,10 @@ export function FlyoutWindow() {
         if (!(p.kind in WIDTH)) return
         anchor.current = { x: p.x, y: p.y, placement: p.placement ?? 'above' }
         openRef.current = true
+        last.current = null
         setPlacement(p.placement ?? 'above')
         setMenuItems(p.items ?? [])
+        setCap(null)
         setKind(p.kind)
         setSeq((n) => n + 1)
       }),
@@ -99,65 +108,101 @@ export function FlyoutWindow() {
     return () => subs.forEach((s) => void s.then((fn) => fn()))
   }, [hide])
 
-  // Size to the content and sit centred over the anchor, clamped on-screen.
+  /** Works out the card's box on the screen and the window around it, then moves the window there. */
+  const place = useCallback(async (first: boolean) => {
+    if (!kind) return
+    const scale = pxScale()
+    const a = anchor.current
+    const [here, all] = await Promise.all([currentMonitor(), availableMonitors().catch(() => [])])
+    // The screen the anchor is on (in physical pixels), not necessarily the one the popup was last shown on.
+    const monitors = all.length ? all : here ? [here] : []
+    const pick = monitors.find((m) => a.x * scale >= m.position.x && a.x * scale < m.position.x + m.size.width && a.y * scale >= m.position.y && a.y * scale < m.position.y + m.size.height) ?? here ?? monitors[0]
+    const mon = {
+      x: (pick?.position.x ?? 0) / scale,
+      y: (pick?.position.y ?? 0) / scale,
+      w: (pick?.size.width ?? window.screen.width * scale) / scale,
+      h: (pick?.size.height ?? window.screen.height * scale) / scale,
+    }
+    const left = mon.x + EDGE
+    const right = mon.x + mon.w - EDGE
+    const top = mon.y + TOP_BAR + GAP
+    const bottom = mon.y + mon.h - DOCK_ZONE
+    const el = contentRef.current
+
+    let card: Box
+    let win: Box
+    let nextCap: number | null = null
+    let nextSide: 'right' | 'left' = 'right'
+
+    if (kind === 'context-menu') {
+      const ext = menuExtent(menuItems)
+      const subSpace = ext.depth * (MENU_W - SUB_OVERLAP)
+      // Left/right: the pointer is the top-left corner; no room to the right means open to its left.
+      let mx = a.x + MENU_W <= right ? a.x : a.x - MENU_W
+      mx = Math.max(left, mx)
+      // Sub-menus open on whichever side has room.
+      if (subSpace && mx + MENU_W + subSpace > right && mx - subSpace >= left) nextSide = 'left'
+      // Up/down: opens down from the pointer, or up when it would not fit (always up for point-up).
+      const fitsBelow = a.y + ext.window <= mon.y + mon.h - EDGE
+      let my = a.placement === 'point-up' || !fitsBelow ? a.y - ext.card : a.y
+      my = Math.min(Math.max(mon.y + EDGE, my), mon.y + mon.h - EDGE - ext.window)
+      const wx = nextSide === 'left' ? mx - subSpace : mx
+      card = { x: mx, y: my, w: MENU_W, h: ext.card }
+      win = { x: wx, y: my, w: MENU_W + subSpace, h: ext.window }
+    } else if (a.placement === 'sheet-right') {
+      const w = SHEET_W
+      const h = mon.y + mon.h - EDGE - top
+      card = { x: right - w, y: top, w, h }
+      win = card
+    } else {
+      const w = WIDTH[kind]
+      const natural = el?.offsetHeight || 400
+      // Centred on its button, then pulled back inside the screen.
+      const x = Math.min(Math.max(a.x - w / 2, left), right - w)
+      if (a.placement === 'below') {
+        const y = a.y + GAP
+        const room = bottom - y
+        const h = Math.min(natural, Math.max(room, 120))
+        nextCap = natural > h ? h : null
+        card = { x, y, w, h }
+      } else {
+        const room = a.y - GAP - top
+        const h = Math.min(natural, Math.max(room, 120))
+        nextCap = natural > h ? h : null
+        card = { x, y: a.y - GAP - h, w, h }
+      }
+      win = card
+    }
+
+    // The window is the card plus its transparent margin.
+    const box: Box = { x: win.x - PAD, y: win.y - PAD, w: win.w + PAD * 2, h: win.h + PAD * 2 }
+    setCap(nextCap)
+    setSide(nextSide)
+    const prev = last.current
+    if (!first && prev && Math.abs(prev.x - box.x) < 1 && Math.abs(prev.y - box.y) < 1 && Math.abs(prev.w - box.w) < 2 && Math.abs(prev.h - box.h) < 2) return
+    last.current = box
+    await invoke('shell_set_window_rect', { x: Math.round(box.x * scale), y: Math.round(box.y * scale), w: Math.round(box.w * scale), h: Math.round(box.h * scale) })
+  }, [kind, menuItems])
+
+  // Show: wait for the card's height to settle (panels that load data start small), place it, then present it.
   useLayoutEffect(() => {
     if (!kind) return
     let cancelled = false
     void (async () => {
-      // Panels that load data (network, media, notifications...) start small and grow a
-      // moment later. Wait for their height to stop changing so the window opens at its
-      // real size instead of visibly moving and resizing after it appears.
-      if (kind !== 'context-menu') {
-        let last = -1
-        for (let i = 0; i < 4 && !cancelled; i++) {
-          const now = heightOf(contentRef.current, 0, cardRef.current)
-          if (now === last) break
-          last = now
+      if (kind !== 'context-menu' && placement !== 'sheet-right') {
+        let lastH = -1
+        for (let i = 0; i < 5 && !cancelled; i++) {
+          const now = contentRef.current?.offsetHeight ?? 0
+          if (now > 0 && now === lastH) break
+          lastH = now
           await new Promise((r) => setTimeout(r, 40))
         }
       }
-      const [scale, monitor] = [pxScale(), await currentMonitor()]
       if (cancelled) return
-      const { placement } = anchor.current
-      const naturalWidth = kind === 'context-menu' ? (cardRef.current?.offsetWidth ?? 190) : WIDTH[kind]
-      const w = Math.round(naturalWidth * scale)
-      const isPoint = placement === 'point' || placement === 'point-up'
-      let x = isPoint ? Math.round(anchor.current.x * scale) : Math.round(anchor.current.x * scale - w / 2)
-      let y: number
-      let h: number
-      if (placement === 'sheet-right' && monitor) {
-        // Notification Center: a full-height sheet on the right edge.
-        const top = Math.round(anchor.current.y * scale + GAP_ABOVE_DOCK * scale)
-        h = monitor.position.y + monitor.size.height - top - Math.round(EDGE * 2 * scale)
-        x = monitor.position.x + monitor.size.width - w - Math.round(EDGE * scale)
-        y = top
-      } else if (isPoint) {
-        // Context menu: top-left anchored exactly at the click point, like
-        // a native right-click menu — not centred like the other panels.
-        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 300, cardRef.current))
-        h = Math.round(height * scale)
-        // 'point-up' opens upward from the point (a menu on the dock sits above it, never over it).
-        y = placement === 'point-up' ? Math.round(anchor.current.y * scale) - h : Math.round(anchor.current.y * scale)
-      } else {
-        const height = Math.min(MAX_HEIGHT, heightOf(contentRef.current, 400, cardRef.current))
-        h = Math.round(height * scale)
-        y = placement === 'below' ? Math.round(anchor.current.y * scale + 6 * scale) : Math.round(anchor.current.y * scale - h - GAP_ABOVE_DOCK * scale)
-      }
-      let finalW = w
-      if (monitor) {
-        const { position: mp, size: ms } = monitor
-        finalW = Math.min(w, ms.width - EDGE * 2 * scale)
-        x = Math.min(Math.max(x, mp.x + EDGE * scale), mp.x + ms.width - finalW - EDGE * scale)
-        y = Math.max(y, mp.y + EDGE * scale)
-        if (placement === 'point' && y + h > mp.y + ms.height - EDGE * scale) {
-          // No room below the click (the dock): open upward instead, like a native menu.
-          y = Math.max(mp.y + EDGE * scale, Math.round(anchor.current.y * scale) - h)
-        }
-      }
-      await invoke('shell_set_window_rect', { x, y, w: finalW, h })
-      void invoke('engine_window_round', { radius: kind === 'context-menu' ? RADIUS.menu : RADIUS.panel }).catch(() => {})
+      await place(true)
+      if (cancelled) return
       await invoke('engine_popup_present')
-      // Tell whoever asked that the popup is really up (a request sent before this window finished loading is lost, so they retry until they hear this).
+      // Tell whoever asked that the popup is really up (a request sent before this window loaded is lost, so they retry until they hear this).
       void emit('taskbar-popup:shown')
       // Any click outside the popup (the desktop included) closes it.
       void invoke('engine_popup_watch', { on: true }).catch(() => {})
@@ -165,46 +210,23 @@ export function FlyoutWindow() {
     return () => {
       cancelled = true
     }
-  }, [kind, placement, seq])
+  }, [kind, placement, seq, place])
 
-  // Panels load their data after opening; grow (or shrink) the window with them.
+  // Panels load data after opening; follow their height (debounced: resizing an OS window is an async chain).
   useEffect(() => {
     const el = contentRef.current
-    // A menu is complete the moment it opens: it never re-fits itself afterwards.
-    if (!kind || !el || placement === 'sheet-right' || kind === 'context-menu') return
-    // Debounced, not per-frame: resizing an OS window is an async IPC chain
-    // (size, monitor, position, set rect) with the compositor re-blurring
-    // behind it, so following content that is mid-animation would resize the
-    // window sixty times a second. Waiting for the size to hold still for a
-    // few frames makes it one resize, after the content has settled.
+    if (!kind || !el || kind === 'context-menu' || placement === 'sheet-right') return
     let timer: ReturnType<typeof setTimeout> | undefined
     const ro = new ResizeObserver(() => {
       clearTimeout(timer)
-      timer = setTimeout(async () => {
-        const win = getCurrentWindow()
-        const scale = pxScale()
-        const height = Math.min(MAX_HEIGHT, heightOf(el, 0, cardRef.current))
-        const h = Math.round(height * scale)
-        const naturalWidth = WIDTH[kind]
-        let w = Math.round(naturalWidth * scale)
-        const size = await win.innerSize()
-        const monitor = await currentMonitor()
-        if (monitor) w = Math.min(w, monitor.size.width - EDGE * 2 * scale)
-        if (Math.abs(size.height - h) < 2 && Math.abs(size.width - w) < 2) return
-        // One call for both, so a panel that grows upward never shows a frame where it
-        // has moved but not yet resized.
-        const pos = await win.outerPosition()
-        const y = anchor.current.placement === 'above' ? pos.y + size.height - h : pos.y
-        await invoke('shell_set_window_rect', { x: pos.x, y, w, h })
-        void invoke('engine_window_round', { radius: RADIUS.panel }).catch(() => {})
-      }, 70)
+      timer = setTimeout(() => void place(false), 70)
     })
     ro.observe(el)
     return () => {
       clearTimeout(timer)
       ro.disconnect()
     }
-  }, [kind, placement])
+  }, [kind, placement, place])
 
   useEffect(() => {
     const un = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
@@ -218,60 +240,41 @@ export function FlyoutWindow() {
     }
   }, [hide])
 
+  const sheet = placement === 'sheet-right'
   return (
-    <div className="popup-host fixed inset-0">
-      <AnimatePresence>
-        {kind && (
-          <motion.div
-            key={kind}
-            ref={cardRef}
-            {...(reduced
-              ? flyoutMotionReduced
-              : placement === 'sheet-right'
-                ? sheetMotion
-                : // Unfold from the edge the flyout is anchored to, so it
-                  // visibly belongs to the control that opened it rather
-                  // than appearing from its own centre.
-                  placement === 'below' || placement === 'point'
-                  ? flyoutFromTop
-                  : flyoutFromBottom)}
-            className={cn(
-              'os-panel-material os-sheen text-(--os-text)',
-              kind === 'context-menu' ? 'overflow-hidden' : 'max-h-full overflow-y-auto',
-            )}
-            style={{
-              width: kind === 'context-menu' ? 'max-content' : WIDTH[kind],
-              minWidth: kind === 'context-menu' ? 190 : undefined,
-              maxWidth: kind === 'context-menu' ? 260 : undefined,
-              borderRadius: kind === 'context-menu' ? RADIUS.menu : RADIUS.panel,
-              height: placement === 'sheet-right' ? '100%' : undefined,
-              // Grow from the anchored edge. Scaling from the centre makes a
-              // flyout look like it zoomed in from nowhere; scaling from the
-              // edge it is attached to looks like it unfolded.
-              transformOrigin:
-                placement === 'sheet-right' ? 'right center' : placement === 'below' || placement === 'point' ? 'top center' : 'bottom center',
-            }}
-          >
-            <div ref={contentRef} className={kind === 'context-menu' ? 'p-1' : 'popup-panel'}>
-              {kind === 'network' ? (
-                <NetworkPanel />
-              ) : kind === 'sound' ? (
-                <SoundPanel />
-              ) : kind === 'media' ? (
-                <MediaPanel />
-              ) : kind === 'calendar' ? (
-                <CalendarPanel onClose={hide} />
-              ) : kind === 'layouts' ? (
-                <LayoutsPanel onDone={hide} />
-              ) : kind === 'context-menu' ? (
-                <ContextMenuList items={menuItems} onSelect={(id) => { void emit('taskbar-popup:select', id); hide() }} />
-              ) : (
-                <NotificationsPanel />
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="popup-host fixed inset-0" style={{ padding: PAD }}>
+      {kind && (
+        <div
+          key={`${kind}-${seq}`}
+          ref={contentRef}
+          className={sheet ? 'h-full' : kind === 'context-menu' ? `flex h-full ${side === 'left' ? 'justify-end' : 'justify-start'}` : 'w-fit'}
+          style={!sheet && cap ? { maxHeight: cap, overflowY: 'auto', borderRadius: 24 } : undefined}
+        >
+          {kind === 'network' ? (
+            <NetworkConnected />
+          ) : kind === 'sound' ? (
+            <SoundConnected />
+          ) : kind === 'media' ? (
+            <MediaConnected />
+          ) : kind === 'calendar' ? (
+            <CalendarConnected onClose={hide} />
+          ) : kind === 'layouts' ? (
+            <LayoutsConnected onDone={hide} />
+          ) : kind === 'context-menu' ? (
+            <ContextMenuList
+              items={menuItems}
+              onClose={hide}
+              onSelect={(id) => {
+                void emit('taskbar-popup:select', id)
+                hide()
+              }}
+              side={side}
+            />
+          ) : (
+            <NotificationsConnected onClose={hide} sheet={sheet} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import zeroHourCover from '@/assets/cnc-mod-switcher/zero-hour-cover.jpg'
 import zeroHourEnhancedDisc from '@/assets/cnc-mod-switcher/zero-hour-enhanced-disc.jpg'
 import zeroHourEnhancedCover from '@/assets/cnc-mod-switcher/zero-hour-enhanced-cover.jpg'
 import { ViewShell, ViewHeader } from '@/shared/components/ui/view'
+import { HealthPanel, logActivity } from './HealthPanel'
 
 interface CncModSwitcherViewProps {
   onClose: () => void
@@ -78,6 +79,7 @@ export function CncModSwitcherView(_props: CncModSwitcherViewProps) {
     try {
       await switchMod(name, version)
       setActiveMod(name)
+      logActivity(`Switched to ${name} and launched`)
       await launchGame()
       refresh()
     } catch (err) {
@@ -93,6 +95,7 @@ export function CncModSwitcherView(_props: CncModSwitcherViewProps) {
     try {
       await restoreBackup()
       setActiveMod(null)
+      logActivity('Restored the last backup')
       refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -256,6 +259,8 @@ export function CncModSwitcherView(_props: CncModSwitcherViewProps) {
                 </ul>
               )}
             </section>
+
+            <HealthPanel refreshKey={Number(checking) + (status.has_backup ? 1 : 0) + (activeMod ? 2 : 0)} onActive={(m) => setActiveMod(m)} />
           </>
         )}
       </div>

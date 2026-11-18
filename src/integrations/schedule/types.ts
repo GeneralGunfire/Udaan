@@ -23,6 +23,10 @@ export interface ScheduleEvent {
   allDay?: boolean
   /** Calendar event duration in minutes, when known. */
   durationMinutes?: number
+  /** A repeat rule as JSON, or none. */
+  recurrence?: string | null
+  /** Minutes before the start to remind, or none. */
+  reminderMinutes?: number | null
 }
 
 export interface NewScheduleEvent {
@@ -35,4 +39,6 @@ export interface NewScheduleEvent {
   category: EventCategory
   allDay?: boolean
   durationMinutes?: number
+  recurrence?: string | null
+  reminderMinutes?: number | null
 }

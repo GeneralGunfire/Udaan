@@ -1,4 +1,5 @@
 import { FocusPill } from './FocusPill'
+import { LiquidGlass } from '@/os/ui/liquid/LiquidGlass'
 import { usePref } from '@/os/kernel/prefs'
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -6,6 +7,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { onLayoutChange, pxScale } from '@/os/kernel/uiScale'
 import { useCovered, useImmersive } from '@/os/kernel/useImmersive'
 import { emit, listen } from '@tauri-apps/api/event'
+import { openSystemUtility } from '@/integrations/quick-settings/client'
 import { invoke } from '@tauri-apps/api/core'
 import { desktopDir, documentDir, downloadDir, homeDir } from '@tauri-apps/api/path'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -17,7 +19,7 @@ import { groupKeyOf, onHotkey, openApp, shell, subscribeShell, useShell, type Sh
 import { BatteryGlyph, StartGlyph } from '@/os/ui/icons/SystemGlyphs'
 import { useShellMenu, type ShellMenuItemDef } from '@/os/ui/useShellMenu'
 import { useLatest } from '@/os/ui/useLatest'
-import { Artwork, mediaCommand, openLiveDj } from '@/os/dock/panels/MediaPanel'
+import { Artwork, mediaCommand } from '@/os/dock/panels/MediaPanel'
 import { useNowPlaying } from '@/os/dock/panels/useNowPlaying'
 import type { PanelKind, ShowFlyoutPayload } from '@/os/dock/taskbarPopupTypes'
 import { playSound } from '@/os/sound/sounds'
@@ -30,7 +32,7 @@ export const MENU_BAR_HEIGHT = 34
 type Zone = { x: number; y: number; w: number; h: number }
 const snap = (handle: number, zone: Zone) => invoke('shell_snap_window', { handle, zone })
 /** The same zone as the Centred layout in Snap Layouts. */
-const CENTRED: Zone = { x: 0.14, y: 0.05, w: 0.72, h: 0.9 }
+const CENTRED: Zone = { x: 0.15, y: 0.1, w: 0.7, h: 0.8 }
 const power = (action: string) => () => void invoke('shell_power', { action })
 
 interface NetworkStatus {
@@ -159,6 +161,7 @@ export function MenuBarWindow() {
   const fullscreen = useShell((s) => s.fullscreen) || immersive
   // A lock screen or the screensaver hides the bar but never gives its strip back (see `useCovered`).
   const covered = useCovered()
+  const barRef = useRef<HTMLDivElement>(null)
   const coveredRef = useRef(covered)
   coveredRef.current = covered
   const front = useMemo(() => windows.find((w) => w.handle === foreground), [windows, foreground])
@@ -169,6 +172,10 @@ export function MenuBarWindow() {
   const target = front ?? lastFront
   const appName = useAppName(target)
   const [clock24] = usePref('menubar.clock24')
+  // How the Notification Center opens (Settings > Notifications): read through a ref so the toggle always sees the latest.
+  const [centerPref] = usePref('notifications.center')
+  const centerStyle = useRef(centerPref)
+  centerStyle.current = centerPref
   const [showSeconds] = usePref('menubar.seconds')
   const [focusEnabled] = usePref('focus.enabled')
   const now = useClock(showSeconds)
@@ -270,7 +277,8 @@ export function MenuBarWindow() {
         kind: which,
         x: window.screenX + (r ? r.left + r.width / 2 : window.innerWidth - 60),
         y: window.screenY + (r ? r.bottom : MENU_BAR_HEIGHT),
-        placement: 'below',
+        // The Notification Center is a full-height sheet on the right edge; every other panel hangs under its button.
+        placement: which === 'notifications-panel' && centerStyle.current === 'sheet' ? 'sheet-right' : 'below',
       }
       setPanel(which)
       playSound('tap')
@@ -296,29 +304,34 @@ export function MenuBarWindow() {
 
   function udaanMenuItems(): ShellMenuItemDef[] {
     return [
-      { label: 'About Udaan', onSelect: () => void openApp('settings', { section: 'system' }) },
+      { label: 'About Udaan', icon: 'info', onSelect: () => void openApp('settings', { section: 'system' }) },
       { label: undefined },
-      { label: 'System Settings…', onSelect: () => void openApp('settings') },
-      { label: 'Wallpaper…', onSelect: () => void emit('launcher:wallpaper') },
-      { label: 'Widgets…', onSelect: () => void openApp('settings', { section: 'widgets' }) },
+      { label: 'System Settings…', icon: 'sliders', onSelect: () => void openApp('settings') },
+      { label: 'Wallpaper…', icon: 'image', onSelect: () => void emit('launcher:wallpaper') },
+      { label: 'Widgets…', icon: 'star', onSelect: () => void openApp('settings', { section: 'widgets' }) },
       { label: undefined },
-      { label: 'Lock Screen', onSelect: () => void emit('launcher:lock') },
+      { label: 'Notification settings…', icon: 'bell', onSelect: () => void openApp('settings', { section: 'notifications' }) },
+      { label: 'Dock and glass settings…', icon: 'sliders', onSelect: () => void openApp('settings', { section: 'personalization' }) },
+      { label: 'Task Manager', icon: 'terminal', onSelect: () => void openSystemUtility('taskManager') },
       { label: undefined },
-      { label: 'Sleep', onSelect: power('sleep') },
-      { label: 'Restart…', onSelect: power('restart') },
-      { label: 'Shut Down…', onSelect: power('shut-down') },
-      { label: 'Log Out', onSelect: power('sign-out') },
+      { label: 'Switch to Work', icon: 'shield', onSelect: () => void emit('launcher:work') },
+      { label: 'Lock Screen', icon: 'lock', onSelect: () => void emit('launcher:lock') },
+      { label: undefined },
+      { label: 'Sleep', icon: 'moon', onSelect: power('sleep') },
+      { label: 'Restart…', icon: 'refresh', onSelect: power('restart') },
+      { label: 'Shut Down…', icon: 'power', danger: true, onSelect: power('shut-down') },
+      { label: 'Log Out', icon: 'user', onSelect: power('sign-out') },
     ]
   }
 
   function appMenuItems(): ShellMenuItemDef[] {
     const all = siblings()
     return [
-      { label: `Hide ${appName}`, disabled: !all.length, onSelect: () => all.forEach((w) => void shell.minimize(w.handle)) },
-      { label: 'Hide Others', disabled: !target, onSelect: () => windows.filter((w) => target && groupKeyOf(w) !== groupKeyOf(target)).forEach((w) => void shell.minimize(w.handle)) },
-      { label: 'Show All', onSelect: () => windows.filter((w) => w.isMinimized).forEach((w) => void shell.focus(w.handle)) },
+      { label: `Hide ${appName}`, icon: 'minimize', disabled: !all.length, onSelect: () => all.forEach((w) => void shell.minimize(w.handle)) },
+      { label: 'Hide Others', icon: 'window', disabled: !target, onSelect: () => windows.filter((w) => target && groupKeyOf(w) !== groupKeyOf(target)).forEach((w) => void shell.minimize(w.handle)) },
+      { label: 'Show All', icon: 'layout', onSelect: () => windows.filter((w) => w.isMinimized).forEach((w) => void shell.focus(w.handle)) },
       { label: undefined },
-      { label: `Quit ${appName}`, disabled: !all.length, onSelect: () => all.forEach((w) => void shell.close(w.handle)) },
+      { label: `Quit ${appName}`, icon: 'x', danger: true, disabled: !all.length, onSelect: () => all.forEach((w) => void shell.close(w.handle)) },
     ]
   }
 
@@ -331,38 +344,38 @@ export function MenuBarWindow() {
       playSound('switch')
     }
     return [
-      { label: 'Minimize', disabled: !h, onSelect: act(shell.minimize) },
-      { label: 'Zoom', disabled: !h, onSelect: act(shell.toggleMaximize) },
+      { label: 'Minimize', icon: 'minimize', disabled: !h, onSelect: act(shell.minimize) },
+      { label: 'Zoom', icon: 'maximize', disabled: !h, onSelect: act(shell.toggleMaximize) },
       { label: undefined },
-      { label: 'Tile Left', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0, w: 0.5, h: 1 })) },
-      { label: 'Tile Right', disabled: !h, onSelect: act((x) => snap(x, { x: 0.5, y: 0, w: 0.5, h: 1 })) },
-      { label: 'Tile Top', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0, w: 1, h: 0.5 })) },
-      { label: 'Tile Bottom', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0.5, w: 1, h: 0.5 })) },
-      { label: 'Center', disabled: !h, onSelect: act((x) => snap(x, { x: 0.15, y: 0.1, w: 0.7, h: 0.8 })) },
-      { label: 'Centre All Windows', disabled: !onScreen.length, onSelect: () => void centreAll() },
+      { label: 'Tile Left', icon: 'layout', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0, w: 0.5, h: 1 })) },
+      { label: 'Tile Right', icon: 'layout', disabled: !h, onSelect: act((x) => snap(x, { x: 0.5, y: 0, w: 0.5, h: 1 })) },
+      { label: 'Tile Top', icon: 'layout', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0, w: 1, h: 0.5 })) },
+      { label: 'Tile Bottom', icon: 'layout', disabled: !h, onSelect: act((x) => snap(x, { x: 0, y: 0.5, w: 1, h: 0.5 })) },
+      { label: 'Center', icon: 'window', disabled: !h, onSelect: act((x) => snap(x, CENTRED)) },
+      { label: 'Centre All Windows', icon: 'layout', disabled: !onScreen.length, onSelect: () => void centreAll() },
       { label: undefined },
-      { label: 'Bring All to Front', disabled: !h, onSelect: () => siblings().forEach((w) => void shell.focus(w.handle)) },
-      { label: 'Show All Windows', onSelect: () => void emit('launcher:expose', { title: 'All windows', handles: null }) },
+      { label: 'Bring All to Front', icon: 'window', disabled: !h, onSelect: () => siblings().forEach((w) => void shell.focus(w.handle)) },
+      { label: 'Show All Windows', icon: 'layout', onSelect: () => void emit('launcher:expose', { title: 'All windows', handles: null }) },
     ]
   }
 
   function goMenuItems(): ShellMenuItemDef[] {
     const go = (dir: () => Promise<string>) => () => void dir().then((p) => invoke('installed_apps_launch', { path: p }))
     return [
-      { label: 'Desktop', onSelect: go(desktopDir) },
-      { label: 'Documents', onSelect: go(documentDir) },
-      { label: 'Downloads', onSelect: go(downloadDir) },
-      { label: 'Home', onSelect: go(homeDir) },
+      { label: 'Desktop', icon: 'monitor', onSelect: go(desktopDir) },
+      { label: 'Documents', icon: 'file', onSelect: go(documentDir) },
+      { label: 'Downloads', icon: 'download', onSelect: go(downloadDir) },
+      { label: 'Home', icon: 'home', onSelect: go(homeDir) },
       { label: undefined },
-      { label: 'Recycle Bin', onSelect: () => void invoke('installed_apps_launch', { path: 'shell:RecycleBinFolder' }) },
-      { label: 'Control Panel', onSelect: () => void invoke('installed_apps_launch', { path: 'shell:ControlPanelFolder' }) },
+      { label: 'Recycle Bin', icon: 'trash', onSelect: () => void invoke('installed_apps_launch', { path: 'shell:RecycleBinFolder' }) },
+      { label: 'Control Panel', icon: 'sliders', onSelect: () => void invoke('installed_apps_launch', { path: 'shell:ControlPanelFolder' }) },
     ]
   }
 
   function helpMenuItems(): ShellMenuItemDef[] {
     return [
-      { label: 'Udaan Tips', onSelect: () => void emit('launcher:tips') },
-      { label: 'Keyboard Shortcuts', onSelect: () => void openApp('settings', { section: 'keyboard' }) },
+      { label: 'Udaan Tips', icon: 'info', onSelect: () => void emit('launcher:tips') },
+      { label: 'Keyboard Shortcuts', icon: 'terminal', onSelect: () => void openApp('settings', { section: 'keyboard' }) },
     ]
   }
 
@@ -372,9 +385,12 @@ export function MenuBarWindow() {
   return (
     <div
       // Real compositor blur sits under this window (it is exactly the bar); see ui.css.
+      ref={barRef}
       className="u-menubar relative flex h-screen w-screen select-none items-center justify-between px-2"
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* The liquid-glass fill: background only, the bar's widgets draw on top of it. */}
+      <LiquidGlass role="bar" barRef={barRef} paused={covered || fullscreen} />
       {/* ── Left: Udaan menu and the focused app's menus ─────────────── */}
       <div className="flex min-w-0 items-center gap-0.5">
         <StatusButton aria-label="Udaan menu" onClick={(e) => openMenu(e, udaanMenuItems())} className="px-2.5">
@@ -426,14 +442,6 @@ export function MenuBarWindow() {
               </svg>
             </StatusButton>
             <span className="mx-0.5 h-3.5 w-px bg-(--u-edge)" aria-hidden />
-            <StatusButton aria-label="Open DJ board" title="Mix what's playing in the DJ board" onClick={openLiveDj} className="gap-1 px-1.5 text-[12px] font-semibold">
-              <svg viewBox="0 0 24 24" width="14" height="14" {...ICON} aria-hidden>
-                <circle cx="12" cy="12" r="8.5" />
-                <circle cx="12" cy="12" r="2.2" />
-                <path d="M12 3.5v3M20.5 12h-3" />
-              </svg>
-              DJ
-            </StatusButton>
             {media.durationMs != null && positionMs != null && (
               <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-(--u-edge)" aria-hidden>
                 <motion.span
@@ -480,14 +488,6 @@ export function MenuBarWindow() {
           }}
         >
           <SoundIcon level={volume?.level ?? 1} muted={!!volume?.muted} />
-        </StatusButton>
-
-        <StatusButton aria-label="DJ board" title="DJ board — mix and shape what's playing" onClick={openLiveDj} className="px-1.5">
-          <svg viewBox="0 0 24 24" width="17" height="17" {...ICON} aria-hidden>
-            <circle cx="12" cy="12" r="8.5" />
-            <circle cx="12" cy="12" r="2.2" />
-            <path d="M12 3.5v3M20.5 12h-3" />
-          </svg>
         </StatusButton>
 
         <StatusButton ref={refs['notifications-panel']} aria-label={unread ? `${unread} notifications` : 'Notifications'} onClick={() => toggle('notifications-panel')} active={panel === 'notifications-panel'} className="relative px-1.5">

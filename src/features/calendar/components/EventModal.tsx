@@ -1,3 +1,4 @@
+import { REMINDER_CHOICES, type Freq } from '../lib/recurrence'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/components/ui/dialog'
@@ -49,6 +50,10 @@ export function EventModal({
   const [notes, setNotes] = useState(editingEvent?.notes ?? '')
   const [durationMinutes, setDurationMinutes] = useState(editingEvent?.durationMinutes ?? 30)
   const [tag, setTag] = useState<EventTag>(editingEvent?.tag ?? 'personal')
+  const [repeat, setRepeat] = useState<Freq | 'none'>(editingEvent?.recurrence?.freq ?? 'none')
+  const [weekdays, setWeekdays] = useState<number[]>(editingEvent?.recurrence?.weekdays ?? [])
+  const [until, setUntil] = useState<string>(editingEvent?.recurrence?.until ?? '')
+  const [reminder, setReminder] = useState<number | null>(editingEvent?.reminderMinutes ?? null)
 
   useEffect(() => {
     if (!open) return
@@ -65,6 +70,10 @@ export function EventModal({
     setNotes(editingEvent?.notes ?? '')
     setDurationMinutes(editingEvent?.durationMinutes ?? 30)
     setTag(editingEvent?.tag ?? 'personal')
+    setRepeat(editingEvent?.recurrence?.freq ?? 'none')
+    setWeekdays(editingEvent?.recurrence?.weekdays ?? [])
+    setUntil(editingEvent?.recurrence?.until ?? '')
+    setReminder(editingEvent?.reminderMinutes ?? null)
   }, [open, initialDate, editingEvent, initialTime])
 
   function goPrevMonth() {
@@ -111,6 +120,8 @@ export function EventModal({
         tag,
         title: title.trim(),
         notes: notes.trim(),
+        recurrence: repeat === 'none' ? null : { freq: repeat, interval: 1, until: until || null, weekdays: repeat === 'weekly' && weekdays.length ? weekdays : undefined },
+        reminderMinutes: reminder,
       },
       editingEvent?.id,
     )
@@ -324,6 +335,50 @@ export function EventModal({
                       </div>
                     </div>
                   )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-text-secondary text-2xs font-semibold uppercase tracking-wide">Repeat</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {([['none', 'Never'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['yearly', 'Yearly']] as const).map(([k, label]) => (
+                        <button key={k} type="button" onClick={() => setRepeat(k)} className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-[background-color,color,box-shadow] duration-150', repeat === k ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]' : 'border-hairline bg-surface-hover text-text-primary border hover:bg-surface-overlay')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {repeat === 'weekly' && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-text-secondary mr-1 text-xs">On</span>
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                          <button key={i} type="button" aria-label={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i]} aria-pressed={weekdays.includes(i)} onClick={() => setWeekdays((w) => (w.includes(i) ? w.filter((x) => x !== i) : [...w, i]))} className={cn('h-8 w-8 rounded-full text-xs font-medium', weekdays.includes(i) ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]' : 'border-hairline bg-surface-hover text-text-primary border hover:bg-surface-overlay')}>
+                            {d}
+                          </button>
+                        ))}
+                        <span className="text-text-tertiary ml-1 text-xs">{weekdays.length ? '' : 'the same weekday'}</span>
+                      </div>
+                    )}
+                    {repeat !== 'none' && (
+                      <label className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="text-text-secondary">Until</span>
+                        <input type="date" value={until} min={toISODate(selectedDate)} onChange={(e) => setUntil(e.target.value)} className="border-hairline bg-surface-hover text-text-primary h-8 rounded-lg border px-2 text-xs" />
+                        {until && (
+                          <button type="button" onClick={() => setUntil('')} className="text-text-tertiary hover:text-text-primary">
+                            No end
+                          </button>
+                        )}
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-text-secondary text-2xs font-semibold uppercase tracking-wide">Reminder</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {REMINDER_CHOICES.filter(([m]) => !(allDay && m !== null && m < 60 && m !== 0)).map(([m, label]) => (
+                        <button key={String(m)} type="button" onClick={() => setReminder(m)} className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-[background-color,color,box-shadow] duration-150', reminder === m ? 'bg-accent text-accent-contrast shadow-[inset_0_1px_0_rgb(255_255_255/22%),var(--shadow-raised)]' : 'border-hairline bg-surface-hover text-text-primary border hover:bg-surface-overlay')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="border-hairline -mx-5 mt-1 flex items-center justify-between gap-4 border-t px-5 pt-4">
                     <p className="text-text-secondary min-w-0 truncate text-sm">

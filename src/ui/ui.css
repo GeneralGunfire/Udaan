@@ -335,9 +335,9 @@
     z-index: 100;
     padding: 5px 9px;
     border-radius: 7px;
-    background: var(--u-m-solid-hi);
-    border: 1px solid var(--u-edge-strong);
-    box-shadow: var(--u-shadow-md);
+    background: var(--u-mat-surface-hi);
+    border: 0;
+    box-shadow: var(--u-mat-edge);
     color: var(--u-ink);
     font-size: 12px;
     animation: u-pop 120ms var(--u-ease);
@@ -407,7 +407,7 @@
     isolation: isolate;
     display: flex;
     align-items: center;
-    border-radius: 22px;
+    border-radius: var(--u-mat-r-dock);
     /* No outline and no outer shadow: the window is exactly the bar, so a shadow is cut off flat at the window edge and shows as a rectangle, and a light outline reads as a white border. */
     border: 0;
     box-shadow: none;
@@ -422,7 +422,7 @@
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: var(--u-m-dock);
+    background: var(--u-mat-bar);
   }
   .u-dock::after {
     content: '';
@@ -436,6 +436,22 @@
     mix-blend-mode: soft-light;
     opacity: 0.8;
   }
+  /* LIQUID GLASS (os/ui/liquid): while it is on, the bars' old fill is hidden and a GPU surface is drawn behind
+     their widgets instead. Only the background changes. The surface is dark in both themes, so the bars keep light
+     ink even in the light theme. */
+  html[data-liquid] .u-dock,
+  html[data-liquid] .u-menubar {
+    background: transparent !important;
+    box-shadow: none !important;
+    --u-ink: #faf8f4;
+    --u-ink-2: rgb(250 248 244 / 68%);
+    --u-ink-3: rgb(250 248 244 / 44%);
+  }
+  html[data-liquid] .u-dock { border-radius: 9999px; }
+  html[data-liquid] .u-dock::before,
+  html[data-liquid] .u-dock::after,
+  html[data-liquid] .u-menubar::before { display: none; }
+  html[data-liquid] .u-dock > span[aria-hidden]:first-child:not(.u-dock__sep) { display: none; }
   .u-dock__item {
     position: relative;
     display: flex;
@@ -491,9 +507,9 @@
     opacity: 0;
     padding: 3px 8px;
     border-radius: 7px;
-    background: rgb(26 27 31 / 94%);
+    background: var(--u-mat-surface-hi);
     border: 0;
-    box-shadow: none;
+    box-shadow: var(--u-mat-edge);
     color: var(--u-ink);
     font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
     font-size: 11.5px;
@@ -512,13 +528,9 @@
     position: relative;
     isolation: isolate;
     color: var(--u-ink);
-    background: var(--u-m-solid);
+    background: var(--u-mat-bar);
     box-shadow: none;
   }
-  [data-material='legacy'] .u-menubar,
-  [data-material='modern'] .u-menubar { background: rgb(18 18 21 / 66%); }
-  [data-theme='light'][data-material='legacy'] .u-menubar,
-  [data-theme='light'][data-material='modern'] .u-menubar { background: rgb(246 245 243 / 70%); }
   .u-menubar::before {
     content: '';
     position: absolute;
@@ -537,8 +549,9 @@
      launcher window is the whole screen). It is a dense, matte material
      instead: near-opaque charcoal + grain + top light + edge. */
   .u-start {
-    border-radius: 20px;
-    background: var(--u-m-solid) !important;
+    border-radius: var(--u-mat-r-start);
+    background: var(--u-mat-surface) !important;
+    box-shadow: var(--u-mat-edge);
   }
   @keyframes u-start-in {
     from { opacity: 0; transform: translate(-50%, calc(-50% - 8px)) scale(0.985); }
@@ -577,9 +590,9 @@
   /* ── BANNER ───────────────────────────────────────────────────────── */
   .u-banner {
     position: relative;
-    border-radius: 18px;
-    background: var(--u-m-solid) !important;
-    box-shadow: var(--u-shadow-md);
+    border-radius: var(--u-mat-r-panel);
+    background: var(--u-mat-surface) !important;
+    box-shadow: var(--u-mat-edge);
     animation: u-banner-in 220ms var(--u-ease);
     cursor: default;
   }
@@ -746,13 +759,64 @@
 /* ONE POPUP STANDARD: the same material, edge, font and rhythm for every menu and panel. The edge is a faint DARK line (never a light one, which reads as a white outline). */
 .popup-host .os-panel-material, .popup-host .u-surface {
   border: 0 !important;
-  background: rgb(27 28 32 / 95%) !important;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 38%) !important;
+  background: var(--u-mat-surface) !important;
+  box-shadow: var(--u-mat-edge) !important;
 }
-[data-theme='light'] .popup-host .os-panel-material, [data-theme='light'] .popup-host .u-surface { background: rgb(249 249 247 / 96%) !important; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%) !important; }
 .popup-host .os-sheen::before { display: none !important; }
 .popup-host { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; font-size: 12.5px; line-height: 1.35; -webkit-font-smoothing: antialiased; }
 .popup-host * { font-family: inherit !important; letter-spacing: normal !important; }
 /* Panels are drawn a notch smaller than their parts were designed for, so none of them is bulky. */
 .popup-host .popup-panel { zoom: 0.88; }
-.u-banner { box-shadow: inset 0 0 0 1px var(--u-edge) !important; }
+/* The popup window is transparent around its card, so the card's own rounded corners are what you see. */
+html:has(.popup-host), html:has(.popup-host) body, html:has(.popup-host) #root { background: transparent !important; }
+.popup-host .os-sheen::before { display: none !important; }
+.popup-host { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; font-size: 12.5px; line-height: 1.35; -webkit-font-smoothing: antialiased; }
+.popup-host * { font-family: inherit !important; letter-spacing: normal !important; }
+/* Panels are drawn a notch smaller than their parts were designed for, so none of them is bulky. */
+.popup-host .popup-panel { zoom: 0.88; }
+.u-banner { box-shadow: var(--u-mat-edge) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ONE MATERIAL. Every surface in the shell (dock, top bar, popups and menus, Start, tips) takes its colour,
+   edge and corner radius from these tokens and from nowhere else, so they always match and a style change
+   (Settings, Appearance, Materials) restyles all of them together.
+
+     surface     popups, menus, Start         near opaque, so it reads well over anything
+     surface-hi  tooltips and raised parts    one step lighter than surface
+     bar         dock and top bar             translucent; the dock also blurs a slice of your wallpaper
+     edge        outline                      none in Matte; a faint line in Windows 11
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --u-mat-surface: rgb(26 27 31 / 97%);
+  --u-mat-surface-hi: rgb(34 35 40 / 97%);
+  --u-mat-bar: rgb(18 19 23 / 74%);
+  --u-mat-edge: none;
+  --u-mat-r-menu: 10px;
+  --u-mat-r-panel: 14px;
+  --u-mat-r-start: 20px;
+  --u-mat-r-dock: 22px;
+}
+[data-theme='light'] {
+  --u-mat-surface: rgb(249 248 246 / 97%);
+  --u-mat-surface-hi: rgb(255 255 254 / 98%);
+  --u-mat-bar: rgb(246 245 243 / 68%);
+}
+/* Windows 11 style: cool slate tint instead of charcoal, tighter corners, a hairline edge, a flatter bar. */
+[data-mat='win11'] {
+  --u-mat-surface: rgb(33 38 53 / 91%);
+  --u-mat-surface-hi: rgb(43 49 67 / 93%);
+  --u-mat-bar: rgb(27 33 49 / 72%);
+  --u-mat-edge: inset 0 0 0 1px rgb(255 255 255 / 7%);
+  --u-mat-r-menu: 8px;
+  --u-mat-r-panel: 12px;
+  --u-mat-r-start: 16px;
+  --u-mat-r-dock: 14px;
+}
+[data-mat='win11'][data-theme='light'] {
+  --u-mat-surface: rgb(236 241 250 / 93%);
+  --u-mat-surface-hi: rgb(246 249 254 / 95%);
+  --u-mat-bar: rgb(232 238 249 / 70%);
+  --u-mat-edge: inset 0 0 0 1px rgb(0 0 0 / 8%);
+}
+/* Solid surfaces (Settings) and the Eco profile keep every surface solid, in whichever style. */
+[data-opaque] { --u-mat-bar: var(--u-mat-surface); }

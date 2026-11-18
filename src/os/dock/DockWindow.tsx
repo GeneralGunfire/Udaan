@@ -18,9 +18,10 @@ import { useLatest } from '@/os/ui/useLatest'
 import { launchBounce, minimizeNudge, restoreNudge, focusPop } from '@/os/motion/systemMotion'
 import { playSound } from '@/os/sound/sounds'
 import { dockMetrics } from './geometry'
-import { isPermanent, savePins, togglePin } from './pins'
+import { isPermanent, savePins, togglePin, type Pin } from './pins'
 import { toPin, useDockItems, type DockItem } from './useDockItems'
 import { GlassSlice } from '@/ui/GlassSlice'
+import { LiquidGlass } from '@/os/ui/liquid/LiquidGlass'
 
 const METRICS = dockMetrics()
 const LAUNCH_TIMEOUT_MS = 8000
@@ -56,39 +57,44 @@ async function activate(item: DockItem, foreground: number) {
   return emit('launcher:expose', { title: item.name, handles: ws.map((w) => w.handle) })
 }
 
-function itemMenuItems(item: DockItem): ShellMenuItemDef[] {
+function itemMenuItems(item: DockItem, pins: Pin[]): ShellMenuItemDef[] {
   const ws = item.windows
   const truncate = (t: string) => (t.length > 60 ? `${t.slice(0, 57)}…` : t || 'Untitled window')
   return [
     ...(ws.length > 1
       ? [
-          ...ws.slice(0, 12).map((w) => ({ label: truncate(w.title), onSelect: () => void shell.focus(w.handle) })),
-          { label: 'Show all windows', onSelect: () => void emit('launcher:expose', { title: item.name, handles: ws.map((w) => w.handle) }) },
+          { header: true, label: 'Open windows' },
+          ...ws.slice(0, 12).map((w): ShellMenuItemDef => ({ label: truncate(w.title), icon: 'window', onSelect: () => void shell.focus(w.handle) })),
+          { label: 'Show all windows', icon: 'layout', onSelect: () => void emit('launcher:expose', { title: item.name, handles: ws.map((w) => w.handle) }) },
           { label: undefined },
         ]
       : []),
-    { label: item.appId || !ws.length ? `Open ${item.name}` : 'New window', onSelect: () => void launch(item) },
-    ...(toPin(item) && !(item.pinned && isPermanent(item.key)) ? [{ label: item.pinned ? 'Unpin from dock' : 'Pin to dock', onSelect: () => void togglePin(toPin(item)!) }] : []),
+    { label: item.appId || !ws.length ? `Open ${item.name}` : 'New window', icon: item.appId || !ws.length ? 'external' : 'plus', onSelect: () => void launch(item) },
+    ...(toPin(item) && !(item.pinned && isPermanent(item.key)) ? [{ label: item.pinned ? 'Unpin from dock' : 'Pin to dock', icon: 'pin' as const, checked: item.pinned, onSelect: () => void togglePin(toPin(item)!) }] : []),
+    ...(item.pinned && !isPermanent(item.key) ? [{ label: 'Move to the start of the dock', icon: 'star' as const, onSelect: () => { const p = pins.find((x) => x.key === item.key); if (p) void savePins([p, ...pins.filter((x) => x.key !== item.key)]) } }] : []),
+    ...(item.appId ? [{ label: `${item.name} settings`, icon: 'sliders' as const, onSelect: () => void openApp('settings') }] : []),
     ...(ws.length
       ? [
           { label: undefined },
-          { label: ws.length > 1 ? 'Minimize all' : 'Minimize', onSelect: () => ws.forEach((w) => void shell.minimize(w.handle)) },
-          { label: ws.length > 1 ? `Close all ${ws.length} windows` : 'Close window', onSelect: () => ws.forEach((w) => void shell.close(w.handle)) },
+          { label: ws.length > 1 ? 'Minimize all' : 'Minimize', icon: 'minimize' as const, onSelect: () => ws.forEach((w) => void shell.minimize(w.handle)) },
+          { label: ws.length > 1 ? `Close all ${ws.length} windows` : 'Close window', icon: 'x' as const, danger: true, onSelect: () => ws.forEach((w) => void shell.close(w.handle)) },
         ]
       : []),
   ]
 }
 
 const dockMenuItems: ShellMenuItemDef[] = [
-  { label: 'Show desktop', onSelect: () => void shell.toggleDesktop() },
-  { label: 'Lock screen', onSelect: () => void emit('launcher:lock') },
+  { label: 'Show desktop', icon: 'monitor', onSelect: () => void shell.toggleDesktop() },
+  { label: 'Lock screen', icon: 'lock', onSelect: () => void emit('launcher:lock') },
+  { label: 'Start screensaver', icon: 'moon', onSelect: () => void emit('launcher:screensaver') },
   { label: undefined },
-  { label: 'Change wallpaper…', onSelect: () => void emit('launcher:wallpaper') },
-  { label: 'Next wallpaper', onSelect: () => void invoke('wallpaper_step', { forward: true }) },
+  { label: 'Change wallpaper…', icon: 'image', onSelect: () => void emit('launcher:wallpaper') },
+  { label: 'Next wallpaper', icon: 'refresh', onSelect: () => void invoke('wallpaper_step', { forward: true }) },
   { label: undefined },
-  { label: 'Auto-hide the dock', onSelect: () => void getPref('dock.autoHide').then((v) => setPref('dock.autoHide', !v)) },
-  { label: 'Dock settings', onSelect: () => void openApp('settings', { section: 'dock' }) },
-  { label: 'Task Manager', onSelect: () => void openSystemUtility('taskManager') },
+  { label: 'Auto-hide the dock', icon: 'eye', onSelect: () => void getPref('dock.autoHide').then((v) => setPref('dock.autoHide', !v)) },
+  { label: 'Dock and glass settings…', icon: 'sliders', onSelect: () => void openApp('settings', { section: 'personalization' }) },
+  { label: undefined },
+  { label: 'Task Manager', icon: 'terminal', onSelect: () => void openSystemUtility('taskManager') },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -99,12 +105,14 @@ function DockIcon({
   dragOffset,
   onPointerDown,
   onOpenMenu,
+  itemMenu,
 }: {
   item: DockItem
   foreground: number
   dragOffset: { x: number; y: number } | null
   onPointerDown: (e: React.PointerEvent, item: DockItem, el: HTMLElement) => void
   onOpenMenu: (e: React.MouseEvent, items: ShellMenuItemDef[]) => void
+  itemMenu: (item: DockItem) => ShellMenuItemDef[]
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const controls = useAnimationControls()
@@ -162,7 +170,7 @@ function DockIcon({
       onContextMenu={(e) => {
         e.preventDefault()
         e.stopPropagation()
-        onOpenMenu(e, itemMenuItems(item))
+        onOpenMenu(e, itemMenu(item))
       }}
       onWheel={(e) => {
         if (!count) return
@@ -236,6 +244,7 @@ function DockGlyph({ item }: { item: DockItem }) {
 export function DockWindow() {
   const [autoHide] = usePref('dock.autoHide')
   const { items, pins, pinnedCount } = useDockItems()
+  const itemMenu = useCallback((item: DockItem) => itemMenuItems(item, pins), [pins])
   const foreground = useShell((s) => s.foreground)
   const immersive = useImmersive()
   const fullscreen = useShell((s) => s.fullscreen) || immersive
@@ -504,6 +513,8 @@ export function DockWindow() {
         }}
       >
         <GlassSlice edge="bottom" parentRef={barRef} />
+        {/* The liquid-glass fill (hides GlassSlice's while on). Only the background: everything below draws on top. */}
+        <LiquidGlass role="dock" barRef={barRef} paused={!visible} />
         <button
           type="button"
           aria-label="Start"
@@ -512,7 +523,7 @@ export function DockWindow() {
           style={{ width: METRICS.slot, height: METRICS.slot }}
         >
           <DockLabel text="Start" count={0} />
-          <span className="u-dock__glyph relative">
+          <span className="u-dock__glyph relative" style={{ transform: 'translateY(3px)' }}>
             <StartTile size={METRICS.iconSize} />
           </span>
         </button>
@@ -520,7 +531,7 @@ export function DockWindow() {
 
         {items.flatMap((item, i) => {
           const icon = (
-            <DockIcon key={item.key} item={item} foreground={foreground} dragOffset={drag?.key === item.key ? { x: drag.dx, y: drag.dy } : null} onPointerDown={onPointerDown} onOpenMenu={openMenu} />
+            <DockIcon key={item.key} item={item} foreground={foreground} dragOffset={drag?.key === item.key ? { x: drag.dx, y: drag.dy } : null} onPointerDown={onPointerDown} onOpenMenu={openMenu} itemMenu={itemMenu} />
           )
           return i === pinnedCount && pinnedCount > 0 ? [<Divider key="div-running" />, icon] : [icon]
         })}

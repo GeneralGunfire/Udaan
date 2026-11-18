@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useAnimationControls } from 'framer-motion'
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -7,6 +7,7 @@ import { prefersReducedMotion } from '@/shared/lib/motion'
 import { APP_COMPONENTS, APP_DEFS, type AppId } from '@/os/kernel/registry'
 import { loadBounds, saveBounds, shell } from '@/os/kernel/shell'
 import { windowMotion } from '@/os/motion/systemMotion'
+import { useMotion, windowCloseMotion, windowOpenMotion } from '@/os/motion/config'
 import { TitleBar } from './TitleBar'
 
 function Loading() {
@@ -169,6 +170,30 @@ export function AppWindow({ appId }: { appId: AppId }) {
   const args = useLaunchArgs()
   const shown = useRef(false)
   const reduced = prefersReducedMotion()
+  const openMo = useMotion('open')
+  const closeMo = useMotion('close')
+  const openProps = windowOpenMotion(openMo, openMo.style)
+  const controls = useAnimationControls()
+  const closing = useRef(false)
+  const closedOnce = useRef(false)
+
+  // A window that was closed is only hidden (it stays warm), so when it is shown again the open animation plays again.
+  useEffect(() => {
+    const replay = () => {
+      if (!closedOnce.current) return
+      closedOnce.current = false
+      closing.current = false
+      controls.set(openProps.initial)
+      void controls.start(openProps.animate)
+    }
+    const onVis = () => document.visibilityState === 'visible' && replay()
+    document.addEventListener('visibilitychange', onVis)
+    const un = getCurrentWindow().onFocusChanged(({ payload }) => payload && replay())
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      void un.then((f) => f())
+    }
+  }, [controls, openProps])
 
   useEffect(() => {
     document.title = def.name
@@ -181,11 +206,21 @@ export function AppWindow({ appId }: { appId: AppId }) {
   }, [def.name])
 
   const win = getCurrentWindow()
+  useEffect(() => {
+    void controls.start(reduced ? windowMotion.reduced.animate : openProps.animate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Closing hides the window instantly so reopening is immediate. How long it then stays
   // warm is the engine's decision (engine::apps): briefly, capped, and shorter when the PC
   // is short of memory. The TV always closes fully (its players must stop).
-  const close = () => {
+  const close = async () => {
     if (appId === 'tv') return void win.close()
+    if (closing.current) return
+    closing.current = true
+    // A short exit first (chosen in Settings → Animations), then the window is hidden.
+    const exit = reduced ? null : windowCloseMotion(closeMo, closeMo.style)
+    if (exit) await controls.start(exit.animate).catch(() => {})
+    closedOnce.current = true
     void invoke('engine_app_closed')
   }
   const content: ReactNode = <Component {...(args ?? {})} onClose={close} />
@@ -193,7 +228,9 @@ export function AppWindow({ appId }: { appId: AppId }) {
   return (
     <motion.div
       className="flex h-screen w-screen flex-col overflow-hidden bg-bg-base"
-      {...(reduced ? windowMotion.reduced : windowMotion.open)}
+      initial={reduced ? windowMotion.reduced.initial : openProps.initial}
+      animate={controls}
+      onAnimationComplete={undefined}
     >
       {!fullscreen && <TitleBar
         title={def.name}

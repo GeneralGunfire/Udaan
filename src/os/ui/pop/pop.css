@@ -1,0 +1,65 @@
+/*
+ * THE POP KIT: every floating card in the OS (notification banners, Notification Center, the six top-bar
+ * popups, right-click menus, Start). One family: a liquid-glass card, light ink, a hairline edge, a soft
+ * neutral shadow (never a glow), generous radius, quiet hover washes.
+ */
+.pop-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #faf8f4;
+  /* The glass is dark in both themes, so cards keep light ink. */
+  --u-ink: #faf8f4;
+  --u-ink-2: rgb(250 248 244 / 70%);
+  --u-ink-3: rgb(250 248 244 / 46%);
+  --u-edge: rgb(255 255 255 / 9%);
+  --u-wash-hover: rgb(255 255 255 / 7%);
+  --u-wash-on: rgb(255 255 255 / 13%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 6%), 0 16px 44px rgb(0 0 0 / 42%), 0 2px 8px rgb(0 0 0 / 28%);
+}
+.pop-surface--flat { background: var(--u-mat-surface, #1d1e22); }
+
+.pop-in { animation: pop-in calc(240ms / var(--menus-k, 1)) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes pop-fade { from { opacity: 0; } to { opacity: 1; } }
+html[data-menus='fade'] .pop-in { animation-name: pop-fade; }
+html[data-menus='off'] .pop-in { animation: none; }
+
+/* rows and buttons */
+.pop-row { display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 8px 10px; text-align: left; transition: background-color 120ms; }
+.pop-row:hover { background: var(--u-wash-hover); }
+.pop-row:active { background: var(--u-wash-on); }
+.pop-btn { display: inline-flex; height: 28px; align-items: center; justify-content: center; gap: 6px; border-radius: 999px; padding: 0 13px; font-size: 12px; font-weight: 600; background: rgb(255 255 255 / 12%); transition: background-color 120ms, transform 120ms; }
+.pop-btn:hover { background: rgb(255 255 255 / 19%); }
+.pop-btn:active { transform: scale(0.96); }
+.pop-btn--accent { background: var(--u-accent, #3072f0); color: #fff; }
+.pop-btn--accent:hover { background: color-mix(in srgb, var(--u-accent, #3072f0) 88%, white); }
+.pop-iconbtn { display: inline-flex; height: 30px; width: 30px; align-items: center; justify-content: center; border-radius: 999px; transition: background-color 120ms, transform 120ms; }
+.pop-iconbtn:hover { background: rgb(255 255 255 / 12%); }
+.pop-iconbtn:active { transform: scale(0.92); }
+.pop-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--u-ink-3); }
+.pop-chip { height: 32px; border-radius: 10px; padding: 0 6px; font-size: 12.5px; font-weight: 500; background: rgb(255 255 255 / 8%); transition: background-color 120ms; }
+.pop-chip:hover { background: rgb(255 255 255 / 14%); }
+.pop-chip[aria-pressed='true'] { background: var(--u-ink); color: #17181b; font-weight: 600; }
+.pop-sep { height: 1px; margin: 4px 8px; background: var(--u-edge); }
+
+/* notification banner: the auto-dismiss timer is a hairline that drains, and stops while you hover */
+@keyframes pop-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.pop-timer { transform-origin: left; animation: pop-timer var(--pop-dur, 6s) linear forwards; }
+.pop-banner:hover .pop-timer { animation-play-state: paused; }
+.pop-banner .pop-actions { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 180ms ease, opacity 160ms ease, margin 180ms ease; margin-top: 0; }
+.pop-banner:hover .pop-actions, .pop-banner:focus-within .pop-actions { max-height: 40px; opacity: 1; margin-top: 8px; }
+.pop-banner .pop-close { opacity: 0; transition: opacity 120ms; }
+.pop-banner:hover .pop-close { opacity: 1; }
+
+/* menus */
+.pop-menu-item { display: flex; width: 100%; align-items: center; gap: 10px; border-radius: 9px; padding: 0 10px; height: 30px; font-size: 13px; text-align: left; transition: background-color 80ms; }
+.pop-menu-item:hover:not(:disabled), .pop-menu-item[data-open='true'] { background: var(--u-accent, #3072f0); color: #fff; }
+.pop-menu-item:hover:not(:disabled) .pop-kbd, .pop-menu-item[data-open='true'] .pop-kbd { color: rgb(255 255 255 / 75%); }
+.pop-menu-item:disabled { opacity: 0.38; }
+.pop-menu-item[data-danger='true'] { color: #ff8b82; }
+.pop-menu-item[data-danger='true']:hover:not(:disabled) { background: #d9453c; color: #fff; }
+.pop-kbd { margin-left: auto; font-size: 11.5px; letter-spacing: 0.02em; color: var(--u-ink-3); }
+
+/* thin scrollbars inside cards */
+.pop-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 22%) transparent; }

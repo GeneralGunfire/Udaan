@@ -10,6 +10,7 @@ import {
 import { hydrateScheduleCache, isScheduleCacheHydrated } from '@/integrations/schedule/scheduleStore'
 import type { ScheduleEvent as DbScheduleEvent } from '@/integrations/schedule/types'
 import type { CalendarEvent, EventDraft, EventTag } from '../lib/types'
+import { fmtDay, occurrenceDays, parseDay, parseRule, ruleToJson } from '../lib/recurrence'
 
 const LEGACY_STORAGE_KEY = 'udaan.calendar.events'
 const MIGRATION_FLAG_KEY = 'udaan.calendar.migratedToSqlite'
@@ -27,6 +28,8 @@ function calendarEventFromDb(e: DbScheduleEvent): CalendarEvent {
     done: e.status === 'done',
     createdAt: Date.parse(e.createdAt) || Date.now(),
     updatedAt: Date.parse(e.createdAt) || Date.now(),
+    recurrence: parseRule(e.recurrence),
+    reminderMinutes: e.reminderMinutes ?? null,
   }
 }
 
@@ -39,7 +42,25 @@ function draftToDbInput(draft: EventDraft) {
     description: draft.notes || undefined,
     allDay: draft.allDay,
     durationMinutes: draft.durationMinutes,
+    recurrence: ruleToJson(draft.recurrence),
+    reminderMinutes: draft.reminderMinutes ?? null,
   }
+}
+
+/** Which single days of a repeating event were ticked off (the stored event is shared by every day, so this is kept apart). */
+const OCC_DONE_KEY = 'udaan.calendar.occDone'
+function readOccDone(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(OCC_DONE_KEY) ?? '[]') as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+/** "abc@2026-03-09" -> the stored event's id and the day. */
+const splitId = (id: string) => {
+  const i = id.indexOf('@')
+  return i < 0 ? { id, day: null as string | null } : { id: id.slice(0, i), day: id.slice(i + 1) }
 }
 
 /** Reads any pre-migration events sitting in localStorage, without touching them. */
@@ -127,7 +148,23 @@ export function useEvents(): UseEventsResult {
   const [loadError, setLoadError] = useState<string | null>(null)
   // Work keeps to events tagged "work"; Personal leaves them out. The stored events are never touched.
   const profile = useProfile()
-  const visible = useMemo(() => events.filter((e) => (e.tag === 'work') === (profile === 'work')), [events, profile])
+  const [occDone, setOccDone] = useState<Set<string>>(readOccDone)
+  // A repeating event is stored once; the days it falls on (from last year to two years ahead) are made from its rule.
+  const visible = useMemo(() => {
+    const mine = events.filter((e) => (e.tag === 'work') === (profile === 'work'))
+    const now = new Date()
+    const from = fmtDay(new Date(now.getFullYear() - 1, now.getMonth(), 1))
+    const to = fmtDay(new Date(now.getFullYear() + 2, 11, 31))
+    const out: CalendarEvent[] = []
+    for (const e of mine) {
+      if (!e.recurrence) {
+        out.push(e)
+        continue
+      }
+      for (const d of occurrenceDays(e.date, e.recurrence, from, to)) out.push({ ...e, id: `${e.id}@${d}`, seriesId: e.id, date: d, done: occDone.has(`${e.id}@${d}`) })
+    }
+    return out
+  }, [events, profile, occDone])
   const eventsRef = useRef(events)
   eventsRef.current = events
 
@@ -150,6 +187,13 @@ export function useEvents(): UseEventsResult {
       })
     }
   }, [])
+
+  // An import (or anything else outside this hook) changed the calendar.
+  useEffect(() => {
+    const again = () => void refresh()
+    window.addEventListener('udaan:calendar-changed', again)
+    return () => window.removeEventListener('udaan:calendar-changed', again)
+  }, [refresh])
 
   useEffect(() => {
     let cancelled = false
@@ -186,11 +230,19 @@ export function useEvents(): UseEventsResult {
   )
 
   const updateEvent = useCallback(
-    (id: string, draft: EventDraft) => {
+    (given: string, draftIn: EventDraft) => {
       const previous = eventsRef.current
+      const { id, day } = splitId(given)
+      const existing = previous.find((e) => e.id === id)
+      let draft = draftIn
+      if (day && existing) {
+        // One day of a series was changed: the change applies to the whole series, and moving the day moves the series by as much.
+        const shift = Math.round((parseDay(draftIn.date).getTime() - parseDay(day).getTime()) / 86_400_000)
+        const start = new Date(parseDay(existing.date).getFullYear(), parseDay(existing.date).getMonth(), parseDay(existing.date).getDate() + shift, 12)
+        draft = { ...draftIn, date: fmtDay(start), recurrence: draftIn.recurrence ?? existing.recurrence }
+      }
       setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...draft, updatedAt: Date.now() } : e)))
 
-      const existing = previous.find((e) => e.id === id)
       dbUpdateEvent({
         id,
         title: draft.title,
@@ -206,6 +258,8 @@ export function useEvents(): UseEventsResult {
         createdAt: existing ? new Date(existing.createdAt).toISOString() : new Date().toISOString(),
         allDay: draft.allDay,
         durationMinutes: draft.durationMinutes,
+        recurrence: ruleToJson(draft.recurrence),
+        reminderMinutes: draft.reminderMinutes ?? null,
       })
         .then(() => refresh())
         .catch((err) => {
@@ -217,7 +271,23 @@ export function useEvents(): UseEventsResult {
   )
 
   const toggleEventDone = useCallback(
-    (id: string) => {
+    (given: string) => {
+      if (given.includes('@')) {
+        // One day of a repeating event.
+        setOccDone((cur) => {
+          const next = new Set(cur)
+          if (next.has(given)) next.delete(given)
+          else next.add(given)
+          try {
+            localStorage.setItem(OCC_DONE_KEY, JSON.stringify([...next].slice(-2000)))
+          } catch {
+            /* not remembered */
+          }
+          return next
+        })
+        return
+      }
+      const id = given
       const previous = eventsRef.current
       const existing = previous.find((e) => e.id === id)
       if (!existing) return
@@ -236,8 +306,10 @@ export function useEvents(): UseEventsResult {
   )
 
   const deleteEvent = useCallback(
-    (id: string) => {
+    (given: string) => {
       const previous = eventsRef.current
+      // Deleting one day of a repeating event deletes the whole series.
+      const id = splitId(given).id
       setEvents((prev) => prev.filter((e) => e.id !== id))
 
       dbDeleteEvent(id)

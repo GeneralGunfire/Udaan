@@ -3,6 +3,7 @@ import { MotionConfig, MotionGlobalConfig } from 'framer-motion'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { usePref } from './prefs'
+import { useMotionConfig } from '@/os/motion/config'
 import { installUiScale } from './uiScale'
 
 installUiScale()
@@ -10,6 +11,13 @@ installUiScale()
 /** Applies Settings → "Animations off" to every window: no motion, no transitions. */
 export function MotionRoot({ children }: { children: ReactNode }) {
   const [off] = usePref('motion.off')
+  const cfg = useMotionConfig()
+  // Menus and popups animate with plain CSS, so their speed and style travel as a variable and an attribute.
+  useEffect(() => {
+    const m = cfg.parts.menus
+    document.documentElement.style.setProperty('--menus-k', String(cfg.speed * m.speed))
+    document.documentElement.dataset.menus = m.on ? m.style : 'off'
+  }, [cfg])
   useEffect(() => {
     document.documentElement.classList.toggle('no-motion', off)
     // Every Framer Motion animation jumps straight to its end state.

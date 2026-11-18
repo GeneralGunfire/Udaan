@@ -30,8 +30,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 /// Longest a Ctrl press may be held and still count as a tap.
 const MAX_HOLD_MS: u32 = 220;
-/// Longest pause between the first tap's release and the second press.
-const MAX_GAP_MS: u32 = 350;
+/// Longest pause between the first tap's release and the second press (the default; Settings → Window Switcher changes it).
+const DEFAULT_GAP_MS: u32 = 350;
+static GAP_MS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(DEFAULT_GAP_MS);
+
+/// Sets the longest pause between the two taps, clamped to a sensible range.
+pub fn set_gap_ms(ms: u32) {
+  GAP_MS.store(ms.clamp(200, 600), std::sync::atomic::Ordering::Relaxed);
+}
+
+fn max_gap_ms() -> u32 {
+  GAP_MS.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 /// The shortcut id for Win+<key>, if Udaan owns it.
 pub fn win_combo(vk: u32) -> Option<&'static str> {
@@ -178,14 +188,14 @@ impl Keys {
       let busy = self.shift || self.win || e.alt || ctx.mouse_down;
       self.dirty = busy;
       self.press_at = e.time;
-      if self.armed && (busy || e.time.wrapping_sub(self.first_up) > MAX_GAP_MS || ctx.clicked_since(self.first_up)) {
+      if self.armed && (busy || e.time.wrapping_sub(self.first_up) > max_gap_ms() || ctx.clicked_since(self.first_up)) {
         self.armed = false;
       }
     } else if !e.down && was_down {
       let clean = !self.dirty && e.time.wrapping_sub(self.press_at) <= MAX_HOLD_MS && !ctx.clicked_since(self.press_at);
       if !clean {
         self.armed = false;
-      } else if self.armed && self.press_at.wrapping_sub(self.first_up) <= MAX_GAP_MS {
+      } else if self.armed && self.press_at.wrapping_sub(self.first_up) <= max_gap_ms() {
         self.armed = false;
         r.hotkey = Some("switcher-ctrl");
       } else {

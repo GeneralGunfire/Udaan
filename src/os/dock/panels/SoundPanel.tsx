@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { invoke } from '@tauri-apps/api/core'
 import { launchApp } from '@/integrations/installed-apps/client'
 import { usePref } from '@/os/kernel/prefs'
-import { openApp } from '@/os/kernel/shell'
 import { VolumeIcon, VolumeMuteIcon } from '@/shared/icons'
 import { cn } from '@/shared/lib/cn'
 import { Button, Segmented, Slider, Switch } from '@/os/ui/controls'
@@ -399,7 +398,7 @@ export function SoundPanel() {
 
         <p className="mt-2 text-[11px] leading-snug text-[var(--os-text-dim)]">
           {preset === 'flat'
-            ? 'Shapes everything Udaan plays — music, the DJ board, video and interface sounds.'
+            ? 'Shapes everything Udaan plays — music, video and interface sounds.'
             : 'Applied instantly to everything Udaan plays. Levels drop automatically as you boost, so it never distorts.'}
         </p>
       </section>
@@ -447,9 +446,6 @@ export function SoundPanel() {
       </section>
 
       <div className="flex gap-2" data-no-wheel>
-        <Button variant="tinted" size="lg" onClick={() => void openApp('live-dj')} className="flex-1 rounded-[10px] text-[12.5px]">
-          DJ board
-        </Button>
         <Button variant="tinted" size="lg" onClick={() => void launchApp('ms-settings:sound')} className="flex-1 rounded-[10px] text-[12.5px]">
           Sound settings…
         </Button>

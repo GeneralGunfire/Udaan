@@ -1,0 +1,6 @@
+/* These only run while research is in progress. */
+@keyframes research-spin { to { transform: rotate(360deg); } }
+.research-spin { animation: research-spin 0.8s linear infinite; }
+@keyframes research-caret { 50% { opacity: 0; } }
+.research-caret { animation: research-caret 1s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) { .research-spin, .research-caret { animation: none; } }

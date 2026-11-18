@@ -32,7 +32,7 @@ export function useNowPlaying(pollMs: number, tickMs = 250, audibleFallback = fa
         let m = await invoke<NowPlaying | null>('shell_now_playing')
         if (!m && audibleFallback) {
           // Some pages make sound without telling Windows what it is: show which app is playing.
-          const src = await invoke<{ name: string; exe: string; active: boolean; peak: number }[]>('live_audio_sources').catch(() => [])
+          const src = await invoke<{ name: string; exe: string; active: boolean; peak: number }[]>('audio_active_apps').catch(() => [])
           const hit = src.find((x) => x.active && x.peak > 0.02)
           if (hit) m = { title: `${hit.name} audio`, artist: 'Playing sound', album: '', source: hit.exe, playing: true, canNext: false, canPrevious: false, thumbnail: null, positionMs: null, durationMs: null, canSeek: false } as NowPlaying
         }

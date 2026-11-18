@@ -5,6 +5,7 @@ import type { ScheduleEvent } from '@/integrations/schedule/types'
 import { weatherCodeToGlyph, weatherCodeToLabel } from '@/integrations/weather/weatherClient'
 import { buildStories, parseRawItems } from '@/features/news-brief/NewsBriefView'
 import { openApp } from '@/os/kernel/shell'
+import { useProfile } from '@/os/kernel/profile'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { ChevronRightIcon } from '@/shared/icons'
 
@@ -144,27 +145,42 @@ function greeting(h: number) {
   return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
 }
 
-function Card({ title, action, onAction, children, className = '' }: { title: string; action?: string; onAction?: () => void; children: ReactNode; className?: string }) {
+/** A glass sub-card: the same family as the popups. */
+function Card({ title, action, onAction, children, className = '' }: { title?: string; action?: string; onAction?: () => void; children: ReactNode; className?: string }) {
   return (
-    <section className={`flex shrink-0 flex-col rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 ${className}`}>
-      <header className="mb-3 flex items-center justify-between">
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-(--os-text-dim)">{title}</h3>
-        {action && (
-          <button type="button" onClick={onAction} className="flex items-center gap-0.5 rounded-[6px] px-2 py-0.5 text-[12px] text-(--os-text-dim) hover:bg-(--os-hover) hover:text-(--os-text)">
-            {action}
-            <ChevronRightIcon width={12} height={12} />
-          </button>
-        )}
-      </header>
+    <section className={`flex flex-col rounded-[22px] bg-white/[0.08] p-4 ${className}`}>
+      {(title || action) && (
+        <header className="mb-3 flex items-center justify-between">
+          <h3 className="pop-label">{title}</h3>
+          {action && (
+            <button type="button" onClick={onAction} className="pop-btn" style={{ height: 24, fontSize: 11.5 }}>
+              {action} <ChevronRightIcon width={11} height={11} />
+            </button>
+          )}
+        </header>
+      )}
       {children}
     </section>
   )
 }
 
+/** Minutes since midnight for "HH:mm". */
+const minutes = (hm?: string) => (hm ? Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)) : 0)
+
+/**
+ * MY DAY: one calm screen that fits the Start card exactly (no clipping, nothing to scroll).
+ *
+ *   top      a greeting, the date and a one-line summary
+ *   middle   Today as a timeline on the left (with a marker for "now"); the weather on the right
+ *   bottom   the news brief as a slim strip of headlines
+ * In the Work profile the timeline shows Work events only (the calendar itself is untouched).
+ */
 export function MyDay({ user, onClose }: { user: string; onClose: () => void }) {
   const now = new Date()
+  const profile = useProfile()
   const { weather, error } = useWeather()
-  const events = useAgenda()
+  const all = useAgenda()
+  const events = useMemo(() => (all && profile === 'work' ? all.filter((e) => e.category === 'work') : all), [all, profile])
   const brief = useBrief()
   const stories = useMemo(() => {
     if (!brief) return []
@@ -179,130 +195,123 @@ export function MyDay({ user, onClose }: { user: string; onClose: () => void }) 
     fn()
   }
   const nowHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const upcoming = events?.filter((e) => !e.allDay && e.status !== 'done' && (e.endTime ?? e.startTime ?? '') >= nowHm) ?? []
+  const summary =
+    events === null ? '' : events.length === 0 ? 'Nothing scheduled today' : upcoming.length ? `${upcoming.length} still to come · next at ${upcoming[0].startTime ?? 'today'}` : `${events.length} ${events.length === 1 ? 'event' : 'events'} today, all done`
+  const firstFuture = events ? events.findIndex((x) => !x.allDay && x.startTime !== undefined && minutes(x.startTime) > nowMin) : -1
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-5">
-      <div className="pb-1">
-        <p className="text-[24px] font-semibold tracking-tight">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-7 pb-4">
+      {/* greeting */}
+      <div className="shrink-0">
+        <p className="text-[28px] font-extralight leading-tight tracking-tight">
           {greeting(now.getHours())}
           {user ? `, ${user}` : ''}
         </p>
-        <p className="text-[13px] text-(--os-text-dim)">
+        <p className="mt-0.5 text-[12.5px] text-(--u-ink-2)">
           {now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-          {events && ` · ${events.length === 0 ? 'Nothing scheduled' : `${events.length} ${events.length === 1 ? 'event' : 'events'} today`}`}
+          {profile === 'work' ? ' · Work' : ''}
+          {summary && ` · ${summary}`}
         </p>
       </div>
 
-      <div className="grid grid-cols-[1.15fr_1fr] gap-3">
-        <Card title={weather?.place ?? 'Weather'}>
-          {weather ? (
-            <>
-              <div className="flex items-center gap-4">
-                <span className="text-[44px] leading-none">{weatherCodeToGlyph(weather.code)}</span>
-                <div>
-                  <p className="text-[34px] font-light leading-none tabular-nums">{weather.temp}°</p>
-                  <p className="mt-1 text-[12.5px] text-(--os-text-dim)">
-                    {weatherCodeToLabel(weather.code)} · feels {weather.feels}°
-                  </p>
-                </div>
-                <div className="ml-auto text-right text-[12.5px] tabular-nums text-(--os-text-dim)">
-                  <p>
-                    H {weather.high}° · L {weather.low}°
-                  </p>
-                  <p>{weather.rainChance}% rain</p>
-                </div>
+      {/* today + weather */}
+      <div className="grid min-h-0 flex-1 grid-cols-[1fr_246px] gap-3">
+        <Card title="Today" action="Calendar" onAction={open(() => void openApp('calendar'))} className="min-h-0 overflow-hidden">
+          <div className="pop-scroll -mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+            {events === null ? (
+              <p className="text-[13px] text-(--u-ink-3)">Loading…</p>
+            ) : events.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 py-6 text-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[18px]">✓</span>
+                <p className="text-[14px] font-medium">A clear day</p>
+                <p className="text-[12px] text-(--u-ink-3)">{profile === 'work' ? 'No Work events on your calendar.' : 'No events on your calendar.'}</p>
               </div>
-              <div className="mt-4 grid grid-cols-6 gap-1 border-t border-[var(--border-hairline)] pt-3 text-center">
-                {weather.hours.map((h) => (
-                  <div key={h.time} className="flex flex-col items-center gap-1">
-                    <span className="text-[11px] text-(--os-text-dim)">{h.time?.slice(11, 16)}</span>
-                    <span className="text-[16px]">{weatherCodeToGlyph(h.code)}</span>
-                    <span className="text-[12.5px] tabular-nums">{h.temp}°</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 flex justify-between border-t border-[var(--border-hairline)] pt-3">
-                {weather.days.map((d) => (
-                  <div key={d.date} className="flex flex-col items-center gap-0.5 text-[12px] tabular-nums">
-                    <span className="text-[11px] text-(--os-text-dim)">{new Date(`${d.date}T12:00`).toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                    <span className="text-[15px]">{weatherCodeToGlyph(d.code)}</span>
-                    <span>
-                      {d.high}° <span className="text-(--os-text-dim)">{d.low}°</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-[13px] text-(--os-text-dim)">{error ? 'Weather is unavailable right now.' : 'Getting the forecast…'}</p>
-          )}
+            ) : (
+              <ol className="relative flex flex-col pl-3">
+                <span aria-hidden className="absolute bottom-1 left-[3px] top-1 w-px bg-white/15" />
+                {events.map((e, i) => {
+                  const past = !e.allDay && e.endTime !== undefined && e.endTime < nowHm
+                  const isNow = !e.allDay && e.startTime !== undefined && minutes(e.startTime) <= nowMin && (e.endTime === undefined || minutes(e.endTime) > nowMin)
+                  return (
+                    <li key={e.id}>
+                      {i === firstFuture && !isNow && (
+                        <div className="relative my-1 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-[#ff6b61]">
+                          <span aria-hidden className="absolute -left-[13px] h-[7px] w-[7px] rounded-full bg-[#ff6b61]" />
+                          Now · {nowHm}
+                          <span className="h-px flex-1 bg-[#ff6b61]/40" />
+                        </div>
+                      )}
+                      <div className={`flex items-start gap-3 rounded-[12px] px-2.5 py-2 ${isNow ? 'bg-white/[0.1]' : ''} ${past || e.status === 'done' ? 'opacity-45' : ''}`}>
+                        <span className="w-[60px] shrink-0 pt-px text-[12px] tabular-nums text-(--u-ink-2)">{e.allDay || !e.startTime ? 'All day' : e.startTime}</span>
+                        <span aria-hidden className="mt-0.5 h-7 w-[3px] shrink-0 rounded-full" style={{ background: CATEGORY_COLOUR[e.category] }} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13.5px] font-medium">{e.title}</span>
+                          <span className="block truncate text-[11.5px] text-(--u-ink-3)">{isNow ? 'Happening now' : e.endTime && e.startTime ? `${e.startTime} to ${e.endTime}` : e.description || e.category}</span>
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </div>
         </Card>
 
-        <Card title="Today" action="Calendar" onAction={open(() => void openApp('calendar'))}>
-          {events === null ? (
-            <p className="text-[13px] text-(--os-text-dim)">Loading…</p>
-          ) : events.length === 0 ? (
-            <div className="flex flex-1 flex-col items-start justify-center gap-2">
-              <p className="text-[14px]">A clear day.</p>
-              <p className="text-[12.5px] text-(--os-text-dim)">No events on your calendar.</p>
+        <Card title={weather?.place ?? 'Weather'} className="min-h-0 overflow-hidden">
+          {weather ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center gap-3">
+                <span className="text-[32px] leading-none">{weatherCodeToGlyph(weather.code)}</span>
+                <div>
+                  <p className="text-[34px] font-extralight leading-none tabular-nums">{weather.temp}°</p>
+                  <p className="mt-0.5 text-[11.5px] text-(--u-ink-2)">{weatherCodeToLabel(weather.code)}</p>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11.5px] tabular-nums text-(--u-ink-3)">H {weather.high}° · L {weather.low}° · feels {weather.feels}°</p>
+              <div className="mt-2 grid grid-cols-5 gap-0.5 border-t border-white/10 pt-2 text-center">
+                {weather.hours.slice(0, 5).map((h) => (
+                  <div key={h.time} className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-(--u-ink-3)">{h.time?.slice(11, 13)}h</span>
+                    <span className="text-[14px]">{weatherCodeToGlyph(h.code)}</span>
+                    <span className="text-[11.5px] tabular-nums">{h.temp}°</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-5 gap-0.5 border-t border-white/10 pt-2 text-center">
+                {weather.days.slice(0, 5).map((d) => (
+                  <div key={d.date} className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-(--u-ink-3)">{new Date(`${d.date}T12:00`).toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                    <span className="text-[14px]">{weatherCodeToGlyph(d.code)}</span>
+                    <span className="text-[11px] tabular-nums">{d.high}°<span className="text-(--u-ink-3)"> {d.low}°</span></span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
-            <ol className="flex flex-col gap-1.5 overflow-y-auto">
-              {events.slice(0, 6).map((e) => {
-                const past = !e.allDay && e.endTime !== undefined && e.endTime < nowHm
-                return (
-                  <li key={e.id} className={`flex items-start gap-3 rounded-[8px] bg-[var(--surface-raised)] px-3 py-2 ${past || e.status === 'done' ? 'opacity-50' : ''}`}>
-                    <span className="mt-[3px] h-8 w-[3px] shrink-0 rounded-full" style={{ background: CATEGORY_COLOUR[e.category] }} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium">{e.title}</span>
-                      <span className="block text-[11.5px] tabular-nums text-(--os-text-dim)">{e.allDay || !e.startTime ? 'All day' : `${e.startTime}${e.endTime ? ` – ${e.endTime}` : ''}`}</span>
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
+            <p className="text-[12.5px] text-(--u-ink-3)">{error ? 'Weather is unavailable right now.' : 'Getting the forecast…'}</p>
           )}
         </Card>
       </div>
 
-      <Card title="Your news brief" action="Open News" onAction={open(() => void openApp('news-brief'))}>
-        {brief === undefined ? (
-          <p className="text-[13px] text-(--os-text-dim)">Loading…</p>
-        ) : stories.length === 0 ? (
-          <div className="flex items-center gap-3">
-            <AppIcon appId="news-brief" size={32} />
-            <p className="text-[13px] text-(--os-text-dim)">{brief?.degraded ? "Today's brief couldn't be written — open News to retry." : "Today's brief hasn't been written yet. It's generated in the background each morning."}</p>
-          </div>
+      {/* news: a slim strip of headlines */}
+      <button type="button" onClick={open(() => void openApp('news-brief'))} className="flex h-[74px] shrink-0 items-stretch gap-4 rounded-[22px] bg-white/[0.08] px-4 py-2.5 text-left transition-colors hover:bg-white/[0.12]">
+        <span className="flex w-[84px] shrink-0 flex-col justify-center gap-1.5">
+          <AppIcon appId="news-brief" size={26} />
+          <span className="pop-label">News brief</span>
+        </span>
+        {stories.length === 0 ? (
+          <span className="flex flex-1 items-center text-[12.5px] text-(--u-ink-3)">{brief === undefined ? 'Loading…' : brief?.degraded ? "Today's brief couldn't be written. Open News to retry." : "Today's brief hasn't been written yet. It's generated in the background each morning."}</span>
         ) : (
-          <div className="grid grid-cols-[1.1fr_1fr] gap-4">
-            {stories[0] && (
-              <button type="button" onClick={open(() => void openApp('news-brief'))} className="group flex flex-col overflow-hidden rounded-[10px] bg-[var(--surface-raised)] text-left transition-colors hover:bg-(--os-hover)">
-                {stories[0].image ? (
-                  <img src={stories[0].image} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[16/9] w-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                ) : (
-                  <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#2a3550] to-[#1b1c20]" />
-                )}
-                <span className="block p-3">
-                  <span className="block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">{stories[0].section}</span>
-                  <span className="mt-1 line-clamp-2 block text-[15px] font-semibold leading-snug">{stories[0].headline}</span>
-                  {stories[0].body[0] && <span className="mt-1.5 line-clamp-3 block text-[12.5px] leading-snug text-(--os-text-dim)">{stories[0].body[0].replace(/\*/g, '')}</span>}
-                </span>
-              </button>
-            )}
-            <div className="flex min-w-0 flex-col divide-y divide-[var(--border-hairline)]">
-              {stories.slice(1, 5).map((s) => (
-                <button key={s.headline} type="button" onClick={open(() => void openApp('news-brief'))} className="flex min-w-0 gap-3 py-2.5 text-left first:pt-0 hover:opacity-80">
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-accent)]">{s.section}</span>
-                    <span className="mt-0.5 line-clamp-2 block text-[13px] font-medium leading-snug">{s.headline}</span>
-                  </span>
-                  {s.image && <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-[52px] w-[70px] shrink-0 rounded-[6px] object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />}
-                </button>
-              ))}
-            </div>
-          </div>
+          stories.slice(0, 3).map((s) => (
+            <span key={s.headline} className="flex min-w-0 flex-1 flex-col justify-center border-l border-white/10 pl-4">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-(--u-accent,#3072f0)">{s.section}</span>
+              <span className="mt-0.5 line-clamp-2 text-[12.5px] font-medium leading-snug">{s.headline}</span>
+            </span>
+          ))
         )}
-      </Card>
+      </button>
     </div>
   )
 }
