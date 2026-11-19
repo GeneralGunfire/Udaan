@@ -8,7 +8,7 @@ import { StartMenu } from './StartMenu'
 import { invoke } from '@tauri-apps/api/core'
 import { LockScreen, Screensaver } from './LockScreen'
 import { WorkLock } from './WorkLock'
-import { warmSwitcher } from './switcherCache'
+import { gestureLive, warmSwitcher } from './switcherCache'
 import { applyProfile, loadProfile, switchProfile, useProfile, WORK_IDLE_LOCK_MS } from '@/os/kernel/profile'
 import { playSound } from '@/os/sound/sounds'
 import { onHotkey, shell, subscribeShell, useShell } from '@/os/kernel/shell'
@@ -171,7 +171,9 @@ export function LauncherWindow() {
   // WORK. Opening it shows its own lock; the profile only changes once the password is right, behind the
   // lock's full-screen cover. Going back to Personal covers the screen for one short veil while the desktop
   // swaps. Work is always locked again on the way in.
-  const openWork = useCallback(() => void present('work-lock'), [present])
+  const openWork = useCallback(() => {
+    void getPref('work.enabled').then((on) => on && void present('work-lock'))
+  }, [present])
   const unlockWork = useCallback(async () => {
     if (profileRef.current !== 'work') await switchProfile('work')
     modeRef.current = 'launchpad'
@@ -282,9 +284,13 @@ export function LauncherWindow() {
       listen('launcher:tips', () => void present('tips')),
       listen<{ x: number; y: number }>('gesture://start', (e) => {
         if (modeRef.current !== 'idle' && modeRef.current !== 'launchpad') return
+        gestureLive.ended = false
         setGestureOrigin(e.payload)
         void present('switcher')
       }),
+      // Always listening, so a release that lands before the switcher has mounted is not lost.
+      listen('gesture://end', () => void (gestureLive.ended = true)),
+      listen('gesture://cancel', () => void (gestureLive.ended = true)),
       listen('launcher:wallpaper', () => void present('wallpaper')),
       listen<{ title: string; handles: number[] }>('launcher:expose', (e) => {
         setExpose(e.payload)

@@ -82,6 +82,8 @@ export interface Prefs {
   'lock.pinLength': number
   /** Salted hash of the Work password; empty until the person sets one. */
   'work.passwordHash': string
+  /** The Work profile is switched on. Off by default: Start shows no Work switch until it is turned on in Settings. */
+  'work.enabled': boolean
   /** Which screensaver: clock, aurora, warp, flow, drift or shuffle. */
   'screensaver.scene': string
   /** Udaan apps kept loaded in the background for instant opening (JSON list of app ids). */
@@ -150,6 +152,7 @@ export const PREF_DEFAULTS: Prefs = {
   'lock.pinHash': '',
   'lock.pinLength': 4,
   'work.passwordHash': '',
+  'work.enabled': false,
   'screensaver.scene': 'clock',
   'apps.warm': '["settings","file-explorer"]',
   'apps.startup': '[]',

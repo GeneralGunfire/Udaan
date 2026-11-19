@@ -11,6 +11,7 @@ import { launchApp } from '@/integrations/installed-apps/client'
 import { APP_DEFS, type AppId } from '@/os/kernel/registry'
 import { openApp, shell } from '@/os/kernel/shell'
 import { useProfile } from '@/os/kernel/profile'
+import { usePref } from '@/os/kernel/prefs'
 import { pictureOf, useIdentity } from '@/os/kernel/identity'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { PopIcon } from '@/os/ui/pop/icons'
@@ -123,6 +124,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<'home' | 'all' | 'day'>('home')
   const [active, setActive] = useState(0)
   const profile = useProfile()
+  const [workOn] = usePref('work.enabled')
   const [pins, setPins] = useState<Pin[]>(loadPins)
   // Work's section sits above the normal Start; it is only built when Work is active.
   const [workPins, setWorkPins] = useState<Pin[]>([])
@@ -296,7 +298,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
     const r = e.currentTarget.getBoundingClientRect()
     const toWork = profile !== 'work'
     openMenu({ clientX: r.left, clientY: r.top - 6 - 232, preventDefault: () => {} }, [
-      { label: toWork ? 'Switch to Work' : 'Switch to Personal', icon: 'user', onSelect: () => finish(() => emit(toWork ? 'launcher:work' : 'launcher:personal')) },
+      ...(workOn || profile === 'work' ? [{ label: toWork ? 'Switch to Work' : 'Switch to Personal', icon: 'user' as const, onSelect: () => finish(() => emit(toWork ? 'launcher:work' : 'launcher:personal')) }] : []),
       { label: 'My Day', icon: 'calendar', onSelect: () => setView('day') },
       { label: 'Lock Udaan', icon: 'lock', onSelect: () => finish(() => emit('launcher:lock')) },
       { type: 'sep' },
@@ -313,7 +315,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
       type="button"
       draggable
       whileTap={{ scale: 0.95 }}
-      className="group flex w-full flex-col items-center gap-1.5 rounded-[8px] px-0.5 pb-2 pt-2.5 transition-colors hover:bg-white/10 active:bg-white/15"
+      className="group flex h-[78px] w-full flex-col items-center gap-1.5 rounded-[10px] px-0.5 pt-2.5 transition-colors hover:bg-white/10 active:bg-white/15"
       onContextMenu={(e) => appMenu(e, p, () => finish(() => launchPin(p)))}
       onDragStart={() => (dragKey.current = pinKey(p))}
       onDragOver={(e) => e.preventDefault()}
@@ -328,8 +330,8 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
       }}
       onClick={() => finish(() => launchPin(p))}
     >
-      <motion.span whileHover={{ scale: 1.1, y: -1 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }}><PinIcon pin={p} size={44} /></motion.span>
-      <span className="line-clamp-2 w-full px-0.5 text-center text-[11.5px] leading-tight">{pinName(p)}</span>
+      <motion.span whileHover={{ scale: 1.1, y: -1 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }}><PinIcon pin={p} size={38} /></motion.span>
+      <span className="w-full truncate px-0.5 text-center text-[10.5px] font-semibold leading-[14px]">{pinName(p)}</span>
     </motion.button>
   )
 
@@ -356,10 +358,10 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
       >
         <Surface glass="start" radius={28} className="flex flex-col" style={{ height: 'min(650px, calc(100vh - 140px))', width: 'min(800px, calc(100vw - 40px))' }}>
           {/* Search */}
-          <div className="px-7 pb-2 pt-6">
-            <label className="flex h-11 items-center gap-3 rounded-full bg-black/25 px-4 shadow-[inset_0_0_0_1px_rgb(255_255_255/.1)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--u-accent,#3072f0)]">
+          <div className="px-7 pb-0 pt-5">
+            <label className="flex h-[42px] items-center gap-3 rounded-full bg-black/10 px-4 shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.38)] transition-shadow focus-within:bg-black/20 focus-within:shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.8)]">
               <PopIcon name="search" size={16} className="shrink-0 opacity-60" />
-              <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for apps, settings, and documents" spellCheck={false} className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-(--u-ink-3)" />
+              <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search apps, settings, files and the web" spellCheck={false} className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-(--u-ink-3)" />
               {query && (
                 <button type="button" aria-label="Clear search" className="pop-iconbtn h-6 w-6" onClick={() => setQuery('')}>
                   <PopIcon name="x" size={13} strokeWidth={2.2} />
@@ -414,7 +416,7 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
                 {workPins.length > 0 && (
                   <div className="mb-2 mt-1">
                     <div className="flex items-center gap-2 px-1 pb-1.5 pt-2">
-                      <h2 className="text-[14px] font-semibold">Work tools</h2>
+                      <h2 className="text-[14px] font-bold">Work</h2>
                     </div>
                     <div className="grid grid-cols-8 pb-0.5">{workPins.map((p) => tile(p, `work-${pinKey(p)}`))}</div>
                   </div>
@@ -433,9 +435,11 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
               {picture ? <img src={picture} alt="" draggable={false} className="h-12 w-12 rounded-full object-cover shadow-[0_2px_8px_rgb(0_0_0/.3)]" /> : <span className={cn('flex h-12 w-12 items-center justify-center rounded-full text-[19px] font-semibold shadow-[0_2px_8px_rgb(0_0_0/.3)]', profile === 'work' ? 'bg-[#2f6bff] text-white' : 'bg-white/[0.18]')}>{(ident.name || 'U').charAt(0).toUpperCase()}</span>}
               <span className="text-[16px] font-semibold tracking-tight">{ident.name || 'Account'}{profile === 'work' && <span className="ml-2.5 rounded-full bg-[#2f6bff]/30 px-2 py-px align-middle text-[10.5px] font-semibold uppercase tracking-wide text-[#9dbaff]">Work</span>}</span>
             </button>
-            <button type="button" onClick={() => finish(() => emit(profile !== 'work' ? 'launcher:work' : 'launcher:personal'))} className="ml-3 flex h-10 items-center gap-2 rounded-full bg-white/[0.08] px-4 text-[13px] font-medium transition-colors hover:bg-white/[0.16] active:bg-white/[0.22]">
-              <PopIcon name="user" size={15} /> {profile !== 'work' ? 'Switch to Work' : 'Switch to Personal'}
-            </button>
+            {(workOn || profile === 'work') && (
+              <button type="button" onClick={() => finish(() => emit(profile !== 'work' ? 'launcher:work' : 'launcher:personal'))} className="ml-3 flex h-10 items-center gap-2 rounded-full bg-white/[0.08] px-4 text-[13px] font-medium transition-colors hover:bg-white/[0.16] active:bg-white/[0.22]">
+                <PopIcon name="user" size={15} /> {profile !== 'work' ? 'Switch to Work' : 'Switch to Personal'}
+              </button>
+            )}
             <button type="button" aria-label="Power" title="Power" className="pop-iconbtn ml-auto h-12 w-12 rounded-full bg-white/[0.08] hover:bg-white/[0.16]" onClick={powerMenu}><PopIcon name="power" size={22} /></button>
           </footer>
         </Surface>
@@ -449,10 +453,10 @@ export function StartMenu({ onClose }: { onClose: () => void }) {
 function Header({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div className="flex items-center justify-between px-1 pb-1.5 pt-3.5">
-      <h2 className="text-[14px] font-semibold">{title}</h2>
+      <h2 className="text-[14px] font-bold">{title}</h2>
       {action && (
-        <button type="button" className="flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[12px] text-(--u-ink-2) transition-colors hover:bg-white/10 hover:text-(--u-ink)" onClick={onAction}>
-          {action} <PopIcon name="chevron" size={12} />
+        <button type="button" className="rounded-[8px] bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-(--u-ink) transition-colors hover:bg-white/20 active:bg-white/25" onClick={onAction}>
+          {action}
         </button>
       )}
     </div>

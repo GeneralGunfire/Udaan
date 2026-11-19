@@ -20,7 +20,7 @@ import { Button } from '@/shared/components/ui/button'
 import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
 import { QuickstartsSection } from './QuickstartsSection'
 import { LiquidGlassSettings } from './LiquidSection'
-import { ProfileGroup } from './ProfileGroup'
+import { ProfileGroup, WorkProfileGroup } from './ProfileGroup'
 import { AnimationsSettings } from './AnimationsSection'
 import { SwitcherSettings } from './SwitcherSection'
 import { AiSection, AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
@@ -497,6 +497,7 @@ function SystemSection() {
   return (
     <Stack>
       <ProfileGroup />
+      <WorkProfileGroup />
       <Group title="About">
         <Row title="Udaan">
           <span className="text-[13px] text-[var(--color-text-secondary)]">{version ? `Version ${version}` : ''}</span>

@@ -32,6 +32,10 @@ function PinChanger() {
   const [again, setAgain] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [length, setLength] = useState<number | null>(null)
+  const [hasPin, setHasPin] = useState(true)
+  useEffect(() => {
+    void loadPinConfig().then((c) => setHasPin(Boolean(c.hash)))
+  }, [])
   const reset = () => (setCur(''), setNext(''), setAgain(''))
 
   const submit = async () => {
@@ -42,12 +46,13 @@ function PinChanger() {
     reset()
     setOpen(false)
     setLength(next.length)
+    setHasPin(true)
     setMsg({ ok: true, text: 'PIN changed. Udaan Lock will ask for it from now on.' })
   }
 
   return (
     <>
-      <Row title="Lock PIN" description={length ? `${length} digits` : 'Numbers only, 4 to 8 digits. Asked for on the lock screen.'}>
+      <Row title="Lock PIN" description={!hasPin ? 'No PIN yet. Create one to lock Udaan.' : length ? `${length} digits` : 'Numbers only, 4 to 8 digits. Asked for on the lock screen.'}>
         <ActionButton
           onClick={() => {
             setOpen((o) => !o)
@@ -55,12 +60,12 @@ function PinChanger() {
             void loadPinConfig().then((c) => setLength(c.length))
           }}
         >
-          {open ? 'Cancel' : 'Change PIN…'}
+          {open ? 'Cancel' : hasPin ? 'Change PIN…' : 'Create PIN…'}
         </ActionButton>
       </Row>
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-4">
-          <button
+          {hasPin && <button
             type="button"
             className="self-start text-[12px] text-(--u-accent) hover:underline"
             onClick={async () => {
@@ -74,11 +79,11 @@ function PinChanger() {
             }}
           >
             I forgot my current PIN
-          </button>
-          <Field type="password" inputMode="numeric" autoComplete="off" placeholder="Current PIN" value={cur} onChange={(e) => setCur(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+          </button>}
+          {hasPin && <Field type="password" inputMode="numeric" autoComplete="off" placeholder="Current PIN" value={cur} onChange={(e) => setCur(e.target.value.replace(/\D/g, '').slice(0, 8))} />}
           <Field type="password" inputMode="numeric" autoComplete="off" placeholder="New PIN (4 to 8 digits)" value={next} onChange={(e) => setNext(e.target.value.replace(/\D/g, '').slice(0, 8))} />
           <Field type="password" inputMode="numeric" autoComplete="off" placeholder="Repeat new PIN" value={again} onChange={(e) => setAgain(e.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={(e) => e.key === 'Enter' && void submit()} />
-          <Button variant="primary" className="self-start" disabled={!cur || next.length < 4} onClick={() => void submit()}>
+          <Button variant="primary" className="self-start" disabled={(hasPin && !cur) || next.length < 4} onClick={() => void submit()}>
             Save new PIN
           </Button>
         </div>
