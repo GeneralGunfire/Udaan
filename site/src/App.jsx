@@ -1,4 +1,5 @@
 import Hero from './sections/Hero.jsx'
+import Advert from './sections/Advert.jsx'
 import Apps from './sections/Apps.jsx'
 import Start from './sections/Start.jsx'
 import Switcher from './sections/Switcher.jsx'
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <>
       <Hero />
+      <Advert />
       <Apps />
       <Start />
       <Switcher />
