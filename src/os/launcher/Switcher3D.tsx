@@ -7,7 +7,7 @@ import { useMotion } from '@/os/motion/config'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { Wallpaper } from '@/os/desktop/Wallpaper'
 import { playSound } from '@/os/sound/sounds'
-import { captureSnapshots, iconCache, snapshotCache } from './switcherCache'
+import { captureSnapshots, gestureLive, iconCache, snapshotCache } from './switcherCache'
 
 const SIZES = { small: 360, medium: 440, large: 540 } as const
 
@@ -40,9 +40,22 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   const storeWindows = useShell((s) => s.windows)
   const storeForeground = useShell((s) => s.foreground)
   // Ask for the live list on open rather than trusting a possibly stale store.
+  const shell_handles = useRef<number[]>(storeWindows.map((w) => w.handle))
   const [fresh, setFresh] = useState<{ windows: ShellWindow[]; foreground: number } | null>(null)
   useEffect(() => {
-    void shell.snapshot().then((snap) => setFresh({ windows: snap.windows, foreground: snap.foreground }), () => {})
+    let dead = false
+    void shell.snapshot().then(
+      (snap) => {
+        if (dead) return
+        const have = new Set(shell_handles.current)
+        const same = snap.windows.length === have.size && snap.windows.every((w) => have.has(w.handle))
+        if (!same) setFresh({ windows: snap.windows, foreground: snap.foreground })
+      },
+      () => {},
+    )
+    return () => {
+      dead = true
+    }
   }, [])
   const all = fresh?.windows.length ? fresh.windows : storeWindows
   const foreground = fresh?.foreground ?? storeForeground
@@ -56,6 +69,11 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   const n = windows.length
   const dpr = window.devicePixelRatio || 1
 
+  const [settled, setSettled] = useState(!mo.on)
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), mo.on ? 380 / mo.k : 0)
+    return () => clearTimeout(t)
+  }, [mo.on, mo.k])
   const [shots, setShots] = useState<Record<number, string>>(() => Object.fromEntries(windows.flatMap((w) => (snapshotCache.has(w.handle) ? [[w.handle, snapshotCache.get(w.handle)!]] : []))))
   const [icons, setIcons] = useState<Record<number, string | null>>(() => Object.fromEntries(iconCache))
 
@@ -64,7 +82,7 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   useEffect(() => {
     const live = windows.filter((w) => w !== DESKTOP)
     setShots((prev) => ({ ...Object.fromEntries(live.flatMap((w) => (snapshotCache.has(w.handle) ? [[w.handle, snapshotCache.get(w.handle)!]] : []))), ...prev }))
-    void captureSnapshots(live.filter((w) => !w.isMinimized).map((w) => w.handle), CARD_W * dpr).then((next) => setShots((prev) => ({ ...prev, ...next })))
+    if (settled) void captureSnapshots(live.filter((w) => !w.isMinimized).map((w) => w.handle), CARD_W * dpr).then((next) => setShots((prev) => ({ ...prev, ...next })))
     const need = live.filter((w) => !w.appId && !iconCache.has(w.handle)).map((w) => w.handle)
     if (need.length)
       void shell.windowIcons(need).then((r) => {
@@ -72,7 +90,7 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
         setIcons(Object.fromEntries(iconCache))
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleKey, CARD_W])
+  }, [handleKey, CARD_W, settled])
 
   /** Where the carousel is, as a (fractional) card index. The cards turn with one transform off this. */
   const pos = useMotionValue(0)
@@ -93,6 +111,8 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
     }
   })
 
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const goTo = useCallback(
     (i: number, instant = false) => {
@@ -112,8 +132,11 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   }, [n, pos])
   useEffect(() => () => clearTimeout(settle.current), [])
 
+  const closing = useRef(false)
   const open = useCallback(
     (i: number) => {
+      if (closing.current) return
+      closing.current = true
       const w = windows[i]
       if (!w) return onDone()
       frontRef.current = i
@@ -122,7 +145,7 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
       playSound('open')
       // The chosen window comes forward straight away, behind the switcher, so it is already there as the cards leave.
       if (w !== DESKTOP) void shell.focus(w.handle)
-      setTimeout(() => {
+      closeTimer.current = setTimeout(() => {
         onDone()
         if (w === DESKTOP) void shell.toggleDesktop()
       }, 100)
@@ -163,16 +186,24 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
   }, [n, goTo, openFront, onDone])
 
   // Drag-opened: the native gesture stream steers it; release opens the card in front.
+  const handlers = useRef({ scrub, openFront, onDone })
+  handlers.current = { scrub, openFront, onDone }
   useEffect(() => {
     if (!origin) return
     anchor.current = { x: origin.x / dpr, p: pos.get() }
+    // Subscribed once (handlers are read through a ref), so a re-render never drops an end/cancel event or resets the anchor.
     const subs = [
-      listen<{ x: number; y: number }>('gesture://move', (e) => scrub(e.payload.x / dpr)),
-      listen('gesture://end', openFront),
-      listen('gesture://cancel', () => onDone()),
+      listen<{ x: number; y: number }>('gesture://move', (e) => handlers.current.scrub(e.payload.x / dpr)),
+      listen('gesture://end', () => handlers.current.openFront()),
+      listen('gesture://cancel', () => handlers.current.onDone()),
     ]
+    // If the button came up before these listeners existed, finish now instead of hanging open.
+    void Promise.all(subs).then(() => {
+      if (gestureLive.ended) handlers.current.openFront()
+    })
     return () => subs.forEach((p) => void p.then((fn) => fn()))
-  }, [origin, dpr, pos, scrub, onDone, openFront])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origin, dpr, pos])
 
   const onWheel = (e: React.WheelEvent) => goTo(frontRef.current + (e.deltaY + e.deltaX > 0 ? 1 : -1))
 
@@ -205,24 +236,24 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
         <>
           <div style={{ perspective: 2000, perspectiveOrigin: '50% 40%', width: CARD_W, height: CARD_H }} className="relative">
             {style === 'flat' ? (
-              <motion.div className="absolute inset-0" initial={mo.on ? { opacity: 0, y: 50 } : false} animate={{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300 * k * k, damping: 30 * k } }}>
+              <motion.div className="absolute inset-0" initial={mo.on ? { opacity: 0, y: 16 } : false} animate={{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300 * k * k, damping: 36 * k } }}>
                 {windows.map((w, i) => (
-                  <FlatCard key={w.handle} index={i} smooth={smooth} w={w} shot={shots[w.handle]} icon={icons[w.handle] ?? null} active={i === front} desktop={w === DESKTOP} width={CARD_W} onOpen={() => open(i)} delay={i * 0.025 * quick} />
+                  <FlatCard key={w.handle} settled={settled} index={i} smooth={smooth} w={w} shot={shots[w.handle]} icon={icons[w.handle] ?? null} active={i === front} desktop={w === DESKTOP} width={CARD_W} onOpen={() => open(i)} delay={i * 0.025 * quick} />
                 ))}
               </motion.div>
             ) : (
               <motion.div
                 className="absolute inset-0"
                 style={{ transformStyle: 'preserve-3d', rotateY, rotateX: -4, z: -radius, willChange: 'transform' }}
-                initial={mo.on ? (style === 'fade' ? { opacity: 0 } : { scale: 0.78, y: 70, opacity: 0 }) : false}
-                animate={{ scale: 1, y: 0, opacity: 1, transition: { type: 'spring', stiffness: 250 * k * k, damping: 26 * (1.25 - mo.bounce * 0.5) * k, mass: 0.9 } }}
+                initial={mo.on ? (style === 'fade' ? {} : { scale: 0.96, y: 16 }) : false}
+                animate={{ scale: 1, y: 0, transition: { scale: { type: 'spring', stiffness: 260 * k * k, damping: 34 * k, mass: 1 }, y: { type: 'spring', stiffness: 260 * k * k, damping: 34 * k, mass: 1 } } }}
               >
                 {windows.map((w, i) => {
                   // Distance from the front card in positions; the desktop is a plain neighbour like any other.
                   const depth = Math.abs(i - front)
                   return (
                     <div key={w.handle} className="absolute inset-0" style={{ transform: `rotateY(${i * step}deg) translateZ(${radius}px)`, backfaceVisibility: 'hidden' }}>
-                      <Card w={w} shot={shots[w.handle]} icon={icons[w.handle] ?? null} active={i === front} depth={depth} desktop={w === DESKTOP} delay={Math.min(depth, 5) * 0.03 * quick} onOpen={() => open(i)} />
+                      <Card w={w} settled={settled} shot={shots[w.handle]} icon={icons[w.handle] ?? null} active={i === front} depth={depth} desktop={w === DESKTOP} delay={Math.min(depth, 5) * 0.03 * quick} onOpen={() => open(i)} />
                     </div>
                   )
                 })}
@@ -251,15 +282,13 @@ export function Switcher3D({ origin, onDone }: { origin?: { x: number; y: number
 }
 
 /** The picture (or icon) and name shared by both layouts. */
-function Face({ w, shot, icon, desktop }: { w: ShellWindow; shot?: string; icon: string | null; desktop?: boolean }) {
+function Face({ w, shot, icon, desktop, settled }: { w: ShellWindow; settled?: boolean; shot?: string; icon: string | null; desktop?: boolean }) {
   return (
     <>
       {desktop ? (
-        <div className="absolute inset-0">
-          <Wallpaper />
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2a2c33] to-[#17181c]">{settled && <Wallpaper />}</div>
       ) : shot ? (
-        <img src={shot} alt="" draggable={false} className="h-full w-full object-cover object-top" />
+        <img src={shot} alt="" draggable={false} decoding="async" className="h-full w-full object-cover object-top" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#2a2c33] to-[#17181c]">{w.appId ? <AppIcon appId={w.appId} size={88} /> : icon ? <img src={icon} alt="" className="h-20 w-20" /> : null}</div>
       )}
@@ -278,23 +307,23 @@ const IDLE = 'inset 0 0 0 1px rgb(255 255 255 / 0.1)'
  * One card on the carousel. Depth is shown by a dark overlay that grows with distance, which costs almost nothing, instead
  * of a blur filter, which is re-drawn every frame; only the front card carries a shadow.
  */
-function Card({ w, shot, icon, active, depth, desktop, delay, onOpen }: { w: ShellWindow; shot?: string; icon: string | null; active: boolean; depth: number; desktop?: boolean; delay: number; onOpen: () => void }) {
+function Card({ w, settled, shot, icon, active, depth, desktop, delay, onOpen }: { w: ShellWindow; settled: boolean; shot?: string; icon: string | null; active: boolean; depth: number; desktop?: boolean; delay: number; onOpen: () => void }) {
   return (
     <motion.div
       className="absolute inset-0 cursor-pointer overflow-hidden rounded-[14px] bg-[var(--surface-base)]"
-      initial={{ opacity: 0, y: 36 }}
-      animate={{ opacity: 1, y: 0, scale: active ? 1.035 : 1, boxShadow: active ? ACTIVE : IDLE }}
-      transition={{ type: 'spring', stiffness: 380, damping: 30, delay: active ? 0 : delay }}
+      initial={{ opacity: 0, scale: active ? 1.035 : 1 }}
+      animate={{ opacity: 1, scale: active ? 1.035 : 1, boxShadow: active ? ACTIVE : IDLE }}
+      transition={{ opacity: { duration: 0.2, delay: active ? 0 : delay, ease: 'easeOut' }, scale: { type: 'spring', stiffness: 380, damping: 34 }, boxShadow: { duration: 0.2 } }}
       onClick={(e) => (e.stopPropagation(), onOpen())}
     >
-      <Face w={w} shot={shot} icon={icon} desktop={desktop} />
+      <Face w={w} shot={shot} icon={icon} desktop={desktop} settled={settled} />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-black transition-opacity duration-200" style={{ opacity: active ? 0 : Math.min(0.6, 0.18 + depth * 0.14) }} />
     </motion.div>
   )
 }
 
 /** The lightest layout: cards in a row that slide and shrink away from the one in front. */
-function FlatCard({ index, smooth, w, shot, icon, active, desktop, width, onOpen, delay }: { index: number; smooth: MotionValue<number>; w: ShellWindow; shot?: string; icon: string | null; active: boolean; desktop?: boolean; width: number; onOpen: () => void; delay: number }) {
+function FlatCard({ settled, index, smooth, w, shot, icon, active, desktop, width, onOpen, delay }: { settled: boolean; index: number; smooth: MotionValue<number>; w: ShellWindow; shot?: string; icon: string | null; active: boolean; desktop?: boolean; width: number; onOpen: () => void; delay: number }) {
   const x = useTransform(smooth, (p) => (index - p) * width * 0.62)
   const scale = useTransform(smooth, (p) => Math.max(0.62, 1 - Math.abs(index - p) * 0.14))
   const dim = useTransform(smooth, (p) => Math.min(0.6, Math.abs(index - p) * 0.2))
@@ -307,7 +336,7 @@ function FlatCard({ index, smooth, w, shot, icon, active, desktop, width, onOpen
       animate={{ opacity: 1, transition: { delay } }}
       onClick={(e) => (e.stopPropagation(), onOpen())}
     >
-      <Face w={w} shot={shot} icon={icon} desktop={desktop} />
+      <Face w={w} shot={shot} icon={icon} desktop={desktop} settled={settled} />
       <motion.div aria-hidden className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: dim }} />
     </motion.div>
   )

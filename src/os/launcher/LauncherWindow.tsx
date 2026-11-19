@@ -18,6 +18,8 @@ import { Tips } from './Tips'
 import { WallpaperPicker } from './WallpaperPicker'
 import { getPref, setPref, usePref, type CORNER_KEYS } from '@/os/kernel/prefs'
 import { runFirstRunSetup } from '@/os/kernel/firstRun'
+import { checkForUpdate } from '@/os/kernel/updates'
+import { toast } from '@/os/ui/toasts'
 
 type CornerKey = (typeof CORNER_KEYS)[number]
 import { unregisterAllThumbnails } from '@/integrations/taskbar/client'
@@ -197,6 +199,21 @@ export function LauncherWindow() {
       dismiss()
     }
   }, [leaveWork, dismiss])
+
+  // Looks for a newer version a little after start, and when the website's "Check my version" button asks.
+  useEffect(() => {
+    const look = (said: boolean) =>
+      void checkForUpdate().then(
+        (a) => (a ? toast(`Udaan ${a.version} is available`, 'Open Settings, then Updates, to install it. Your data is kept.') : said && toast('Udaan is up to date')),
+        () => said && toast('Could not check for updates', 'Try again in a moment.'),
+      )
+    const t = setTimeout(() => look(false), 30_000)
+    const off = listen('update://check', () => look(true))
+    return () => {
+      clearTimeout(t)
+      void off.then((fn) => fn())
+    }
+  }, [])
 
   // A brand-new install picks settings that suit this PC, once.
   useEffect(() => {

@@ -4,7 +4,6 @@ import { APP_DEFS } from '@/os/kernel/registry'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
 import { cn } from '@/shared/lib/cn'
 import { spring, useMotion } from '@/os/motion/config'
-import { Switch } from '@/os/ui/controls'
 import { PopIcon } from './icons'
 import { Surface } from './Surface'
 import type { Note } from './samples'
@@ -103,8 +102,7 @@ export function BannerStack({ notes, onDismiss, onAction, onOpen, onMenu, second
           return (
             <motion.div
               key={n.id}
-              layout
-              drag="x"
+                            drag="x"
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={{ left: 0, right: 0.7 }}
@@ -158,100 +156,90 @@ interface CenterHandlers {
   onMenu?: (e: React.MouseEvent, n: Note) => void
 }
 
-/** One app's notifications: a quiet label, then flat rows on a single card. Details only appear on hover. */
-function GroupCard({ g, onClear, onClearOne, onOpen, onAction, onMenu }: { g: Group; onClear: () => void; onClearOne: (id: string) => void } & CenterHandlers) {
-  const [open, setOpen] = useState(false)
-  const SHOWN = 2
-  const hidden = Math.max(0, g.notes.length - SHOWN)
-  const list = open ? g.notes : g.notes.slice(0, SHOWN)
+/** One notification. It never changes size: hover only tints it and swaps the time for a dismiss button. Click opens it. */
+function Row({ n, onOpen, onAction, onMenu, onClear }: { n: Note; onClear: () => void } & CenterHandlers) {
+  const extras = (n.actions ?? []).filter((a) => a !== 'Open').slice(0, 2)
   return (
-    <motion.section layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 80 }} className="group/g">
-      <div className="flex h-6 items-center px-1.5">
-        <span className="pop-label" style={{ fontSize: 10.5 }}>{g.app}</span>
-        <button type="button" className="ml-auto rounded-full px-2 text-[11px] text-(--u-ink-3) opacity-0 transition-opacity hover:bg-white/10 hover:text-(--u-ink) group-hover/g:opacity-100" onClick={onClear}>Clear</button>
-      </div>
-      <div className="overflow-hidden rounded-[18px] bg-white/[0.07]">
-        <AnimatePresence initial={false}>
-          {list.map((n, i) => (
-            <motion.div key={n.id} layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <div className={cn('group/n relative flex items-start gap-3 px-3.5 py-3 transition-colors hover:bg-white/[0.05]', i > 0 && 'border-t border-white/[0.06]', onOpen && 'cursor-pointer')} onClick={() => onOpen?.(n)} onContextMenu={(e) => onMenu?.(e, n)}>
-                <AppTile n={n} size={34} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <p className="truncate text-[13.5px] font-semibold leading-tight">{n.title}</p>
-                    {n.unread && <span aria-label="Unread" className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-(--u-accent,#3072f0)" />}
-                    <span className="ml-auto shrink-0 text-[11px] text-(--u-ink-3) transition-opacity group-hover/n:opacity-0">{n.time}</span>
-                  </div>
-                  {n.body && <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-(--u-ink-2)">{n.body}</p>}
-                  {!!n.actions?.length && (
-                    <div className="mt-2 hidden gap-1.5 group-hover/n:flex">
-                      {n.actions.slice(0, 2).map((a) => (
-                        <button key={a} type="button" className="pop-btn" style={{ height: 24, fontSize: 11.5 }} onClick={(e) => (e.stopPropagation(), onAction?.(n, a))}>{a}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button type="button" aria-label="Dismiss" className="pop-iconbtn absolute right-2.5 top-2.5 h-5 w-5 opacity-0 transition-opacity group-hover/n:opacity-100" onClick={(e) => (e.stopPropagation(), onClearOne(n.id))}>
-                  <PopIcon name="x" size={11} strokeWidth={2.2} />
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        {hidden > 0 && (
-          <button type="button" className="flex w-full items-center justify-center gap-1 border-t border-white/[0.06] py-2 text-[11.5px] text-(--u-ink-2) transition-colors hover:bg-white/[0.05] hover:text-(--u-ink)" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-            {open ? 'Show less' : `${hidden} more`}
-            <PopIcon name="down" size={11} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 160ms' }} />
-          </button>
+    <div
+      className={cn('group/n relative flex items-start gap-3 rounded-[14px] px-2.5 py-2.5 transition-colors duration-150 hover:bg-white/[0.07]', onOpen && 'cursor-pointer')}
+      onClick={() => onOpen?.(n)}
+      onContextMenu={(e) => onMenu?.(e, n)}
+    >
+      <span className="mt-0.5 shrink-0"><AppTile n={n} size={34} /></span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 pr-9">
+          <p className="min-w-0 truncate text-[13.5px] font-semibold leading-[18px] tracking-[-0.005em]">{n.title}</p>
+          {n.unread && <span aria-label="Unread" className="h-[7px] w-[7px] shrink-0 rounded-full bg-(--u-accent,#3072f0)" />}
+        </div>
+        {n.body && <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-[12.5px] leading-[18px] text-(--u-ink-2)">{n.body}</p>}
+        {extras.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            {extras.map((a) => (
+              <button key={a} type="button" className="h-7 rounded-full bg-white/10 px-3 text-[12px] font-medium transition-colors hover:bg-white/[0.18]" onClick={(e) => (e.stopPropagation(), onAction?.(n, a))}>{a}</button>
+            ))}
+          </div>
         )}
       </div>
-    </motion.section>
+      <span className="absolute right-3 top-2.5 text-[11px] tabular-nums text-(--u-ink-3) transition-opacity duration-150 group-hover/n:opacity-0">{n.time}</span>
+      <button type="button" aria-label="Dismiss" className="pop-iconbtn absolute right-2 top-2 h-6 w-6 opacity-0 transition-opacity duration-150 group-hover/n:opacity-100" onClick={(e) => (e.stopPropagation(), onClear())}>
+        <PopIcon name="x" size={12} strokeWidth={2.2} />
+      </button>
+    </div>
   )
 }
 
-export function NotificationCenter({ notes, onChange, dnd, onDnd, height, width = 392, maxHeight, onOpen, onAction, onMenu, onSettings }: { notes: Note[]; onChange: (notes: Note[]) => void; dnd: boolean; onDnd: (v: boolean) => void; height?: number | string; width?: number; maxHeight?: number | string; onSettings?: () => void } & CenterHandlers) {
-  const groups = groupByApp(notes)
-  const unread = notes.filter((n) => n.unread).length
+/** One app's notifications: a quiet label, then flat rows. Details only appear on hover. No layout animation, so nothing jumps. */
+function GroupCard({ g, onClear, onClearOne, onOpen, onAction, onMenu }: { g: Group; onClear: () => void; onClearOne: (id: string) => void } & CenterHandlers) {
+  const [open, setOpen] = useState(false)
+  const SHOWN = 3
+  const hidden = Math.max(0, g.notes.length - SHOWN)
+  const list = open ? g.notes : g.notes.slice(0, SHOWN)
   return (
-    <Surface radius={26} className="pop-in flex flex-col" style={{ height, width, maxHeight }}>
-      <div className="flex items-end gap-3 px-5 pb-2 pt-5">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[24px] font-light leading-none tracking-tight">Notifications</h2>
-          <p className="mt-1.5 text-[12px] text-(--u-ink-3)">{notes.length === 0 ? "You're all caught up" : unread ? `${unread} new · ${notes.length} in total` : `${notes.length} in total`}</p>
-        </div>
-        {onSettings && <button type="button" aria-label="Notification settings" className="pop-iconbtn" onClick={onSettings}><PopIcon name="sliders" size={16} /></button>}
+    <section className="group/g">
+      <div className="flex h-6 items-center px-1">
+        <span className="pop-label" style={{ fontSize: 10.5 }}>{g.app}</span>
+        <button type="button" className="ml-auto rounded-full px-2 text-[11px] text-(--u-ink-3) opacity-0 transition-opacity hover:text-(--u-ink) group-hover/g:opacity-100" onClick={onClear}>Clear</button>
+      </div>
+      <div>
+        {list.map((n) => (
+          <Row key={n.id} n={n} onOpen={onOpen} onAction={onAction} onMenu={onMenu} onClear={() => onClearOne(n.id)} />
+        ))}
+        {hidden > 0 && (
+          <button type="button" className="flex w-full items-center justify-center gap-1 py-1.5 text-[11.5px] text-(--u-ink-2) transition-colors hover:text-(--u-ink)" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+            {open ? 'Show less' : `${hidden} more`}
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function NotificationCenter({ notes, onChange, dnd, onDnd, height, width = 380, maxHeight, onOpen, onAction, onMenu, onSettings }: { notes: Note[]; onChange: (notes: Note[]) => void; dnd: boolean; onDnd: (v: boolean) => void; height?: number | string; width?: number; maxHeight?: number | string; onSettings?: () => void } & CenterHandlers) {
+  const groups = groupByApp(notes)
+  return (
+    <Surface radius={22} className="flex flex-col" style={{ height, width, maxHeight }}>
+      <div className="flex items-center gap-2 px-4 pb-1 pt-4">
+        <h2 className="min-w-0 flex-1 text-[17px] font-semibold leading-none tracking-tight">Notifications</h2>
+        <button type="button" aria-pressed={dnd} title="Do not disturb" className={cn('pop-iconbtn', dnd && 'bg-[#6b5cff] text-white')} onClick={() => onDnd(!dnd)}>
+          <PopIcon name="moon" size={15} />
+        </button>
+        {onSettings && <button type="button" aria-label="Notification settings" className="pop-iconbtn" onClick={onSettings}><PopIcon name="sliders" size={15} /></button>}
         {notes.length > 0 && (
-          <button type="button" className="pop-btn" onClick={() => onChange([])}>
+          <button type="button" className="rounded-full px-2 text-[12px] text-(--u-ink-2) transition-colors hover:text-(--u-ink)" onClick={() => onChange([])}>
             Clear all
           </button>
         )}
       </div>
 
-      <div className="mx-5 mb-2 flex items-center gap-3 rounded-[14px] bg-white/[0.07] px-3 py-2.5">
-        <span className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', dnd ? 'bg-[#6b5cff] text-white' : 'bg-white/10')}>
-          <PopIcon name="moon" size={16} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium leading-tight">Do not disturb</p>
-          <p className="text-[11.5px] text-(--u-ink-3)">{dnd ? 'Banners are silenced. Everything lands here.' : 'Banners and sounds are on'}</p>
-        </div>
-        <Switch checked={dnd} onChange={onDnd} label="Do not disturb" />
-      </div>
-
-      <div className="pop-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-5 pt-2">
-        <AnimatePresence initial={false}>
-          {groups.map((g) => (
-            <GroupCard key={g.app} g={g} onClear={() => onChange(notes.filter((n) => n.app !== g.app))} onClearOne={(id) => onChange(notes.filter((n) => n.id !== id))} onOpen={onOpen} onAction={onAction} onMenu={onMenu} />
-          ))}
-        </AnimatePresence>
+      <div className="pop-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-3 pt-1">
+        {groups.map((g) => (
+          <GroupCard key={g.app} g={g} onClear={() => onChange(notes.filter((n) => n.app !== g.app))} onClearOne={(id) => onChange(notes.filter((n) => n.id !== id))} onOpen={onOpen} onAction={onAction} onMenu={onMenu} />
+        ))}
         {notes.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.07]">
-              <PopIcon name="bell" size={28} strokeWidth={1.5} />
-            </span>
-            <p className="text-[15px] font-medium">Nothing new</p>
-            <p className="max-w-[220px] text-[12.5px] text-(--u-ink-3)">New notifications from your apps will collect here.</p>
-          </motion.div>
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 py-14 text-center">
+            <PopIcon name="bell" size={24} strokeWidth={1.5} />
+            <p className="text-[13px] text-(--u-ink-2)">{dnd ? 'Do not disturb is on' : "You're all caught up"}</p>
+          </div>
         )}
       </div>
     </Surface>

@@ -21,6 +21,7 @@ import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } 
 import { QuickstartsSection } from './QuickstartsSection'
 import { LiquidGlassSettings } from './LiquidSection'
 import { ProfileGroup, WorkProfileGroup } from './ProfileGroup'
+import { UpdatesGroup } from './UpdatesGroup'
 import { AnimationsSettings } from './AnimationsSection'
 import { SwitcherSettings } from './SwitcherSection'
 import { AiSection, AppearanceExtras, LockSection, PowerSection, PrivacySection, StartupSection } from './sections'
@@ -498,6 +499,7 @@ function SystemSection() {
     <Stack>
       <ProfileGroup />
       <WorkProfileGroup />
+      <UpdatesGroup />
       <Group title="About">
         <Row title="Udaan">
           <span className="text-[13px] text-[var(--color-text-secondary)]">{version ? `Version ${version}` : ''}</span>

@@ -4,6 +4,7 @@ import type { Notification } from '@/integrations/notifications/client'
 import { shell } from '@/os/kernel/shell'
 import { APP_DEFS, isAppId } from '@/os/kernel/registry'
 import { AppIcon } from '@/os/ui/icons/AppIcon'
+import { installedApps } from '@/os/launcher/start/model'
 
 export interface WindowsExtra {
   app: string
@@ -11,6 +12,10 @@ export interface WindowsExtra {
   image: string | null
   /** Set when the notification is a website's, delivered through this browser. */
   browser?: string | null
+  /** The sending app's own id (AppUserModelID), when it has one. */
+  aumid?: string | null
+  /** Relayed from the phone through Phone Link. */
+  phone?: boolean
 }
 
 /** Mirrored Windows notifications (Phone Link, WhatsApp...) carry their picture and click target here. */
@@ -56,6 +61,42 @@ function tileColours(name: string): [string, string] {
 }
 
 const cache = new Map<string, string | null>()
+const NAME_PREFIX = 'name:'
+
+const PHONE_LINK = 'Microsoft.YourPhone_8wekyb3d8bbwe!App'
+const APPS = 'shell:AppsFolder\\'
+
+/**
+ * Where to read a sender's real icon from, best first. Each is tried in turn until one gives a picture: the app's own id
+ * (a relayed phone notification maps to Phone Link itself), a launch target that is an app or exe, then the installed app
+ * of that name. A toast's `launch` is only its click arguments, which is why it alone never found Phone Link's icon.
+ */
+function iconTargets(extra: WindowsExtra | null, name: string): string[] {
+  const out: string[] = []
+  if (extra?.phone || /YourPhone/i.test(extra?.aumid ?? '')) out.push(APPS + PHONE_LINK)
+  if (extra?.aumid) out.push(APPS + extra.aumid)
+  const l = extra?.launch
+  if (l && (/^shell:appsfolder\\/i.test(l) || /\.exe$/i.test(l))) out.push(l)
+  out.push(NAME_PREFIX + name)
+  if (extra?.phone) out.push(NAME_PREFIX + 'Phone Link')
+  return out
+}
+
+async function loadIcon(target: string): Promise<string | null> {
+  if (target.startsWith(NAME_PREFIX)) {
+    const want = target.slice(NAME_PREFIX.length).toLowerCase()
+    const apps = await installedApps()
+    const hit = apps.find((a) => a.name.toLowerCase() === want) ?? apps.find((a) => a.name.toLowerCase().includes(want))
+    if (!hit) return null
+    return invoke<Record<string, string | null>>('shell_installed_app_icons', { ids: [hit.id] }).then((r) => r[hit.id] ?? null)
+  }
+  if (target.toLowerCase().startsWith(APPS.toLowerCase())) {
+    const id = target.slice(APPS.length)
+    return invoke<Record<string, string | null>>('shell_installed_app_icons', { ids: [id] }).then((r) => r[id] ?? null)
+  }
+  if (/\.exe$/i.test(target)) return shell.fileIcons([target]).then((r) => r[target] ?? null)
+  return null
+}
 
 /**
  * Who sent a notification.
@@ -80,44 +121,34 @@ const cache = new Map<string, string | null>()
 export function NotificationIcon({ n, size = 22 }: { n: Notification; size?: number }) {
   const extra = windowsExtra(n)
   const name = extra?.app || n.sourceApp
-  const target = isAppId(n.sourceApp) ? null : (extra?.launch ?? null)
-  const [src, setSrc] = useState<string | null>(() => (target ? (cache.get(target) ?? null) : null))
+  const targets = isAppId(n.sourceApp) ? [] : iconTargets(extra, name)
+  const key = targets.join('|')
+  const [src, setSrc] = useState<string | null>(() => (key ? (cache.get(key) ?? null) : null))
 
   useEffect(() => {
-    if (!target) return
-    if (cache.has(target)) {
-      setSrc(cache.get(target) ?? null)
-      return
-    }
+    if (!key) return
+    if (cache.has(key)) return void setSrc(cache.get(key) ?? null)
     let off = false
-    const prefix = 'shell:appsfolder\\'
-    const load = target.toLowerCase().startsWith(prefix)
-      ? invoke<Record<string, string | null>>('shell_installed_app_icons', { ids: [target.slice(prefix.length)] }).then((r) => r[target.slice(prefix.length)] ?? null)
-      : /\.exe$/i.test(target)
-        ? shell.fileIcons([target]).then((r) => r[target] ?? null)
-        : Promise.resolve(null)
-    void load.then(
-      (url) => {
-        cache.set(target, url)
-        if (!off) setSrc(url)
-      },
-      () => cache.set(target, null),
-    )
+    void (async () => {
+      let found: string | null = null
+      for (const t of key.split('|')) {
+        found = await loadIcon(t).catch(() => null)
+        if (found) break
+      }
+      cache.set(key, found)
+      if (!off) setSrc(found)
+    })()
     return () => {
       off = true
     }
-  }, [target])
+  }, [key])
 
   if (isAppId(n.sourceApp)) return <AppIcon appId={n.sourceApp} size={size} />
 
   // The app's real icon, extracted from the app itself.
   if (src) {
-    // Same plate and icon ratio as in Start, so every app is the same size whatever margin its own artwork has.
-    return (
-      <span className="flex shrink-0 items-center justify-center rounded-[22%] bg-white/[0.13] shadow-[inset_0_0_0_1px_rgb(255_255_255/.1),0_1px_2px_rgb(0_0_0/.25)]" style={{ width: size, height: size }}>
-        <img src={src} alt="" draggable={false} className="object-contain" style={{ width: size * 0.66, height: size * 0.66 }} />
-      </span>
-    )
+    // The real logo, bare, with nothing behind it (as in Start).
+    return <img src={src} alt="" draggable={false} className="shrink-0 object-contain" style={{ width: size, height: size }} />
   }
 
   const [from, to] = tileColours(name)

@@ -7,6 +7,8 @@ import { shell } from '@/os/kernel/shell'
  * short of memory); the switcher itself shows whatever is here at once and replaces it with fresh pictures a moment later.
  */
 export const snapshotCache = new Map<number, string>()
+/** Whether the drag gesture's button was released before the switcher was ready to hear it (see Switcher3D). */
+export const gestureLive = { ended: false }
 export const iconCache = new Map<number, string | null>()
 
 const WARM_WIDTH = 540
