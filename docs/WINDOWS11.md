@@ -13,8 +13,8 @@ Already built and version-independent: Settings, Dock, "Use the Udaan dock" (`do
   names (its new taskbar is still hosted in them), so the same hide/show works. Explorer re-shows the taskbar after
   it restarts; the tracker already hides it again.
 
-To do: make this a clear choice during first-run ("Use the Udaan dock" or "Keep the Windows taskbar") instead of
-only a Settings toggle. Default for new installs: ask.
+Done: a fresh install now asks this at the end of first-run setup ("Udaan dock and top bar" or "Keep the Windows
+taskbar"), and it can be changed any time in Settings. Tested on Windows 10 (the Udaan dock choice).
 
 ## What differs on Windows 11, and what to check
 
