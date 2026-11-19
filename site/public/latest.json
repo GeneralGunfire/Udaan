@@ -3,14 +3,14 @@
   "date": "2026-11-19",
   "installers": {
     "10": {
-      "url": null,
-      "size": null,
-      "sha256": null
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.0/Udaan_0.1.0_win10_x64-setup.exe",
+      "size": "219 MB",
+      "sha256": "f560c88c0a532529c6c5389d435125e44c9f24b61193a9a83d4c228f2fbc83f4"
     },
     "11": {
-      "url": null,
-      "size": null,
-      "sha256": null
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.0/Udaan_0.1.0_win11_x64-setup.exe",
+      "size": "219 MB",
+      "sha256": "f09f3c0c43eb0cb64fb06d8e9d1e160ba28bff75fc47c478e73da73c47105f03"
     }
   },
   "updates": [
