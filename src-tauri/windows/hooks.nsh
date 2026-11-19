@@ -22,18 +22,16 @@ Var UdaanWasFresh
   EnableWindow $0 1
 !macroend
 
-; Pressing Cancel: confirm once.
-Function .onUserAbort
-  MessageBox MB_YESNO|MB_ICONQUESTION "Stop setting up ${PRODUCTNAME}?$\r$\n$\r$\nAnything already copied will be removed. Your settings and files are not touched." IDYES udaan_stop
+; The wizard calls this when Cancel is pressed (on any page, including while files are being copied). Ask once;
+; on Yes, a FRESH install is rolled back and the installer stops. An update over an existing install is left as it was.
+!define MUI_CUSTOMFUNCTION_ABORT UdaanOnAbort
+Function UdaanOnAbort
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_TOPMOST|MB_SETFOREGROUND "Stop setting up Udaan?$\r$\n$\r$\nAnything already copied will be removed. Your settings and files are not touched." IDYES udaan_stop
   Abort
   udaan_stop:
-FunctionEnd
-
-; The install stopped part-way (Cancel, or an error). Roll a fresh install back; leave an existing one alone.
-Function .onInstFailed
   ${If} $UdaanWasFresh == "1"
     ; Only ever the product's own folder.
-    ${StrLoc} $2 "$INSTDIR" "${PRODUCTNAME}" ">"
+    ${StrLoc} $2 "$INSTDIR" "Udaan" ">"
     ${If} $2 != ""
       SetOutPath "$TEMP"
       RMDir /r "$INSTDIR"
@@ -51,6 +49,6 @@ FunctionEnd
 !macro NSIS_HOOK_POSTUNINSTALL
   DeleteRegKey HKCU "Software\Classes\udaan"
   ; The installer remembers its folder under Software\Udaan\<product>; remove it, and Software\Udaan if now empty.
-  DeleteRegKey /ifempty HKCU "Software\Udaan\${PRODUCTNAME}"
+  DeleteRegKey HKCU "Software\Udaan\${PRODUCTNAME}"
   DeleteRegKey /ifempty HKCU "Software\Udaan"
 !macroend

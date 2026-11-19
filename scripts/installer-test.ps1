@@ -42,7 +42,8 @@ Check ($null -ne (Get-ChildItem $dest -Filter *.exe -ErrorAction SilentlyContinu
 
 Write-Host '3. uninstall keeps data'
 Start-Process (Join-Path $dest 'uninstall.exe') -ArgumentList '/S' -Wait
-Start-Sleep 2
+# The uninstaller hands off to a temporary copy of itself, so wait for it to finish rather than for a fixed time.
+$t = 0; while ((Test-Path (Join-Path $dest 'uninstall.exe')) -and $t -lt 60) { Start-Sleep 1; $t++ }
 Check ((Get-Content (Join-Path $data 'settings-probe.txt') -ErrorAction SilentlyContinue) -eq 'pin-and-notes-probe') 'data file intact after uninstall'
 Check (-not (Test-Path (Join-Path $dest 'uninstall.exe'))) 'uninstaller removed itself'
 Check (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\UdaanTest')) 'uninstall registry entry removed'
