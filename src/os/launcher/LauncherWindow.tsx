@@ -17,6 +17,7 @@ import { Switcher3D } from './Switcher3D'
 import { Tips } from './Tips'
 import { WallpaperPicker } from './WallpaperPicker'
 import { getPref, setPref, usePref, type CORNER_KEYS } from '@/os/kernel/prefs'
+import { runFirstRunSetup } from '@/os/kernel/firstRun'
 
 type CornerKey = (typeof CORNER_KEYS)[number]
 import { unregisterAllThumbnails } from '@/integrations/taskbar/client'
@@ -196,6 +197,11 @@ export function LauncherWindow() {
       dismiss()
     }
   }, [leaveWork, dismiss])
+
+  // A brand-new install picks settings that suit this PC, once.
+  useEffect(() => {
+    void runFirstRunSetup()
+  }, [])
 
   // Udaan restarting while in Work comes back locked, and the Notes and Clipboard stores follow the profile.
   useEffect(() => {

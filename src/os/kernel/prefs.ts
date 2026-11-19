@@ -84,6 +84,10 @@ export interface Prefs {
   'work.passwordHash': string
   /** The Work profile is switched on. Off by default: Start shows no Work switch until it is turned on in Settings. */
   'work.enabled': boolean
+  /** First-run setup has run (or was skipped because this is an existing install). */
+  'setup.done': boolean
+  /** JSON: what first-run setup detected about this PC. */
+  'setup.detected': string
   /** Which screensaver: clock, aurora, warp, flow, drift or shuffle. */
   'screensaver.scene': string
   /** Udaan apps kept loaded in the background for instant opening (JSON list of app ids). */
@@ -153,6 +157,8 @@ export const PREF_DEFAULTS: Prefs = {
   'lock.pinLength': 4,
   'work.passwordHash': '',
   'work.enabled': false,
+  'setup.done': false,
+  'setup.detected': '',
   'screensaver.scene': 'clock',
   'apps.warm': '["settings","file-explorer"]',
   'apps.startup': '[]',
