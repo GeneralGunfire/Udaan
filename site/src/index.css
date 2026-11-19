@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@theme {
+  --font-sans: "Segoe UI Variable Display", "Segoe UI", "Inter", system-ui, sans-serif;
+  --color-brand: #1a66f2;
+  --color-blue: #2f7bff;
+  --color-brand-dark: #0f4fc4;
+  --color-ink: #1a1a1a;
+  --color-mist: #f2f2f2;
+  --color-sky: #dcebf8;
+}
+html { background: #fff; }
+body { font-family: var(--font-sans); background: #fff; color: #1a1a1a; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+.card { background: #fff; border-radius: 24px; box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.06); }
+.btn { display: inline-flex; align-items: center; gap: .5rem; background: var(--color-brand); color: #fff; font-weight: 600; font-size: 15px; padding: .8rem 1.5rem; border-radius: 6px; transition: background .2s, transform .2s; }
+.btn:hover { background: var(--color-brand-dark); }
+.link { color: var(--color-brand); font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; gap: .35rem; }
+.link:hover { text-decoration: underline; }
+
+/* Anchor links glide, and stop below the fixed top bar. */
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+
+/* Every button and link that looks like one lifts a little on hover and presses in on click. */
+a, button { -webkit-tap-highlight-color: transparent; }
+a.rounded-full, button.rounded-full, button.rounded-2xl { transition: transform .2s cubic-bezier(.22,1,.36,1), background-color .2s, color .2s, box-shadow .2s, opacity .2s; }
+a.rounded-full:hover:not([aria-disabled]), button.rounded-full:hover:not(:disabled) { transform: translateY(-1px); }
+a.rounded-full:active, button.rounded-full:active:not(:disabled) { transform: translateY(0) scale(.98); }
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; border-radius: 8px; }
+
+/* A page fades in once when it loads. */
+@keyframes udaan-page { from { opacity: 0; } to { opacity: 1; } }
+#root { animation: udaan-page .5s ease-out both; }
+
+/* Pictures in framed cards ease up a touch on hover. */
+.lift { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s; }
+.lift:hover { transform: translateY(-3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  #root { animation: none; }
+  a.rounded-full:hover, button.rounded-full:hover, .lift:hover { transform: none; }
+}
+
+/* A thin progress line that doubles as the timer for a self-advancing list. */
+@keyframes udaan-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.fill-bar { animation-name: udaan-fill; animation-timing-function: linear; animation-fill-mode: forwards; }
+@media (prefers-reduced-motion: reduce) { .fill-bar { animation: none; transform: scaleX(0); } }
