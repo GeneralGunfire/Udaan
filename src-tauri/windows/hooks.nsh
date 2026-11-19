@@ -35,6 +35,9 @@ Function UdaanOnAbort
     ${If} $2 != ""
       SetOutPath "$TEMP"
       RMDir /r "$INSTDIR"
+      ; The file being copied at this moment is still open and survives the line above. A hidden helper
+      ; removes the rest a few seconds later, once this installer has exited.
+      Exec '"$SYSDIR\cmd.exe" /c ping -n 4 127.0.0.1 >nul & rmdir /s /q "$INSTDIR"'
     ${EndIf}
   ${EndIf}
 FunctionEnd
