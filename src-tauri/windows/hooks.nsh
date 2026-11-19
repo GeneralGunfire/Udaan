@@ -11,6 +11,24 @@
 Var UdaanWasFresh
 
 !macro NSIS_HOOK_PREINSTALL
+  ; Which Windows is this? Build 22000 and up is Windows 11. The two installers are built separately
+  ; (hooks-win10.nsh / hooks-win11.nsh set UDAAN_FLAVOUR); if one is run on the other Windows it says so.
+  ReadRegStr $3 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "CurrentBuildNumber"
+  IntCmp $3 22000 udaan_is11 udaan_is10 udaan_is11
+  udaan_is10:
+    !ifdef UDAAN_WIN11
+      IfSilent udaan_os_ok
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_TOPMOST "This is the Udaan installer for Windows 11, but this PC runs Windows 10.$\r$\n$\r$\nThe Windows 10 installer is the right one for this PC (udaan.dev, Download page).$\r$\n$\r$\nInstall anyway?" IDYES udaan_os_ok
+      Abort
+    !endif
+    Goto udaan_os_ok
+  udaan_is11:
+    !ifdef UDAAN_WIN10
+      IfSilent udaan_os_ok
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_TOPMOST "This is the Udaan installer for Windows 10, but this PC runs Windows 11.$\r$\n$\r$\nThe Windows 11 installer is the right one for this PC (Download page).$\r$\n$\r$\nInstall anyway?" IDYES udaan_os_ok
+      Abort
+    !endif
+  udaan_os_ok:
   ; Remember whether there was already an Udaan here (so a cancelled update never deletes it).
   ${If} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
     StrCpy $UdaanWasFresh "0"
