@@ -17,7 +17,7 @@ import { Switcher3D } from './Switcher3D'
 import { Tips } from './Tips'
 import { WallpaperPicker } from './WallpaperPicker'
 import { getPref, setPref, usePref, type CORNER_KEYS } from '@/os/kernel/prefs'
-import { runFirstRunSetup } from '@/os/kernel/firstRun'
+import { FirstRunScreen } from './FirstRunScreen'
 import { checkForUpdate } from '@/os/kernel/updates'
 import { toast } from '@/os/ui/toasts'
 
@@ -215,11 +215,6 @@ export function LauncherWindow() {
     }
   }, [])
 
-  // A brand-new install picks settings that suit this PC, once.
-  useEffect(() => {
-    void runFirstRunSetup()
-  }, [])
-
   // Udaan restarting while in Work comes back locked, and the Notes and Clipboard stores follow the profile.
   useEffect(() => {
     void loadProfile().then((p) => {
@@ -398,6 +393,7 @@ export function LauncherWindow() {
       <AnimatePresence>{mode === 'tips' && <Tips onClose={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'switcher' && <Switcher3D origin={gestureOrigin} onDone={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'lock' && <LockScreen user={user} onUnlock={unlock} />}</AnimatePresence>
+      <FirstRunScreen />
       <AnimatePresence>{mode === 'work-lock' && <WorkLock inWork={profile === 'work'} onUnlock={unlockWork} onBack={backFromWorkLock} />}</AnimatePresence>
       <AnimatePresence>
         {mode === 'veil' && (

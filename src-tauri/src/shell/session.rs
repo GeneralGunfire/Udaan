@@ -4,7 +4,11 @@
 use std::path::PathBuf;
 
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-const RUN_VALUE: &str = "Udaan";
+/// The sign-in entry is named after the program file, so a second copy (a test build, `UdaanTest.exe`) never
+/// overwrites the real install's entry. The shipped `Udaan.exe` keeps the name "Udaan".
+fn run_value() -> String {
+  std::env::current_exe().ok().and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string())).filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("app")).unwrap_or_else(|| "Udaan".to_string())
+}
 
 /// What should run at sign-in. Release builds launch themselves; the dev
 /// build can't run without its Vite server, so it launches the repo's own
@@ -30,16 +34,16 @@ mod imp {
   pub fn autostart_enabled() -> bool {
     RegKey::predef(HKEY_CURRENT_USER)
       .open_subkey_with_flags(RUN_KEY, KEY_READ)
-      .and_then(|k| k.get_value::<String, _>(RUN_VALUE))
+      .and_then(|k| k.get_value::<String, _>(run_value()))
       .is_ok()
   }
 
   pub fn set_autostart(enabled: bool) -> Result<(), String> {
     let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(RUN_KEY).map_err(|e| e.to_string())?;
     if enabled {
-      key.set_value(RUN_VALUE, &autostart_command()?).map_err(|e| e.to_string())
+      key.set_value(run_value(), &autostart_command()?).map_err(|e| e.to_string())
     } else {
-      match key.delete_value(RUN_VALUE) {
+      match key.delete_value(run_value()) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e.to_string()),
@@ -79,7 +83,7 @@ mod imp {
       let root = RegKey::predef(hive);
       if let Ok(run) = root.open_subkey_with_flags(RUN_KEY, KEY_READ) {
         for (value, _) in run.enum_values().flatten() {
-          if value.eq_ignore_ascii_case(RUN_VALUE) {
+          if value.eq_ignore_ascii_case(&run_value()) {
             continue;
           }
           if let Ok(cmd) = run.get_value::<String, _>(&value) {

@@ -44,6 +44,7 @@ mod focus_video;
 mod news_image;
 mod sound_fx;
 mod tv;
+mod updater;
 mod utilities;
 mod template_library;
 mod webview_permissions;
@@ -84,9 +85,14 @@ pub fn run() {
   eprintln!("[udaan] clear_stale_webview_cache done");
   tauri::Builder::default()
     // Exactly one Udaan: a second launch just brings up Start in the running one.
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
       use tauri::Emitter;
-      let _ = app.emit("launcher:toggle", ());
+      // The website's "Check my version" button opens udaan://check-update.
+      if args.iter().any(|a| a.starts_with("udaan://")) {
+        let _ = app.emit("update://check", ());
+      } else {
+        let _ = app.emit("launcher:toggle", ());
+      }
     }))
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
@@ -117,6 +123,7 @@ pub fn run() {
         .build(),
     )
     .invoke_handler(tauri::generate_handler![
+      updater::update_install,
       engine::engine_health,
       engine::apps::engine_app_closed,
       engine::resources::engine_tier,
