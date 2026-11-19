@@ -22,6 +22,11 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
+if ($Publish -and -not $env:GITHUB_TOKEN) { throw 'Set $env:GITHUB_TOKEN first (in this same window), then run again. Nothing was built.' }
+if ($Publish) {
+  $t = Invoke-RestMethod "https://api.github.com/repos/$Repo" -Headers @{ Authorization = "Bearer $env:GITHUB_TOKEN"; 'User-Agent' = 'udaan-release' }
+  if (-not $t.permissions.push) { throw 'This token cannot write to the repo. Give it Contents: Read and write.' }
+}
 $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
 $version = $conf.version
 $target = 'C:\udaan-release\target'
