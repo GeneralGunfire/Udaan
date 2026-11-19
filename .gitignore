@@ -32,3 +32,4 @@ src-tauri/agritrack-collector/earthengine-key.json
 
 __pycache__/
 *.pyc
+dist-release/

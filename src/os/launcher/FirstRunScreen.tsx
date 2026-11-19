@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { SETUP_STEPS, isFreshInstall, runFirstRunSetup } from '@/os/kernel/firstRun'
+import { setPref } from '@/os/kernel/prefs'
+import { deactivateShell } from '@/os/kernel/session'
 
 /**
  * The screen a new install shows while it gets this PC ready, so it is clear Udaan is working. It shows each
@@ -13,6 +15,9 @@ export function FirstRunScreen() {
   const [done, setDone] = useState<boolean[]>(() => SETUP_STEPS.map(() => false))
   const [finished, setFinished] = useState(false)
   const stopped = useRef(false)
+  // After the steps: which taskbar does the person want? Resolved by the two buttons below.
+  const [choosing, setChoosing] = useState(false)
+  const chosen = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     let live = true
@@ -28,6 +33,12 @@ export function FirstRunScreen() {
         },
       })
       if (!live) return
+      if (!stopped.current) {
+        setChoosing(true)
+        await new Promise<void>((r) => (chosen.current = r))
+        if (!live) return
+        setChoosing(false)
+      }
       setFinished(true)
       setTimeout(() => live && setShow(false), stopped.current ? 0 : 900)
     })
@@ -52,7 +63,7 @@ export function FirstRunScreen() {
           transition={{ duration: 0.4 }}
         >
           <p className="text-[34px] font-light uppercase tracking-[0.5em] pl-[0.5em]">Udaan</p>
-          <p className="mt-3 text-[14px] text-white/55">{finished ? (stopped.current ? 'Setup stopped. Udaan is ready with its defaults.' : 'All set. Welcome.') : 'Getting this PC ready. This only happens once.'}</p>
+          <p className="mt-3 text-[14px] text-white/55">{choosing ? 'One last thing: how should your desktop look?' : finished ? (stopped.current ? 'Setup stopped. Udaan is ready with its defaults.' : 'All set. Welcome.') : 'Getting this PC ready. This only happens once.'}</p>
 
           <div className="mt-10 w-[360px]">
             <div className="h-[3px] overflow-hidden rounded-full bg-white/15">
@@ -77,7 +88,27 @@ export function FirstRunScreen() {
             </ul>
           </div>
 
-          {!finished && (
+          {choosing && (
+            <div className="mt-8 flex gap-3">
+              <button type="button" onClick={() => chosen.current?.()} className="rounded-2xl bg-white px-5 py-3 text-left text-[13.5px] font-semibold text-black transition hover:bg-white/90">
+                Udaan dock and top bar
+                <span className="mt-0.5 block text-[12px] font-normal text-black/55">Replaces the Windows taskbar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void setPref('dock.enabled', false).then(() => deactivateShell())
+                  chosen.current?.()
+                }}
+                className="rounded-2xl border border-white/25 px-5 py-3 text-left text-[13.5px] font-semibold text-white transition hover:bg-white/10"
+              >
+                Keep the Windows taskbar
+                <span className="mt-0.5 block text-[12px] font-normal text-white/55">Udaan apps, your taskbar. Change any time in Settings.</span>
+              </button>
+            </div>
+          )}
+
+          {!finished && !choosing && (
             <button
               type="button"
               onClick={() => {
