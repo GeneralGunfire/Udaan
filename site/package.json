@@ -1,0 +1,25 @@
+{
+  "name": "udaan-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5190",
+    "build": "vite build",
+    "sync-remover": "node -e \"require('fs').copyFileSync('../scripts/uninstall-udaan.cmd','public/uninstall-udaan.cmd')\"",
+    "prebuild": "npm run sync-remover",
+    "predev": "npm run sync-remover"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@vitejs/plugin-react": "^6.3.0",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8"
+  },
+  "dependencies": {
+    "framer-motion": "^14.14.0",
+    "lucide-react": "^1.75.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.6"
+  }
+}

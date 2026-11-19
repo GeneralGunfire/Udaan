@@ -44,12 +44,22 @@ function Step($t) { Write-Host "  - $t"; $log.Add($t) }
 
 # 1. stop Udaan ---------------------------------------------------------------------------------------------------
 Step "Stopping $product"
-foreach ($n in @($product, "$product-guard", 'shell-watchdog')) {
-  Get-Process -Name $n -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($_.Path -like "*\$product\*" -or $_.Path -like "*\Programs\$product*" -or $_.Name -eq $product -or $_.Path -like "*udaan*") } | Stop-Process -Force -ErrorAction SilentlyContinue
+# Anything running from this product's own program folder (the app, its guard and its watchdog), and the app by name.
+$dirs = @((Join-Path $env:LOCALAPPDATA "Programs\$product"))
+foreach ($k in @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$product", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$product")) {
+  $loc = (Get-ItemProperty $k -ErrorAction SilentlyContinue).InstallLocation
+  if ($loc) { $dirs += $loc.Trim('"') }
 }
+Get-Process -ErrorAction SilentlyContinue | Where-Object {
+  $path = $_.Path
+  $_.ProcessName -eq $product -or ($path -and ($dirs | Where-Object { $_ -and $path.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }))
+} | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 800
 
 # 2. give the Windows desktop back ---------------------------------------------------------------------------------
+# Only when no other Udaan is still running: a second copy (a test build) must not un-hide the taskbar for the first.
+$others = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'Udaan*' -and $_.ProcessName -ne 'shell-watchdog' }
+if (-not $others) {
 Step 'Restoring the Windows taskbar'
 Add-Type -Namespace U -Name Tray -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("user32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode)] public static extern System.IntPtr FindWindowEx(System.IntPtr p, System.IntPtr a, string c, string w);
@@ -58,6 +68,7 @@ Add-Type -Namespace U -Name Tray -MemberDefinition @'
 foreach ($cls in 'Shell_TrayWnd', 'Shell_SecondaryTrayWnd') {
   $h = [U.Tray]::FindWindowEx([IntPtr]::Zero, [IntPtr]::Zero, $cls, $null)
   while ($h -ne [IntPtr]::Zero) { [void][U.Tray]::ShowWindow($h, 5); $h = [U.Tray]::FindWindowEx([IntPtr]::Zero, $h, $cls, $null) }
+}
 }
 if ($real) {
   # If Udaan had been set as the Windows shell, put Explorer back. (Only possible when run as administrator.)
@@ -97,6 +108,9 @@ Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 
 if ($real) { Remove-Item 'HKCU:\Software\Classes\udaan' -Recurse -Force -ErrorAction SilentlyContinue }
 foreach ($k in $keys) { Remove-Item $k -Recurse -Force -ErrorAction SilentlyContinue }
 Remove-Item "HKCU:\Software\$id" -Recurse -Force -ErrorAction SilentlyContinue
+# The installer keeps its install folder under Software\Udaan\<product>. Remove it, and the Udaan folder if nothing else is in it.
+Remove-Item "HKCU:\Software\Udaan\$product" -Recurse -Force -ErrorAction SilentlyContinue
+if ((Test-Path 'HKCU:\Software\Udaan') -and -not (Get-ChildItem 'HKCU:\Software\Udaan' -ErrorAction SilentlyContinue)) { Remove-Item 'HKCU:\Software\Udaan' -Force -ErrorAction SilentlyContinue }
 $lnks = @((Join-Path ([Environment]::GetFolderPath('Programs')) $product), (Join-Path ([Environment]::GetFolderPath('Programs')) "$product.lnk"), (Join-Path ([Environment]::GetFolderPath('Desktop')) "$product.lnk"))
 foreach ($l in $lnks) { Remove-Item $l -Recurse -Force -ErrorAction SilentlyContinue }
 

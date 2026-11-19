@@ -96,6 +96,11 @@ export default function Download() {
                 <summary className="flex cursor-pointer list-none items-center gap-2 text-[14px] font-semibold"><Info size={15} className="text-ink/45" />Not sure which one you need?<ChevronDown size={15} className="ml-auto text-ink/40 transition-transform group-open:rotate-180" /></summary>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-ink/60">Open Settings, then System, then About. Under “Windows specifications” it says Windows 10 or Windows 11. If it says Windows 11, pick the Windows 11 installer.</p>
               </details>
+
+              <details className="group mt-3 max-w-md rounded-2xl bg-white/70 px-4 py-3">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-[14px] font-semibold"><ShieldCheck size={15} className="text-ink/45" />Windows says “Windows protected your PC”?<ChevronDown size={15} className="ml-auto text-ink/40 transition-transform group-open:rotate-180" /></summary>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-ink/60">Udaan is new, and Windows shows this notice for any app it has not seen many times. It is expected. Click <b>More info</b>, then <b>Run anyway</b>. The installer then does the rest, shows its progress, and has a Cancel button if you change your mind.</p>
+              </details>
             </motion.div>
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.1 }}>
@@ -131,6 +136,18 @@ export default function Download() {
                   </li>
                 ))}
               </ul>
+            </Reveal>
+          </Wrap>
+        </section>
+
+        <section id="remove" className="bg-white py-16 md:py-20">
+          <Wrap className="max-w-3xl">
+            <Reveal>
+              <Eyebrow>Removing Udaan</Eyebrow>
+              <H2 className="mt-3">Leaving is just as easy.</H2>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink/60">You do not need Udaan to be working to remove it. Download the remover, double-click it, and it asks once before it does anything. It stops Udaan, gives you back the Windows taskbar and desktop, and removes the program, its shortcuts, its start-up entry and its data. Your own files are never touched.</p>
+              <a href="/uninstall-udaan.cmd" download className="mt-5 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-ink/85"><DownloadIcon size={15} />Download the remover</a>
+              <p className="mt-2 text-[12.5px] text-ink/45">Prefer to do it by hand? Settings, Apps, Udaan, Uninstall also works, and keeps your data unless you tick the box.</p>
             </Reveal>
           </Wrap>
         </section>

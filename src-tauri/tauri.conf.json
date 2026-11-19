@@ -158,7 +158,8 @@
     "resources": {
       "resources/piper": "resources/piper",
       "resources/voices": "resources/voices",
-      "../wallpapers": "wallpapers"
+      "../wallpapers": "wallpapers",
+      "../scripts/uninstall-udaan.cmd": "uninstall-udaan.cmd"
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"
