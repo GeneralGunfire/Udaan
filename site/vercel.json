@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/((?!assets/|logo/|shots/|.*\\..*).*)", "destination": "/index.html" }],
+  "headers": [
+    { "source": "/latest.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }, { "key": "Access-Control-Allow-Origin", "value": "*" }] },
+    { "source": "/uninstall-udaan.cmd", "headers": [{ "key": "Content-Type", "value": "application/octet-stream" }, { "key": "Content-Disposition", "value": "attachment; filename=uninstall-udaan.cmd" }] }
+  ]
+}
