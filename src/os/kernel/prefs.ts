@@ -77,9 +77,11 @@ export interface Prefs {
   'profile.avatar': string
   /** The look of every shell surface: 'matte' (charcoal) or 'win11' (slate, Windows 11 style). */
   'ui.materialStyle': 'matte' | 'win11'
-  /** SHA-256 of the Udaan Lock PIN; empty = the built-in default. */
+  /** Salted hash of the Udaan Lock PIN; empty until the person creates one. */
   'lock.pinHash': string
   'lock.pinLength': number
+  /** Salted hash of the Work password; empty until the person sets one. */
+  'work.passwordHash': string
   /** Which screensaver: clock, aurora, warp, flow, drift or shuffle. */
   'screensaver.scene': string
   /** Udaan apps kept loaded in the background for instant opening (JSON list of app ids). */
@@ -147,6 +149,7 @@ export const PREF_DEFAULTS: Prefs = {
   'ui.materialStyle': 'matte',
   'lock.pinHash': '',
   'lock.pinLength': 4,
+  'work.passwordHash': '',
   'screensaver.scene': 'clock',
   'apps.warm': '["settings","file-explorer"]',
   'apps.startup': '[]',

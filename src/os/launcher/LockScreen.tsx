@@ -14,7 +14,7 @@ import { SAVERS } from '@/os/cinema/scenes'
 import { fittedWallpaperSrc } from '@/app/wallpapers'
 import { mediaCommand, sourceName, type NowPlaying } from '@/os/dock/panels/MediaPanel'
 
-import { DEFAULT_PIN_HASH, DEFAULT_PIN_LENGTH, loadPinConfig, sha256, type PinConfig } from '@/os/kernel/lockPin'
+import { DEFAULT_PIN_LENGTH, checkSecret, loadPinConfig, resetPin, type PinConfig } from '@/os/kernel/lockPin'
 
 const ease = [0.16, 1, 0.3, 1] as const
 
@@ -210,9 +210,15 @@ export function LockScreen({ user: systemUser, onUnlock }: { user: string; onUnl
   const np = useNowPlaying()
   const [entering, setEntering] = useState(false)
   const [pin, setPin] = useState('')
-  const [cfg, setCfg] = useState<PinConfig>({ hash: DEFAULT_PIN_HASH, length: DEFAULT_PIN_LENGTH })
+  const [cfg, setCfg] = useState<PinConfig>({ hash: '', length: DEFAULT_PIN_LENGTH })
+  const [loaded, setLoaded] = useState(false)
+  /** First time on this PC there is no PIN: the first entry is kept here until it is typed again to confirm. */
+  const [firstEntry, setFirstEntry] = useState<string | null>(null)
   useEffect(() => {
-    void loadPinConfig().then(setCfg)
+    void loadPinConfig().then((c) => {
+      setCfg(c)
+      setLoaded(true)
+    })
   }, [])
   const PIN_LENGTH = cfg.length
   const [wrong, setWrong] = useState(0)
@@ -222,18 +228,36 @@ export function LockScreen({ user: systemUser, onUnlock }: { user: string; onUnl
 
   const submit = useCallback(
     async (value: string) => {
-      if ((await sha256(value)) === cfg.hash) {
-        setUnlocking(true)
-        playSound('unlock')
-        setTimeout(onUnlock, 100)
-      } else {
+      const fail = () => {
         playSound('error')
         setWrong((w) => w + 1)
         void shake.start({ x: [0, -14, 12, -8, 6, -3, 0], transition: { duration: 0.45 } })
         setPin('')
       }
+      const ok = () => {
+        setUnlocking(true)
+        playSound('unlock')
+        setTimeout(onUnlock, 100)
+      }
+      if (!loaded) return
+      if (!cfg.hash) {
+        // No PIN yet: create one, asking twice.
+        if (firstEntry === null) {
+          setFirstEntry(value)
+          setWrong(0)
+          setPin('')
+        } else if (firstEntry === value) {
+          if ((await resetPin(value)) === 'ok') ok()
+        } else {
+          setFirstEntry(null)
+          fail()
+        }
+        return
+      }
+      if (await checkSecret(value, cfg.hash)) ok()
+      else fail()
     },
-    [onUnlock, shake, cfg.hash],
+    [onUnlock, shake, cfg.hash, loaded, firstEntry],
   )
 
   useEffect(() => {
@@ -296,7 +320,7 @@ export function LockScreen({ user: systemUser, onUnlock }: { user: string; onUnl
           >
             {picture ? <img src={picture} alt="" draggable={false} className="h-20 w-20 rounded-full object-cover shadow-[0_10px_40px_rgb(0_0_0/0.35)]" /> : <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-[32px] font-light text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22),0_10px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl">{user.charAt(0).toUpperCase() || 'U'}</span>}
             <p className="mt-3 text-[18px] font-medium">{user || 'Udaan'}</p>
-            <p className={`mt-0.5 text-[12.5px] ${wrong > 0 ? "text-[#ff8a80]" : "text-white/60"}`}>{wrong > 0 ? 'Incorrect PIN, try again' : 'Enter your Udaan PIN'}</p>
+            <p className={`mt-0.5 text-[12.5px] ${wrong > 0 ? "text-[#ff8a80]" : "text-white/60"}`}>{!cfg.hash ? (wrong > 0 ? 'Those did not match. Start again' : firstEntry === null ? 'Create a PIN for Udaan' : 'Enter it again to confirm') : wrong > 0 ? 'Incorrect PIN, try again' : 'Enter your Udaan PIN'}</p>
 
             <motion.div animate={shake} className="mt-5 flex gap-5">
               {Array.from({ length: PIN_LENGTH }, (_, i) => (

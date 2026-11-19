@@ -4,7 +4,7 @@ import { motion, useAnimationControls } from 'framer-motion'
 import { fittedWallpaperSrc } from '@/app/wallpapers'
 import { playSound } from '@/os/sound/sounds'
 import { Button } from '@/os/ui/controls'
-import { verifyWorkPassword, workLockWallpaperId } from '@/os/kernel/profile'
+import { hasWorkPassword, setWorkPassword, verifyWorkPassword, workLockWallpaperId } from '@/os/kernel/profile'
 
 /**
  * The Work lock screen: shown when Work is opened from Start, after 3 idle minutes in Work, and after
@@ -21,6 +21,12 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
   const [text, setText] = useState('')
   const [wrong, setWrong] = useState(false)
   const [busy, setBusy] = useState(false)
+  // On a fresh install there is no Work password: the first time, the person creates one (typed twice).
+  const [hasPw, setHasPw] = useState<boolean | null>(null)
+  const [firstEntry, setFirstEntry] = useState<string | null>(null)
+  useEffect(() => {
+    void hasWorkPassword().then(setHasPw)
+  }, [])
   const shake = useAnimationControls()
   const lockMotion = useMotion('lock')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -51,7 +57,34 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
 
   const submit = useCallback(async () => {
     if (busy || !text) return
+    if (hasPw === null) return
     setBusy(true)
+    if (!hasPw) {
+      if (text.length < 4) {
+        setWrong(true)
+        setText('')
+        setBusy(false)
+        return
+      }
+      if (firstEntry === null) {
+        setFirstEntry(text)
+        setText('')
+        setBusy(false)
+        return
+      }
+      if (firstEntry === text) {
+        await setWorkPassword(text)
+        playSound('unlock')
+        await onUnlock()
+        return
+      }
+      setFirstEntry(null)
+      setWrong(true)
+      setText('')
+      setBusy(false)
+      playSound('error')
+      return
+    }
     if (await verifyWorkPassword(text)) {
       playSound('unlock')
       await onUnlock()
@@ -63,7 +96,7 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
     setBusy(false)
     void shake.start({ x: [0, -12, 10, -6, 4, 0], transition: { duration: 0.35 } })
     inputRef.current?.focus()
-  }, [busy, text, onUnlock, shake])
+  }, [busy, text, onUnlock, shake, hasPw, firstEntry])
 
   return (
     <motion.div
@@ -103,7 +136,7 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
             ref={inputRef}
             type="password"
             aria-label="Work password"
-            placeholder="Work password"
+            placeholder={hasPw === false ? (firstEntry === null ? 'Create a Work password' : 'Type it again') : 'Work password'}
             autoComplete="off"
             spellCheck={false}
             value={text}
@@ -121,7 +154,7 @@ export function WorkLock({ inWork, onUnlock, onBack }: { inWork: boolean; onUnlo
         </motion.form>
 
         <p className="mt-2.5 h-[18px] text-[12.5px]" style={{ color: wrong ? '#c62828' : undefined, opacity: wrong ? 1 : 0.85 }}>
-          {wrong ? 'Incorrect password, try again' : inWork ? 'Work is locked' : 'Enter your Work password'}
+          {wrong ? (hasPw === false ? 'Use at least 4 characters, and type the same twice' : 'Incorrect password, try again') : hasPw === false ? 'Choose a password for your Work profile' : inWork ? 'Work is locked' : 'Enter your Work password'}
         </p>
 
         <button type="button" onClick={onBack} className="mt-1 rounded-full px-3.5 py-1 text-[12.5px] opacity-80 hover:opacity-100">

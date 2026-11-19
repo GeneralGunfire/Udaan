@@ -3,7 +3,7 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { localDataDir, join } from '@tauri-apps/api/path'
 import { getPref, onPrefChanged, setPref, usePref } from './prefs'
 import { inTauri } from './shell'
-import { sha256 } from './lockPin'
+import { checkSecret, hashSecret } from './lockPin'
 
 /**
  * PROFILES. One Udaan, two profiles. Work changes the layout, the launchers and what is kept apart; it
@@ -21,9 +21,6 @@ import { sha256 } from './lockPin'
  */
 export type Profile = 'personal' | 'work'
 
-/** SHA-256 of the Work password. */
-const WORK_PASSWORD_HASH = 'REMOVED-HASH'
-
 /** Work locks itself after this much time with no input anywhere in Windows. */
 export const WORK_IDLE_LOCK_MS = 3 * 60_000
 
@@ -38,8 +35,18 @@ async function workWallpaper(): Promise<string> {
   }
 }
 
+/** Whether this PC has a Work password yet. A fresh install has none, and the Work lock asks for one. */
+export async function hasWorkPassword(): Promise<boolean> {
+  return Boolean(await getPref('work.passwordHash'))
+}
+
 export async function verifyWorkPassword(text: string): Promise<boolean> {
-  return (await sha256(text)) === WORK_PASSWORD_HASH
+  return checkSecret(text, await getPref('work.passwordHash'))
+}
+
+/** Saves a new Work password (salted and slow-hashed; the password itself is never stored). */
+export async function setWorkPassword(text: string): Promise<void> {
+  await setPref('work.passwordHash', await hashSecret(text))
 }
 
 let current: Profile = 'personal'
