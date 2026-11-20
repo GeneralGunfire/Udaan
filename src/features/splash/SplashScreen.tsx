@@ -123,7 +123,7 @@ const HINT_MS = 4800
 /**
  * The boot screen: pure black and white. The three real startup stages run underneath (shell setup, a safe
  * performance pass, app paint-readiness) and a single hairline fills as each one completes. When they are
- * done the screen says so and simply waits: it stays until the person presses Skip (or Enter / Escape),
+ * done the screen says so and simply waits: it stays until the person clicks Skip or anywhere on the screen (or presses Enter / Escape),
  * then fades into the desktop, and only then is the dock revealed.
  */
 export function SplashScreen({ children }: PropsWithChildren) {
@@ -268,7 +268,7 @@ export function SplashScreen({ children }: PropsWithChildren) {
     return () => window.clearTimeout(timer)
   }, [phase])
 
-  // Enter or Escape also continue; a stray click or other key does not.
+  // Enter or Escape also continue (a click anywhere on the screen does too, see onPointerDown below).
   useEffect(() => {
     if (phase !== 'boot') return
     const onKey = (e: KeyboardEvent) => {
@@ -299,6 +299,7 @@ export function SplashScreen({ children }: PropsWithChildren) {
             exit={{ opacity: 0, transition: { duration: 1.1, ease: [0.4, 0, 0.2, 1] } }}
             role="dialog"
             aria-label="Starting Udaan"
+            onPointerDown={skip}
           >
             <div className="flex flex-col items-center">
               <motion.img
@@ -335,27 +336,33 @@ export function SplashScreen({ children }: PropsWithChildren) {
                   </motion.p>
                 </AnimatePresence>
               </div>
+
+              {/* A quiet line of advice, one at a time. It sits in the centred column with the button below it:
+                  the dock and the Windows taskbar are always-on-top windows along the bottom edge, so anything
+                  pinned there can be covered and unclickable. */}
+              <div className="mt-10 flex h-5 items-center justify-center">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.p key={hint} className="text-[13px] font-light text-white/40" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.5 }}>
+                    {HINTS[hint]}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
+
+              <motion.button
+                type="button"
+                onClick={skip}
+                className="mt-8 rounded-full border border-white/30 px-7 py-2 text-[13px] font-medium tracking-[0.08em] text-white transition-colors hover:bg-white hover:text-black focus-visible:bg-white focus-visible:text-black focus-visible:outline-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.2, duration: 0.8 }}
+              >
+                Skip
+              </motion.button>
+              <motion.p className="mt-3 text-[11.5px] font-light text-white/30" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6, duration: 0.8 }}>
+                or click anywhere
+              </motion.p>
             </div>
 
-            {/* A quiet line of advice, one at a time. */}
-            <div className="absolute inset-x-0 bottom-[17%] flex h-5 items-center justify-center">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.p key={hint} className="text-[13px] font-light text-white/40" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.5 }}>
-                  {HINTS[hint]}
-                </motion.p>
-              </AnimatePresence>
-            </div>
-
-            <motion.button
-              type="button"
-              onClick={skip}
-              className="absolute bottom-[7%] rounded-full border border-white/30 px-7 py-2 text-[13px] font-medium tracking-[0.08em] text-white transition-colors hover:bg-white hover:text-black focus-visible:bg-white focus-visible:text-black focus-visible:outline-none"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.8, duration: 1 }}
-            >
-              Skip
-            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
