@@ -1,19 +1,32 @@
 {
-  "version": "0.1.2",
+  "version": "0.1.3",
   "date": "2026-11-20",
   "installers": {
     "10": {
-      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.2/Udaan_0.1.2_win10_x64-setup.exe",
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.3/Udaan_0.1.3_win10_x64-setup.exe",
       "size": "219 MB",
-      "sha256": "d92a30f2c92ef6f92d62e0327380329e1e13153e60c956e019c032097b733e38"
+      "sha256": "00b175f8d3bf73a5c2b6d3893c1b54890cbd07f0f8bb04037f34c63044cdaba7"
     },
     "11": {
-      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.2/Udaan_0.1.2_win11_x64-setup.exe",
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.3/Udaan_0.1.3_win11_x64-setup.exe",
       "size": "219 MB",
-      "sha256": "3187055a73f43ca615d888baa2e4373a55776fda1d0b544565ac2c08a08b556c"
+      "sha256": "37b4bc20af892124f1f6e075b0c73533d9b5abc36b49ba56106971cebdb30876"
     }
   },
   "updates": [
+    {
+      "date": "2026-11-20",
+      "kind": "release",
+      "version": "0.1.3",
+      "title": "Udaan 0.1.3",
+      "notes": [
+        "Nothing is pinned to the dock for good any more. VS Code, File Explorer and every other icon can be removed: right-click it, or drag it up and off.",
+        "A new Dock apps list in Settings, Desktop & Dock: remove, reorder, add an Udaan app or any program on your PC, or reset the dock.",
+        "A switch to hide the Recycle Bin in the dock.",
+        "Fixed a title bar that could appear at the top of the screen on Windows when the pointer reached the top edge.",
+        "Everything from 0.1.2 is included."
+      ]
+    },
     {
       "date": "2026-11-20",
       "kind": "release",
