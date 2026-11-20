@@ -319,7 +319,21 @@ unsafe extern "system" fn no_frame_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
   const WM_NCPAINT: u32 = 0x0085;
   const WM_NCACTIVATE: u32 = 0x0086;
   const WM_NCDESTROY: u32 = 0x0082;
+  const WM_STYLECHANGING: u32 = 0x007C;
+  // The window library puts the caption style (and the raised window edge) back every time it shows one of
+  // these windows, which brings the real title bar, with its buttons, back too. Refuse those bits at the source.
+  const FRAME_STYLE: u32 = 0x00CF_0000; // WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+  const FRAME_EXSTYLE: u32 = 0x0000_0300; // WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE
   match msg {
+    WM_STYLECHANGING if wp.0 as isize as i32 == -16 || wp.0 as isize as i32 == -20 => {
+      let ss = &mut *(lp.0 as *mut windows::Win32::UI::WindowsAndMessaging::STYLESTRUCT);
+      if wp.0 as isize as i32 == -16 {
+        ss.styleNew &= !FRAME_STYLE;
+      } else {
+        ss.styleNew &= !FRAME_EXSTYLE;
+      }
+      DefSubclassProc(hwnd, msg, wp, lp)
+    }
     // Nothing to paint outside the client area.
     WM_NCPAINT => LRESULT(0),
     // lParam = -1 tells the default handler to update the active state but not to repaint the frame.
@@ -349,8 +363,17 @@ pub fn engine_window_unframe(window: tauri::WebviewWindow) -> Result<(), String>
       SetWindowLongW(hwnd, GWL_STYLE, (style & !strip) as i32);
       let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
-    // Idempotent: attaching again only replaces the same hook.
+    // Hook first, so the style can't come back once it is gone. Idempotent: attaching again only replaces the hook.
     let _ = SetWindowSubclass(hwnd, Some(no_frame_proc), NOFRAME_SUBCLASS_ID, 0);
+    // The raised window edge that comes with the caption style.
+    {
+      use windows::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE;
+      let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+      if ex & 0x0000_0300 != 0 {
+        SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !0x0000_0300) as i32);
+        let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+      }
+    }
 
     // Windows 11 (and later) can also draw a title bar and a border colour through the compositor. Tell it
     // there is none: DWMWA_BORDER_COLOR (34) and DWMWA_CAPTION_COLOR (35) = DWMWA_COLOR_NONE. Older Windows
