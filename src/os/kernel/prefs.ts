@@ -7,10 +7,13 @@ import { inTauri } from './shell'
 export interface Prefs {
   'dock.autoHide': boolean
   'dock.enabled': boolean
+  'menubar.enabled': boolean
   'shell.winKey': boolean
   'windows.autoMaximize': boolean
   'notifications.dnd': boolean
   'sounds.enabled': boolean
+  'sound.uiPack': string
+  'sound.notifyPack': string
   /** Play an inaudible signal so speakers never fall asleep on quiet passages. */
   'sound.keepAwake': boolean
   /** 1 (lowest) to 3. */
@@ -52,6 +55,7 @@ export interface Prefs {
   /** JSON array of app names whose banners are silenced (they still reach Notification Center). */
   'notifications.muted': string
   /** Accent colour for active and live states (hex). */
+  'ui.palette': string
   'ui.accent': string
   /** Solid surfaces instead of translucent glass. */
   'ui.opaque': boolean
@@ -112,10 +116,13 @@ export const CORNER_KEYS = ['corners.tl', 'corners.tr', 'corners.bl', 'corners.b
 export const PREF_DEFAULTS: Prefs = {
   'dock.autoHide': true,
   'dock.enabled': true,
+  'menubar.enabled': true,
   'shell.winKey': true,
   'windows.autoMaximize': false,
   'notifications.dnd': false,
   'sounds.enabled': true,
+  'sound.uiPack': 'udaan',
+  'sound.notifyPack': 'glass',
   'sound.keepAwake': true,
   'sound.keepAwakeLevel': 2,
   'sound.preset': 'flat',
@@ -140,6 +147,7 @@ export const PREF_DEFAULTS: Prefs = {
   'notifications.duration': 6,
   'notifications.center': 'sheet',
   'notifications.muted': '[]',
+  'ui.palette': 'default',
   'ui.accent': '#3072f0',
   'ui.opaque': false,
   'bars.liquid': true,

@@ -10,14 +10,16 @@ import { useTheme } from '@/shared/hooks/useTheme'
 import { TrashIcon } from '@/shared/icons'
 import { ShellSafetyPanel } from '@/shared/components/ShellSafetyPanel'
 import { setWindowWatcherEnabled } from '@/integrations/window-watcher/client'
-import { usePref, type BoolPrefKey, type CornerAction, type CORNER_KEYS } from '@/os/kernel/prefs'
+import { getPref, usePref, type BoolPrefKey, type CornerAction, type CORNER_KEYS } from '@/os/kernel/prefs'
 import { activateShell, deactivateShell, syncHotCorners } from '@/os/kernel/session'
 import { shell } from '@/os/kernel/shell'
 import { toastError } from '@/os/ui/toasts'
-import { setSoundsEnabled } from '@/os/sound/sounds'
+import { playSound, setSoundsEnabled, type SoundId } from '@/os/sound/sounds'
+import { NOTIFY_PACK_LIST, UI_PACK_LIST, type PackInfo } from '@/os/sound/soundPacks'
 import { createElement } from 'react'
 import { Button } from '@/shared/components/ui/button'
-import { WIDGET_CATALOG, WIDGET_VIEWS, addWidget, useWidgets, type WidgetKind } from '@/os/widgets/widgets'
+import { WIDGET_ACCENTS, WIDGET_CATALOG, WIDGET_SIZES, WIDGET_VIEWS, addWidget, useWidgets, widgetOptionSupport, type PlacedWidget, type WidgetKind, type WidgetOpts } from '@/os/widgets/widgets'
+import { ANALOG_STYLES, CLOCK_STYLES } from '@/os/widgets/clocks'
 import { QuickstartsSection } from './QuickstartsSection'
 import { LiquidGlassSettings } from './LiquidSection'
 import { ProfileGroup, WorkProfileGroup } from './ProfileGroup'
@@ -76,7 +78,10 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Turn off animations', section: 'dock', keywords: 'reduce motion accessibility' },
   { title: 'Screensaver delay', section: 'dock', keywords: 'screensaver idle timeout inactive start after seconds minutes 30 seconds 1 minute 5 minutes 10 minutes' },
   { title: 'Lock after the screensaver', section: 'dock', keywords: 'pin password screensaver' },
+  { title: 'App palette', section: 'personalization', keywords: 'colours tones theme dark black graphite midnight ocean forest plum ember amoled preset' },
   { title: 'Interface sounds', section: 'sound', keywords: 'audio effects clicks' },
+  { title: 'Notification sound', section: 'sound', keywords: 'sound pack chime marimba bell alert tone' },
+  { title: 'Interaction sounds', section: 'sound', keywords: 'sound pack clicks switcher 3d off mute soft glass mechanical' },
   { title: 'Widgets', section: 'widgets', keywords: 'desktop clock weather' },
   { title: 'Do not disturb', section: 'notifications', keywords: 'focus banners mute' },
   { title: 'Notification Center', section: 'notifications', keywords: 'alerts missed' },
@@ -201,13 +206,22 @@ function DockSection() {
       <Group title="Dock">
         <PrefToggleRow
           title="Use the Udaan dock"
-          description="Replaces the Windows taskbar. Turn off to get the Windows taskbar back."
+          description="Replaces the Windows taskbar and Start menu. Turn off to get the Windows taskbar, Start menu and Windows key back exactly as they were."
           pref="dock.enabled"
-          onApply={(v) => (v ? activateShell(true) : deactivateShell())}
+          onApply={async (v) => {
+            if (v) {
+              await activateShell(true)
+              await shell.setKeyboardHook(await getPref('shell.winKey'))
+            } else {
+              await shell.setKeyboardHook(false)
+              await deactivateShell()
+            }
+          }}
         />
         <PrefToggleRow title="Automatically hide the dock" description="The dock slides away and returns when you move the pointer to the bottom edge." pref="dock.autoHide" />
       </Group>
       <Group title="Menu Bar">
+        <PrefToggleRow title="Use the Udaan top bar" description="Turn off to hide the top bar and give its space back to your windows." pref="menubar.enabled" />
         <PrefToggleRow title="24-hour clock" description="Show the time as 14:30 instead of 2:30 PM." pref="menubar.clock24" />
         <PrefToggleRow title="Show seconds" description="The clock counts seconds." pref="menubar.seconds" />
         <PrefToggleRow title="Motivation video" description="A thin pill at the top centre of the menu bar. Hover it to open, click to pause." pref="focus.enabled" />
@@ -244,22 +258,60 @@ const SHORTCUTS: [string, string][] = [
   ['Win+Shift+S', 'Screenshot a region (Windows)'],
 ]
 
+function PlacedWidgetRow({ w, onChange, onRemove }: { w: PlacedWidget; onChange: (opts: PlacedWidget['opts']) => void; onRemove: () => void }) {
+  const support = widgetOptionSupport(w.kind)
+  const o = w.opts ?? {}
+  const style = CLOCK_STYLES.find((c) => c.id === o.style)?.id ?? 'classic'
+  const analog = w.kind === 'clock' && ANALOG_STYLES.includes(style)
+  return (
+    <Row stack title={WIDGET_CATALOG[w.kind].name} description={WIDGET_CATALOG[w.kind].description}>
+      <div className="flex flex-wrap items-center gap-2">
+        {support.style && <Select label="Style" value={style} options={CLOCK_STYLES.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => onChange({ ...o, style: v })} />}
+        <Select label="Size" value={String(o.scale ?? 1)} options={WIDGET_SIZES.map((s) => ({ value: String(s.value), label: s.label }))} onChange={(v) => onChange({ ...o, scale: Number(v) })} />
+        {support.accent && <Select label="Colour" value={o.accent ?? ''} options={WIDGET_ACCENTS.map((c) => ({ value: c.value, label: c.label }))} onChange={(v) => onChange({ ...o, accent: v || undefined })} />}
+        {support.hour24 && !analog && <Button type="button" variant="surface" size="pill-sm" onClick={() => onChange({ ...o, hour24: !o.hour24 })}>{o.hour24 ? '24-hour' : '12-hour'}</Button>}
+        {support.seconds && style !== 'words' && (
+          <Button type="button" variant="surface" size="pill-sm" onClick={() => onChange({ ...o, seconds: !(o.seconds ?? (w.kind === 'time-date' || analog)) })}>
+            {(o.seconds ?? (w.kind === 'time-date' || analog)) ? 'Seconds on' : 'Seconds off'}
+          </Button>
+        )}
+        <Button type="button" variant="surface" size="pill-sm" onClick={onRemove}>Remove</Button>
+      </div>
+    </Row>
+  )
+}
+
 function WidgetsSection() {
   const [placed, save] = useWidgets()
-  const kinds = Object.keys(WIDGET_CATALOG) as WidgetKind[]
+  // The clock is one widget with eight faces; each face gets its own card so it can be seen before it is added.
+  const FACE_BLURB: Record<string, string> = {
+    classic: 'Numerals, the date and a sweeping second hand.',
+    minimal: 'Fine tick marks and slim hands.',
+    bold: 'Large numerals and heavy hands, readable at a glance.',
+    rings: 'Hour, minute and second as three rings.',
+    orbit: 'A dot for each hour, with the minute circling it.',
+    digital: 'Large digits with the day and date.',
+    flip: 'Split-flap digits.',
+    words: 'The time in words, such as half past ten.',
+  }
+  type Card = { kind: WidgetKind; opts: WidgetOpts | undefined; name: string }
+  const cards: Card[] = (Object.keys(WIDGET_CATALOG) as WidgetKind[]).flatMap((kind): Card[] =>
+    kind === 'clock' ? CLOCK_STYLES.map((c) => ({ kind, opts: { style: c.id }, name: `Clock: ${c.name}` })) : [{ kind, opts: undefined, name: WIDGET_CATALOG[kind].name }],
+  )
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-[13px] text-[var(--color-text-secondary)]">Add widgets to your desktop. Drag them to arrange; right-click one to remove it.</p>
+      <p className="text-[13px] text-[var(--color-text-secondary)]">Add widgets to your desktop. Drag them to arrange. Right-click one to change its style, size and colour, or remove it.</p>
       <div className="grid grid-cols-2 gap-4">
-        {kinds.map((kind) => {
-          const { name, description, w, h } = WIDGET_CATALOG[kind]
+        {cards.map(({ kind, opts, name }) => {
+          const { w, h } = WIDGET_CATALOG[kind]
+          const description = opts?.style ? (FACE_BLURB[opts.style] ?? WIDGET_CATALOG[kind].description) : WIDGET_CATALOG[kind].description
           const scale = Math.min(1, 300 / w, 150 / h)
-          const count = placed.filter((p) => p.kind === kind).length
+          const count = placed.filter((p) => p.kind === kind && (!opts || (p.opts?.style ?? 'classic') === opts.style)).length
           return (
-            <div key={kind} className="flex flex-col overflow-hidden rounded-[12px] border border-[var(--border-hairline)] bg-(--os-hover)">
+            <div key={name} className="flex flex-col overflow-hidden rounded-[12px] border border-[var(--border-hairline)] bg-(--os-hover)">
               <div className="flex h-[190px] items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgb(90_120_200/0.35),rgb(20_22_30/0.6))]">
                 <div className="pointer-events-none" style={{ width: w * scale, height: h * scale }}>
-                  <div style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{createElement(WIDGET_VIEWS[kind])}</div>
+                  <div style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{createElement(WIDGET_VIEWS[kind], { opts })}</div>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
@@ -268,7 +320,7 @@ function WidgetsSection() {
                   <p className="truncate text-[12px] text-[var(--color-text-secondary)]">{description}</p>
                 </div>
                 {count > 0 && <span className="text-[11.5px] text-[var(--color-text-secondary)]">{count} on desktop</span>}
-                <Button type="button" variant="brand" size="pill-sm" onClick={() => void addWidget(kind)}>
+                <Button type="button" variant="brand" size="pill-sm" onClick={() => void addWidget(kind, opts)}>
                   Add
                 </Button>
               </div>
@@ -276,6 +328,13 @@ function WidgetsSection() {
           )
         })}
       </div>
+      {placed.length > 0 && (
+        <Group title="Customise">
+          {placed.map((w) => (
+            <PlacedWidgetRow key={w.id} w={w} onChange={(opts) => void save(placed.map((o) => (o.id === w.id ? { ...o, opts } : o)))} onRemove={() => void save(placed.filter((o) => o.id !== w.id))} />
+          ))}
+        </Group>
+      )}
       {placed.length > 0 && (
         <div className="flex items-center justify-between rounded-[10px] border border-[var(--border-hairline)] px-4 py-3">
           <span className="text-[13px] text-[var(--color-text-primary)]">{placed.length} {placed.length === 1 ? 'widget' : 'widgets'} on your desktop</span>
@@ -296,7 +355,7 @@ function KeyboardSection() {
           title="Use the Windows key for Udaan"
           description="Win opens the Udaan launcher; Win+D, Win+E, Win+A, Win+N, Win+S and Win+1–9 go to Udaan. Win+L, Win+R and Win+Arrows keep working as usual."
           pref="shell.winKey"
-          onApply={(v) => shell.setKeyboardHook(v)}
+          onApply={async (v) => shell.setKeyboardHook(v && (await getPref('dock.enabled')))}
         />
       </Group>
       <Group title="Keyboard shortcuts">
@@ -476,11 +535,49 @@ function NotificationsSection() {
   )
 }
 
+/** What an interaction pack previews: opening, switching windows in the 3D switcher, a toggle, closing. */
+const PREVIEW_SEQUENCE: SoundId[] = ['open', 'switch', 'toggle', 'close']
+
+/** One row per pack: pick it, or hear it first. "Off" has nothing to preview. */
+function PackRows({ list, pref, preview }: { list: PackInfo[]; pref: 'sound.uiPack' | 'sound.notifyPack'; preview: (id: string) => void }) {
+  const [current, setCurrent] = usePref(pref)
+  return (
+    <>
+      {list.map((p) => (
+        <Row key={p.id} title={p.name} description={p.description}>
+          <div className="flex items-center gap-2">
+            {p.id !== 'off' && (
+              <Button type="button" variant="surface" size="pill-sm" onClick={() => preview(p.id)}>
+                Preview
+              </Button>
+            )}
+            <span className="flex w-[72px] justify-center">
+              {current === p.id ? (
+                <span className="text-[12.5px] font-medium text-(--u-ink-3)">Selected</span>
+              ) : (
+                <Button type="button" variant="brand" size="pill-sm" onClick={() => void setCurrent(p.id)}>
+                  Use
+                </Button>
+              )}
+            </span>
+          </div>
+        </Row>
+      ))}
+    </>
+  )
+}
+
 function SoundSection() {
   return (
     <Stack>
       <Group title="Sound effects">
         <PrefToggleRow title="Interface sounds" description="Short sounds for notifications, launching apps, and other actions." pref="sounds.enabled" onApply={async (v) => setSoundsEnabled(v)} />
+      </Group>
+      <Group title="Notification sound">
+        <PackRows list={NOTIFY_PACK_LIST} pref="sound.notifyPack" preview={(id) => void playSound('notify', { notify: id })} />
+      </Group>
+      <Group title="Interaction sounds">
+        <PackRows list={UI_PACK_LIST} pref="sound.uiPack" preview={(id) => PREVIEW_SEQUENCE.forEach((s, i) => window.setTimeout(() => void playSound(s, { ui: id }), i * 420))} />
       </Group>
     </Stack>
   )

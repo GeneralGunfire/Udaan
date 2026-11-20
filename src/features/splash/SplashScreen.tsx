@@ -1,7 +1,8 @@
-import { useEffect, useState, type PropsWithChildren } from 'react'
+import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DEFAULT_WALLPAPER_ID, fittedWallpaperSrc, isValidWallpaperId } from '@/app/wallpapers'
 import { activateShell, showDock } from '@/os/kernel/session'
+import { getPref } from '@/os/kernel/prefs'
 import { runBootOptimize, onBootOptimizeProgress } from '@/integrations/boot-optimize/client'
 import { listOpenWindows } from '@/integrations/taskbar/client'
 import { hydrateScheduleCache } from '@/integrations/schedule'
@@ -17,14 +18,6 @@ const SLOW_HINT_MS = 4000
  *  underlying work resolves near-instantly — a fast machine could otherwise blow through all three
  *  stages in well under a second, which is what "too short, didn't get to see what it was doing" was about. */
 const MIN_STAGE_MS = 1300
-/** Overall floor for the whole boot sequence (stages 1-3 combined), independent of the per-stage
- *  floor above — real work is genuinely done well within this on a fast machine, but the splash
- *  should still hold for the full duration rather than exit early once that work finishes. */
-const MIN_BOOT_MS = 10_000
-/** How long the logo holds fully stopped, centered, before sliding into the reveal position. */
-const HOLD_BEFORE_SLIDE_MS = 300
-/** How long the wordmark reveal holds before the whole splash dissolves into the app. */
-const HOLD_AFTER_REVEAL_MS = 1500
 
 /** The wallpaper the desktop will show, rendered (or decoded) ahead of time. */
 function currentWallpaperId(): string {
@@ -109,7 +102,7 @@ async function waitForTaskbarHealthy(onAttempt?: (attempt: number) => void): Pro
 }
 
 type Stage = 1 | 2 | 3
-type Phase = 'boot' | 'stopping' | 'reveal' | 'exiting' | 'done'
+type Phase = 'boot' | 'exiting' | 'done'
 
 const STAGE_LABEL: Record<Stage, string> = {
   1: 'Preparing your desktop',
@@ -117,37 +110,36 @@ const STAGE_LABEL: Record<Stage, string> = {
   3: 'Loading Udaan',
 }
 
+/** Short things worth knowing, shown one at a time while the splash waits. */
+const HINTS = [
+  'Press the Windows key to open Start.',
+  'Tap Ctrl twice to see all your windows.',
+  'Right-click a widget to change its style and size.',
+  'Open Help, Udaan Tutorial for a guided tour.',
+  'Every part of Udaan can be switched off in Settings.',
+]
+const HINT_MS = 4800
+
 /**
- * Full boot sequence, replacing the blank window during startup: the logo
- * spins continuously through three real stages (OS/shell setup, safe
- * performance pass, app init) — status text at the bottom tracks whichever
- * is actually in flight, not a fake timer. Once all three resolve, the spin
- * decelerates to a stop, the mark slides left, and the "Udaan" wordmark
- * glows in beside it before the whole splash dissolves into the app
- * (already mounted underneath, ready to be revealed instantly).
+ * The boot screen: pure black and white. The three real startup stages run underneath (shell setup, a safe
+ * performance pass, app paint-readiness) and a single hairline fills as each one completes. When they are
+ * done the screen says so and simply waits: it stays until the person presses Skip (or Enter / Escape),
+ * then fades into the desktop, and only then is the dock revealed.
  */
 export function SplashScreen({ children }: PropsWithChildren) {
-  // Always runs the full staged sequence on every launch — a previous
-  // version checked the OS's prefers-reduced-motion / "Show animations"
-  // setting and skipped straight to a bare 400ms flash with no visible
-  // stages when that was off, which is not what was asked for: the
-  // loading sequence should always play, in full, independent of that OS
-  // setting. Also no longer gated on a sessionStorage "already played
-  // this session" flag (a previous version had that too) — relying on
-  // WebView storage semantics for "did the process actually restart" was
-  // fragile and reportedly didn't always reset.
   const [phase, setPhase] = useState<Phase>('boot')
   const [stage, setStage] = useState<Stage>(1)
   const [subStatus, setSubStatus] = useState<string | null>(null)
   const [slowHint, setSlowHint] = useState(false)
   const [errorHint, setErrorHint] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
+  const [hint, setHint] = useState(0)
 
   useEffect(() => {
     if (phase !== 'boot') return
 
     let cancelled = false
     let slowTimer: number | undefined
-    const bootStartedAt = Date.now()
 
     const startSlowTimer = () => {
       window.clearTimeout(slowTimer)
@@ -180,31 +172,16 @@ export function SplashScreen({ children }: PropsWithChildren) {
     }
 
     async function sequence() {
-      // Stage 1 — reuse the exact same taskbar-hide/resize logic, sequenced
-      // here purely so the splash's status text reflects it honestly during
-      // boot. App.tsx is the actual source of truth for this (it always
-      // calls activateUdaanTaskbar() itself on mount, independent of
-      // whether this stage ran/succeeded) — calling it again here is a
-      // harmless, idempotent no-op if App.tsx's own call already landed
-      // first, and a real head-start if this one wins the race. showDock is
-      // false here too — the dock only becomes visible via
-      // showDock() at the very end of this sequence, once the
-      // splash is actually about to disappear. A failure here is logged but
-      // never blocks the rest of boot.
+      // Stage 1: the same shell setup App.tsx performs; repeating it is idempotent. The dock stays hidden
+      // until the person leaves this screen.
       const stage1 = await runStage(1, () => activateShell(false))
       if (cancelled) return
       if (stage1 === 'error' || stage1 === 'timeout') {
-        setErrorHint('Desktop setup ran into an issue — continuing anyway.')
+        setErrorHint('Desktop setup ran into an issue. Continuing anyway.')
         window.setTimeout(() => setErrorHint(null), 2500)
       }
 
-      // Stage 2 — the real, safe, logged performance pass. Sub-status text
-      // is driven by actual progress events from the Rust side, not timers —
-      // but each real step (temp cleanup, startup scan, disk/memory check,
-      // DNS flush) can complete in a handful of milliseconds, so without a
-      // floor the text would overwrite itself faster than it's readable.
-      // Queue updates through one at a time, each held for a minimum
-      // duration, rather than setting subStatus directly on every event.
+      // Stage 2: the real performance pass. Its progress lines are queued so each stays readable.
       let subStatusChain = Promise.resolve()
       let lastSubStatusAt = 0
       const MIN_SUBSTATUS_MS = 420
@@ -225,36 +202,29 @@ export function SplashScreen({ children }: PropsWithChildren) {
           if (!cancelled) queueSubStatus(detail)
         })
       } catch {
-        // Event subscription failing is non-fatal — the stage still runs,
-        // just without granular sub-status text.
+        // Non-fatal: the stage still runs, just without granular lines.
       }
       const stage2 = await runStage(2, () => runBootOptimize())
       await subStatusChain
       unlistenProgress?.()
       if (cancelled) return
       if (stage2 === 'error') {
-        setErrorHint('Performance check ran into an issue — continuing anyway.')
+        setErrorHint('Performance check ran into an issue. Continuing anyway.')
         window.setTimeout(() => setErrorHint(null), 2500)
       }
       setSubStatus(null)
 
-      // Stage 3 — app paint-readiness (wallpaper decode + fonts) AND a
-      // real taskbar health verification, not just "the activation calls
-      // didn't throw" from Stage 1. This is the actual fix for landing in
-      // a half-warmed app that felt laggy right after boot: previously
-      // the splash only waited for the wallpaper image + fonts, which
-      // says nothing about whether the taskbar's own window has actually
-      // finished mounting and started responding to real IPC calls.
+      // Stage 3: wallpaper and fonts painted, the taskbar answering a real IPC round trip, data warmed.
       await runStage(3, async () => {
-        setSubStatus('Loading Udaan...')
+        setSubStatus('Loading Udaan')
         await waitForAppPaintReady()
         if (cancelled) return
-        setSubStatus('Checking taskbar...')
+        setSubStatus('Checking the taskbar')
         await waitForTaskbarHealthy((attempt) => {
-          if (!cancelled && attempt > 1) setSubStatus(`Checking taskbar... (${attempt}/6)`)
+          if (!cancelled && attempt > 1) setSubStatus(`Checking the taskbar (${attempt}/6)`)
         })
         if (cancelled) return
-        setSubStatus('Warming up your data...')
+        setSubStatus('Warming up your data')
         await Promise.all([
           hydrateScheduleCache().catch((err) => {
             console.error('[splash] Schedule warmup failed:', err)
@@ -266,26 +236,9 @@ export function SplashScreen({ children }: PropsWithChildren) {
       })
       if (cancelled) return
 
-      // The real work is usually done well before the splash has had its full, unhurried moment; hold on the
-      // last stage's label for the rest of it rather than cycling the labels back to the start.
-      const remaining = MIN_BOOT_MS - (Date.now() - bootStartedAt)
-      if (remaining > 0) {
-        setStage(3)
-        setSubStatus(null)
-        await new Promise((resolve) => window.setTimeout(resolve, remaining))
-      }
-      if (cancelled) return
-
-      // Reveal the taskbar dock now, right as the splash begins its own
-      // stop-and-reveal sequence — not on App.tsx's mount, which fires at
-      // process start and would otherwise show the dock while the splash
-      // is still covering the whole screen. A failure here is logged but
-      // never blocks the reveal transition itself.
-      showDock().catch((err) => {
-        console.error('[splash] Failed to reveal taskbar dock:', err)
-      })
-
-      setPhase('stopping')
+      // Everything is ready. Stay here until the person chooses to continue.
+      setSubStatus(null)
+      setReady(true)
     }
 
     void sequence()
@@ -296,42 +249,44 @@ export function SplashScreen({ children }: PropsWithChildren) {
     }
   }, [phase])
 
-  // Deceleration hold, then slide-and-reveal, then exit — each a fixed,
-  // deliberate beat rather than driven by further async work.
-  useEffect(() => {
-    if (phase !== 'stopping') return
-    const timer = window.setTimeout(() => setPhase('reveal'), HOLD_BEFORE_SLIDE_MS)
-    return () => window.clearTimeout(timer)
-  }, [phase])
-
-  useEffect(() => {
-    if (phase !== 'reveal') return
-    const timer = window.setTimeout(() => setPhase('exiting'), HOLD_AFTER_REVEAL_MS)
-    return () => window.clearTimeout(timer)
-  }, [phase])
+  // Leaving: reveal the dock (unless the person turned the Udaan dock off), then fade out.
+  const skip = useCallback(() => {
+    setPhase((p) => {
+      if (p !== 'boot') return p
+      void getPref('dock.enabled')
+        .then((on) => (on ? showDock() : undefined))
+        .catch((err) => {
+          console.error('[splash] Failed to reveal taskbar dock:', err)
+        })
+      return 'exiting'
+    })
+  }, [])
 
   useEffect(() => {
     if (phase !== 'exiting') return
-    const timer = window.setTimeout(() => setPhase('done'), 800)
+    const timer = window.setTimeout(() => setPhase('done'), 1100)
     return () => window.clearTimeout(timer)
   }, [phase])
 
-  // Skip is disabled once the stop-and-reveal sequence has begun — that
-  // finale is short and deliberate, not worth interrupting.
+  // Enter or Escape also continue; a stray click or other key does not.
   useEffect(() => {
     if (phase !== 'boot') return
-    const skip = () => setPhase('stopping')
-    window.addEventListener('pointerdown', skip)
-    window.addEventListener('keydown', skip)
-    return () => {
-      window.removeEventListener('pointerdown', skip)
-      window.removeEventListener('keydown', skip)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') skip()
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase, skip])
+
+  useEffect(() => {
+    if (phase !== 'boot') return
+    const t = window.setInterval(() => setHint((h) => (h + 1) % HINTS.length), HINT_MS)
+    return () => window.clearInterval(t)
   }, [phase])
 
   const visible = phase !== 'done'
-  const stopped = phase !== 'boot'
-  const statusText = errorHint ?? subStatus ?? STAGE_LABEL[stage]
+  const statusText = ready ? 'Ready' : errorHint ?? subStatus ?? STAGE_LABEL[stage]
+  const progress = ready ? 1 : (stage - 1) / 3 + 0.2
   const ease = [0.16, 1, 0.3, 1] as const
 
   return (
@@ -339,62 +294,68 @@ export function SplashScreen({ children }: PropsWithChildren) {
       <AnimatePresence>
         {visible && (
           <motion.div
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-[#0a0b0d]"
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-black"
             initial={{ opacity: 1 }}
-            // Out: a slow, plain fade, so the desktop simply arrives behind it.
             exit={{ opacity: 0, transition: { duration: 1.1, ease: [0.4, 0, 0.2, 1] } }}
-            role="presentation"
-            aria-hidden="true"
+            role="dialog"
+            aria-label="Starting Udaan"
           >
             <div className="flex flex-col items-center">
-              {/* The mark: white on charcoal, one slow fade, nothing else moving. */}
               <motion.img
                 src="/logo/udaan.png"
                 alt=""
                 draggable={false}
-                width={92}
-                height={92}
+                width={88}
+                height={88}
                 className="select-none"
                 initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 1.8, ease }}
+                animate={{ opacity: ready ? 1 : [0.78, 1, 0.78], y: 0 }}
+                transition={ready ? { duration: 0.8 } : { opacity: { duration: 4, repeat: Infinity, ease: 'easeInOut' }, y: { delay: 0.4, duration: 1.6, ease } }}
               />
               <motion.p
-                className="mt-9 text-[14px] font-light uppercase text-white/90"
+                className="mt-9 text-[14px] font-light uppercase text-white"
                 style={{ fontFamily: "Montserrat, 'Segoe UI', sans-serif" }}
                 initial={{ opacity: 0, letterSpacing: '0.75em' }}
-                animate={{ opacity: 1, letterSpacing: '0.56em' }}
-                transition={{ delay: 1.4, duration: 2.4, ease }}
+                animate={{ opacity: 0.92, letterSpacing: '0.56em' }}
+                transition={{ delay: 0.9, duration: 2.2, ease }}
               >
                 Udaan
               </motion.p>
 
-              {/* One hairline carries the progress: a single linear fill across the whole boot, then it completes. */}
-              <motion.div className="mt-12 h-px w-[160px] overflow-hidden rounded-full bg-white/10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1.2 }}>
-                <motion.div
-                  className="h-full w-full origin-left bg-white/75"
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: stopped ? 1 : 0.94 }}
-                  transition={stopped ? { duration: 0.6, ease: [0.4, 0, 0.2, 1] } : { delay: 2, duration: Math.max(1, MIN_BOOT_MS / 1000 - 2), ease: 'linear' }}
-                />
+              {/* One hairline: it fills as each real stage finishes, and is complete when Udaan is ready. */}
+              <motion.div className="mt-12 h-px w-[180px] overflow-hidden rounded-full bg-white/15" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6, duration: 1 }}>
+                <motion.div className="h-full w-full origin-left bg-white" initial={{ scaleX: 0 }} animate={{ scaleX: progress }} transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1] }} />
               </motion.div>
 
               <div className="mt-5 flex h-4 items-center justify-center">
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.p
-                    key={stopped ? 'done' : statusText}
-                    className="text-[12px] font-light tracking-[0.12em] text-white/40"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    {stopped ? '' : statusText}
-                    {!stopped && slowHint ? ', taking a little longer' : ''}
+                  <motion.p key={statusText} className="text-[12px] font-light tracking-[0.14em] text-white/55" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
+                    {statusText}
+                    {!ready && slowHint ? ', taking a little longer' : ''}
                   </motion.p>
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* A quiet line of advice, one at a time. */}
+            <div className="absolute inset-x-0 bottom-[17%] flex h-5 items-center justify-center">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p key={hint} className="text-[13px] font-light text-white/40" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.5 }}>
+                  {HINTS[hint]}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+
+            <motion.button
+              type="button"
+              onClick={skip}
+              className="absolute bottom-[7%] rounded-full border border-white/30 px-7 py-2 text-[13px] font-medium tracking-[0.08em] text-white transition-colors hover:bg-white hover:text-black focus-visible:bg-white focus-visible:text-black focus-visible:outline-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.8, duration: 1 }}
+            >
+              Skip
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

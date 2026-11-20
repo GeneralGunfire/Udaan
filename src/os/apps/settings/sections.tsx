@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { usePref } from '@/os/kernel/prefs'
+import { PALETTES } from '@/os/kernel/palette'
 import { APP_DEFS, APP_IDS, type AppId } from '@/os/kernel/registry'
 import { usePoll } from '@/os/kernel/poll'
 import { changePin, loadPinConfig, resetPin } from '@/os/kernel/lockPin'
@@ -289,11 +290,29 @@ const ACCENTS = [
 
 export function AppearanceExtras() {
   const [accent, setAccent] = usePref('ui.accent')
+  const [palette, setPalette] = usePref('ui.palette')
   const [opaque, setOpaque] = usePref('ui.opaque')
   const [matStyle, setMatStyle] = usePref('ui.materialStyle')
   const [motionOff, setMotionOff] = usePref('motion.off')
   return (
     <Stack>
+      <Group title="App palette" footer="The tones every app and panel stands on, so they all match. Applies in Dark mode. Udaan is the original look.">
+        <div className="grid grid-cols-2 gap-3 px-4 py-4">
+          {PALETTES.map((p) => (
+            <button key={p.id} type="button" aria-pressed={palette === p.id} onClick={() => void setPalette(p.id)} className={cn('u-tile items-stretch gap-2 p-2 text-left', palette === p.id && 'bg-(--u-wash-on) shadow-[inset_0_0_0_2px_var(--u-accent)]')}>
+              <span className="flex h-[44px] overflow-hidden rounded-[8px] shadow-[inset_0_0_0_1px_rgb(255_255_255/10%)]">
+                {p.tones.map((t, i) => (
+                  <span key={i} className="h-full flex-1" style={{ background: t }} />
+                ))}
+              </span>
+              <span className="px-0.5">
+                <span className="block text-[13px] font-medium">{p.name}</span>
+                <span className="block text-[11.5px] text-(--u-ink-3)">{p.blurb}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Group>
       <Group title="Accent colour" footer="Used for what is active or live: the focused dock dot, switches, selections.">
         <div className="flex flex-wrap items-center gap-3 px-4 py-4">
           {ACCENTS.map((a) => (

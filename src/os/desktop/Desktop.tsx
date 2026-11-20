@@ -1,4 +1,5 @@
 import { startReminderService } from '@/integrations/schedule/reminders'
+import { startAlarmService } from '@/os/clock/alarmService'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { emit } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
@@ -101,6 +102,7 @@ export function Desktop() {
   useEffect(() => {
     initDailyBriefScheduler()
     startReminderService()
+    startAlarmService()
     applyStartupPrefs().catch((err) => console.error('[shell] startup prefs failed', err))
     hydrateScheduleCache().catch((err) => console.error('[schedule] hydrate failed', err))
     // Warm the two most commonly opened app windows (each a full WebView2

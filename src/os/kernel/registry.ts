@@ -13,6 +13,8 @@ import {
   LayersIcon,
   ClipboardIcon,
   DatabaseIcon,
+  CalculatorIcon,
+  ClockIcon,
 } from '@/shared/icons'
 
 export type AppId =
@@ -31,6 +33,8 @@ export type AppId =
   | 'photos'
   | 'storage'
   | 'anvil'
+  | 'calculator'
+  | 'clock'
 
 export interface BaseAppProps {
   onClose: () => void
@@ -52,6 +56,8 @@ export interface AppArgsMap {
   'photos': Record<string, never>
   'storage': Record<string, never>
   anvil: Record<string, never>
+  calculator: Record<string, never>
+  clock: Record<string, never>
   settings: { section?: 'personalization' | 'dock' | 'keyboard' | 'windows' | 'widgets' | 'quickstarts' | 'notifications' | 'sound' | 'system' }
 }
 
@@ -81,6 +87,8 @@ export const APP_DEFS: Record<AppId, AppDef> = {
   'photos': { name: 'Photos', icon: LayersIcon, size: { width: 1200, height: 820 }, minSize: { width: 640, height: 480 }, tint: '#ff9f0a' },
   'storage': { name: 'Storage', icon: DatabaseIcon, size: { width: 1000, height: 760 }, minSize: { width: 640, height: 480 }, tint: '#566478' },
   anvil: { name: 'Anvil', icon: LayersIcon, size: { width: 1180, height: 760 }, minSize: { width: 860, height: 520 }, tint: '#6b7686' },
+  calculator: { name: 'Calculator', icon: CalculatorIcon, size: { width: 380, height: 600 }, minSize: { width: 340, height: 540 }, tint: '#3a3f47' },
+  clock: { name: 'Clock', icon: ClockIcon, size: { width: 920, height: 680 }, minSize: { width: 680, height: 520 }, tint: '#2b2f36' },
   tv: { name: 'TV', icon: LayersIcon, size: { width: 1600, height: 900 }, minSize: { width: 960, height: 600 }, tint: '#0a0a0c' },
   settings: { name: 'Settings', icon: SettingsIcon, size: { width: 1040, height: 720 }, minSize: { width: 720, height: 480 }, tint: '#8e8e93' },
 }
@@ -116,6 +124,8 @@ export const APP_COMPONENTS: { [Id in AppId]: ComponentType<any> } = {
   'photos': lazy(() => import('@/os/apps/utilities/PhotosApp').then((m) => ({ default: m.PhotosApp }))),
   'storage': lazy(() => import('@/os/apps/utilities/StorageApp').then((m) => ({ default: m.StorageApp }))),
   anvil: lazy(() => import('@/features/anvil/AnvilApp').then((m) => ({ default: m.AnvilApp }))),
+  calculator: lazy(() => import('@/os/apps/calculator/CalculatorApp').then((m) => ({ default: m.CalculatorApp }))),
+  clock: lazy(() => import('@/os/apps/clock/ClockApp').then((m) => ({ default: m.ClockApp }))),
   tv: lazy(() => import('@/os/apps/tv/TvApp').then((m) => ({ default: m.TvApp }))),
   settings: lazy(() => import('@/os/apps/settings/SettingsApp').then((m) => ({ default: m.SettingsApp }))),
 }

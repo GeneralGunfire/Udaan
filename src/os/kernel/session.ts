@@ -41,7 +41,8 @@ export async function applyStartupPrefs(): Promise<void> {
     getPref('windows.autoMaximize'),
     getPref('dock.enabled'),
   ])
-  await shell.setKeyboardHook(winKey)
+  // With the Windows taskbar back, the Windows key belongs to Windows' own Start menu.
+  await shell.setKeyboardHook(winKey && dockEnabled)
   // Keep the speakers awake through quiet passages (see sound_fx/keepalive.rs).
   const [keepAwake, keepLevel] = await Promise.all([getPref('sound.keepAwake'), getPref('sound.keepAwakeLevel')])
   void invoke('speaker_keepalive_set', { enabled: keepAwake, level: keepLevel }).catch(() => {})

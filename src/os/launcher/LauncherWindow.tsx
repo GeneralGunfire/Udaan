@@ -14,7 +14,7 @@ import { playSound } from '@/os/sound/sounds'
 import { onHotkey, shell, subscribeShell, useShell } from '@/os/kernel/shell'
 import { Expose } from './Expose'
 import { Switcher3D } from './Switcher3D'
-import { Tips } from './Tips'
+import { Tutorial } from './Tutorial'
 import { WallpaperPicker } from './WallpaperPicker'
 import { getPref, setPref, usePref, type CORNER_KEYS } from '@/os/kernel/prefs'
 import { FirstRunScreen } from './FirstRunScreen'
@@ -390,7 +390,7 @@ export function LauncherWindow() {
       <AnimatePresence>{mode === 'launchpad' && <StartMenu onClose={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'wallpaper' && <WallpaperPicker onClose={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'screensaver' && <Screensaver onDismiss={endScreensaver} />}</AnimatePresence>
-      <AnimatePresence>{mode === 'tips' && <Tips onClose={dismiss} />}</AnimatePresence>
+      <AnimatePresence>{mode === 'tips' && <Tutorial onClose={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'switcher' && <Switcher3D origin={gestureOrigin} onDone={dismiss} />}</AnimatePresence>
       <AnimatePresence>{mode === 'lock' && <LockScreen user={user} onUnlock={unlock} />}</AnimatePresence>
       <FirstRunScreen />

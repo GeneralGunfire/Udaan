@@ -26,6 +26,8 @@ import { LiquidGlass } from '@/os/ui/liquid/LiquidGlass'
 const METRICS = dockMetrics()
 const LAUNCH_TIMEOUT_MS = 8000
 const HIDE_DELAY_MS = 450
+/** How long the bar takes to slide out of, or into, the bottom edge. */
+const DOCK_SLIDE_MS = 340
 const DRAG_THRESHOLD = 6
 const UNPIN_LIFT = 60
 const WHEEL_STEP = 60
@@ -243,6 +245,7 @@ function DockGlyph({ item }: { item: DockItem }) {
 
 export function DockWindow() {
   const [autoHide] = usePref('dock.autoHide')
+  const [dockEnabled] = usePref('dock.enabled')
   const { items, pins, pinnedCount } = useDockItems()
   const itemMenu = useCallback((item: DockItem) => itemMenuItems(item, pins), [pins])
   const foreground = useShell((s) => s.foreground)
@@ -318,7 +321,7 @@ export function DockWindow() {
   // so the desktop does not reflow when a lock comes or goes.
   const covered = useCovered()
   const shouldHide = autoHide || fullscreen
-  const visible = (!shouldHide || revealed) && !covered
+  const visible = dockEnabled && (!shouldHide || revealed) && !covered
   const visibleRef = useLatest(visible)
   const itemsRef = useLatest(items)
 
@@ -339,6 +342,11 @@ export function DockWindow() {
 
   useEffect(() => {
     if (!barWidth) return
+    // Switched off in Settings: give the reserved strip back, or windows would stop short of the Windows taskbar.
+    if (!dockEnabled) {
+      void invoke('engine_edge_release').catch(() => {})
+      return
+    }
     let cancelled = false
     const bind = async () => {
       const scale = pxScale()
@@ -364,13 +372,39 @@ export function DockWindow() {
       cancelled = true
       void un.then((fn) => fn())
     }
-  }, [autoHide, barWidth])
+  }, [autoHide, barWidth, dockEnabled])
 
-  // Shown or hidden as a whole (auto-hide, full-screen apps).
+  // Shown or hidden as a whole (auto-hide, full-screen apps). The window appears first and the bar then slides
+  // up into it; on the way out the bar slides down and only then is the window hidden, so it never just blinks.
+  const reduced = prefersReducedMotion()
+  const [open, setOpen] = useState(visible)
   useEffect(() => {
     const win = getCurrentWindow()
-    void (visible ? win.show() : win.hide())
+    if (visible) {
+      void win.show()
+      let raf2 = 0
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setOpen(true))
+      })
+      return () => {
+        cancelAnimationFrame(raf1)
+        cancelAnimationFrame(raf2)
+      }
+    }
+    setOpen(false)
+    const t = setTimeout(() => void win.hide(), prefersReducedMotion() ? 0 : DOCK_SLIDE_MS + 40)
+    return () => clearTimeout(t)
   }, [visible])
+
+  // Turning auto-hide on or off takes effect at once, without waiting for the pointer to visit the bottom edge.
+  useEffect(() => {
+    if (!autoHide) {
+      setRevealed(true)
+      return
+    }
+    const t = setTimeout(() => setRevealed(false), 600)
+    return () => clearTimeout(t)
+  }, [autoHide])
 
   // Auto-hide: the native mouse hook reports the pointer only while it is near the bottom edge.
   useEffect(() => {
@@ -510,6 +544,14 @@ export function DockWindow() {
           height: METRICS.barHeight,
           gap: METRICS.gap,
           padding: `0 ${METRICS.pad + 4}px`,
+          // Slides down out of the window and fades; the spring-like curve overshoots a touch on the way in.
+          transform: open ? 'translateY(0)' : `translateY(${METRICS.barHeight + METRICS.margin + 12}px)`,
+          opacity: open ? 1 : 0,
+          transition: reduced
+            ? 'none'
+            : open
+              ? `transform ${DOCK_SLIDE_MS}ms cubic-bezier(0.22, 1.18, 0.36, 1), opacity ${DOCK_SLIDE_MS * 0.7}ms ease-out`
+              : `transform ${DOCK_SLIDE_MS}ms cubic-bezier(0.4, 0, 0.7, 0.2), opacity ${DOCK_SLIDE_MS * 0.8}ms ease-in`,
         }}
       >
         <GlassSlice edge="bottom" parentRef={barRef} />

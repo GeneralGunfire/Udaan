@@ -49,6 +49,15 @@ export function ClockIcon(props: IconProps) {
   )
 }
 
+export function CalculatorIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="4.5" y="2.5" width="11" height="15" rx="2" />
+      <path d="M7 5.5h6M7.2 9.5h.01M10 9.5h.01M12.8 9.5h.01M7.2 12h.01M10 12h.01M12.8 12h.01M7.2 14.5h.01M10 14.5h.01M12.8 14.5h.01" />
+    </svg>
+  )
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

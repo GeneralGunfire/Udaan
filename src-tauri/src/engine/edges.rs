@@ -74,6 +74,23 @@ fn monitor_rect(hwnd: HWND) -> RECT {
   }
 }
 
+/// The monitor rectangle a bar that reserves nothing (an overlay, such as an auto-hiding dock) is placed against.
+/// For the bottom edge that is the work area's bottom, not the monitor's: a bar that reserves its strip is moved
+/// by the system to sit above whatever already holds the bottom (the Windows taskbar keeps its strip even while
+/// hidden), so an overlay has to start from the same line or the bar would sit lower in one mode than the other.
+fn overlay_rect(hwnd: HWND, edge: Edge) -> RECT {
+  unsafe {
+    let mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+    let _ = GetMonitorInfoW(mon, &mut mi);
+    let mut r = mi.rcMonitor;
+    if edge == Edge::Bottom && mi.rcWork.bottom > mi.rcMonitor.top && mi.rcWork.bottom <= mi.rcMonitor.bottom {
+      r.bottom = mi.rcWork.bottom;
+    }
+    r
+  }
+}
+
 /// The strip of thickness `px` against `edge` of the monitor.
 fn edge_strip(edge: Edge, m: &RECT, px: i32) -> RECT {
   match edge {
@@ -244,7 +261,7 @@ pub fn engine_edge_bind(window: tauri::WebviewWindow, edge: Edge, window_px: i32
       super::guard::cancel(&guard_name(h));
       bar.registered = false;
     }
-    edge_strip(edge, &m, bar.window_px)
+    edge_strip(edge, &overlay_rect(hwnd, edge), bar.window_px)
   };
   bar.strip = strip;
   let rect = bar_rect(&bar, &strip);
@@ -280,7 +297,7 @@ pub fn reassert(fullscreen: bool) {
   let bars: Vec<(isize, Bar)> = with_bars(|b| b.iter().map(|(k, v)| (*k, *v)).collect());
   for (h, bar) in bars {
     let hwnd = HWND(h as *mut core::ffi::c_void);
-    let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &monitor_rect(hwnd), bar.window_px) };
+    let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &overlay_rect(hwnd, bar.edge), bar.window_px) };
     place(hwnd, &bar_rect(&bar, &strip));
   }
 }
@@ -292,7 +309,7 @@ pub fn check(heal: bool) -> (usize, usize) {
   let mut off = 0;
   for (h, bar) in &bars {
     let hwnd = HWND(*h as *mut core::ffi::c_void);
-    let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &monitor_rect(hwnd), bar.window_px) };
+    let strip = if bar.reserve_px > 0 { bar.strip } else { edge_strip(bar.edge, &overlay_rect(hwnd, bar.edge), bar.window_px) };
     let want = bar_rect(&bar, &strip);
     let mut cur = RECT::default();
     unsafe {

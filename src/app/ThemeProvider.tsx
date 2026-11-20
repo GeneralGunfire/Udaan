@@ -2,6 +2,7 @@ import { getPref, onPrefChanged } from '@/os/kernel/prefs'
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react'
 import { ThemeContext, type Theme } from '@/shared/hooks/useTheme'
 import { applyMaterial, type MaterialKind } from '@/os/kernel/material'
+import { applyPalette } from '@/os/kernel/palette'
 
 const STORAGE_KEY = 'udaan-theme'
 
@@ -85,11 +86,13 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     const apply = (key: string, value: unknown) => {
       const root = document.documentElement
       if (key === 'ui.accent' && typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) root.style.setProperty('--u-accent', value)
+      if (key === 'ui.palette' && typeof value === 'string') applyPalette(value)
       if (key === 'ui.opaque') root.toggleAttribute('data-opaque', value === true)
       if (key === 'ui.materialStyle') root.setAttribute('data-mat', value === 'win11' ? 'win11' : 'matte')
       if (key === 'power.profile' && typeof value === 'string') root.setAttribute('data-profile', value)
     }
     void getPref('ui.accent').then((v) => apply('ui.accent', v))
+    void getPref('ui.palette').then((v) => apply('ui.palette', v))
     void getPref('ui.opaque').then((v) => apply('ui.opaque', v))
     void getPref('ui.materialStyle').then((v) => apply('ui.materialStyle', v))
     void getPref('power.profile').then((v) => apply('power.profile', v))

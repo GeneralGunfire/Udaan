@@ -178,6 +178,7 @@ export function MenuBarWindow() {
   centerStyle.current = centerPref
   const [showSeconds] = usePref('menubar.seconds')
   const [focusEnabled] = usePref('focus.enabled')
+  const [barEnabled] = usePref('menubar.enabled')
   const now = useClock(showSeconds)
   const { battery } = useSystemStatus()
   const network = usePolled<NetworkStatus>('shell_network_status', 15000)
@@ -212,6 +213,11 @@ export function MenuBarWindow() {
     const place = async () => {
       const h = Math.round(MENU_BAR_HEIGHT * pxScale())
       try {
+        if (!barEnabled) {
+          // Switched off in Settings: give the strip back and disappear.
+          await invoke('engine_edge_release')
+          return void (await win.hide())
+        }
         if (fullscreen) {
           // Give the strip back and step aside while something is full-screen.
           await invoke('engine_edge_release')
@@ -235,14 +241,14 @@ export function MenuBarWindow() {
       cancelled = true
       offLayout()
     }
-  }, [fullscreen])
+  }, [fullscreen, barEnabled])
 
   // Only hides or shows the window; the reserved strip and position are left exactly as they are.
   useEffect(() => {
     const win = getCurrentWindow()
-    if (covered) void win.hide()
+    if (covered || !barEnabled) void win.hide()
     else if (!fullscreen) void win.show()
-  }, [covered, fullscreen])
+  }, [covered, fullscreen, barEnabled])
 
   useEffect(() => {
     const refresh = () => void getUnreadCount().then(setUnread, () => {})
@@ -374,7 +380,7 @@ export function MenuBarWindow() {
 
   function helpMenuItems(): ShellMenuItemDef[] {
     return [
-      { label: 'Udaan Tips', icon: 'info', onSelect: () => void emit('launcher:tips') },
+      { label: 'Udaan Tutorial', icon: 'info', onSelect: () => void emit('launcher:tips') },
       { label: 'Keyboard Shortcuts', icon: 'terminal', onSelect: () => void openApp('settings', { section: 'keyboard' }) },
     ]
   }

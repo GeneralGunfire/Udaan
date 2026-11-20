@@ -5,7 +5,7 @@ import { useShellMenu } from '@/os/ui/useShellMenu'
 import { springs, staggerDelay } from '@/os/motion/systemMotion'
 import { prefersReducedMotion } from '@/shared/lib/motion'
 import { playSound } from '@/os/sound/sounds'
-import { WIDGET_CATALOG, WIDGET_VIEWS, useWidgets, type PlacedWidget } from './widgets'
+import { WIDGET_CATALOG, WIDGET_VIEWS, useWidgets, widgetOptionMenu, widgetSize, type PlacedWidget } from './widgets'
 
 const SNAP = 8
 /** How far the pointer must travel before a press becomes a drag. */
@@ -35,7 +35,7 @@ export function WidgetLayer({ width, height }: { width: number; height: number }
   const reduced = prefersReducedMotion()
 
   const clamp = (w: PlacedWidget, x: number, y: number) => {
-    const { w: ww, h } = WIDGET_CATALOG[w.kind]
+    const { w: ww, h } = widgetSize(w)
     return {
       x: Math.max(8, Math.min(width - ww - 8, Math.round(x / SNAP) * SNAP)),
       y: Math.max(8, Math.min(height - h - 8, Math.round(y / SNAP) * SNAP)),
@@ -67,14 +67,14 @@ export function WidgetLayer({ width, height }: { width: number; height: number }
       </AnimatePresence>
 
       {widgets.map((w, i) => {
-        const { w: ww, h } = WIDGET_CATALOG[w.kind]
+        const { w: ww, h } = widgetSize(w)
         const dragging = drag?.id === w.id
         const pos = dragging ? drag : clamp(w, w.x, w.y)
         return (
           <motion.div
             key={w.id}
             className="absolute cursor-default"
-            style={{ width: ww, height: h, zIndex: dragging ? 20 : 10 }}
+            style={{ width: ww, height: h, zIndex: dragging ? 20 : 10, ...(w.opts?.accent ? { ['--w-accent' as string]: w.opts.accent } : null) }}
             initial={reduced ? false : { opacity: 0, scale: 0.9, y: 8 }}
             animate={{
               left: pos.x,
@@ -96,7 +96,11 @@ export function WidgetLayer({ width, height }: { width: number; height: number }
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()
+              const setOpts = (opts: PlacedWidget['opts']) => void save(widgets.map((o) => (o.id === w.id ? { ...o, opts } : o)))
+              const custom = widgetOptionMenu(w, setOpts)
               openMenu(e, [
+                ...custom,
+                ...(custom.length ? [{ label: undefined }] : []),
                 { label: `Remove ${WIDGET_CATALOG[w.kind].name}`, onSelect: () => void save(widgets.filter((o) => o.id !== w.id)) },
                 { label: undefined },
                 { label: 'Edit Widgets…', onSelect: () => void openApp('settings', { section: 'widgets' }) },
@@ -132,7 +136,7 @@ export function WidgetLayer({ width, height }: { width: number; height: number }
               setDrag(null)
             }}
           >
-            {createElement(WIDGET_VIEWS[w.kind])}
+            {createElement(WIDGET_VIEWS[w.kind], { opts: w.opts })}
           </motion.div>
         )
       })}

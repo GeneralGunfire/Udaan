@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { SETUP_STEPS, isFreshInstall, runFirstRunSetup } from '@/os/kernel/firstRun'
 import { setPref } from '@/os/kernel/prefs'
 import { deactivateShell } from '@/os/kernel/session'
+import { shell } from '@/os/kernel/shell'
 
 /**
  * The screen a new install shows while it gets this PC ready, so it is clear Udaan is working. It shows each
@@ -97,7 +98,7 @@ export function FirstRunScreen() {
               <button
                 type="button"
                 onClick={() => {
-                  void setPref('dock.enabled', false).then(() => deactivateShell())
+                  void setPref('dock.enabled', false).then(() => shell.setKeyboardHook(false)).then(() => deactivateShell())
                   chosen.current?.()
                 }}
                 className="rounded-2xl border border-white/25 px-5 py-3 text-left text-[13.5px] font-semibold text-white transition hover:bg-white/10"

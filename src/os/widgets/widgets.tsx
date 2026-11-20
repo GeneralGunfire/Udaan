@@ -12,6 +12,7 @@ import { batteryStatus, type BatteryStatus } from '@/integrations/quick-settings
 import { listNotes, readNoteBody, saveNoteBody, type NoteMeta } from '@/integrations/notes/client'
 import { openApp } from '@/os/kernel/shell'
 import { AnalogClock } from '@/os/ui/AnalogClock'
+import { ClockWidget, CLOCK_STYLES, ANALOG_STYLES } from './clocks'
 import { playSound } from '@/os/sound/sounds'
 import { CountdownWidget, CpuGraphWidget, MoonWidget, PhotoWidget, StopwatchWidget, TodoWidget, YearWidget } from './more'
 
@@ -39,16 +40,83 @@ export type WidgetKind =
   | 'year'
   | 'cpu-graph'
 
+/** Per-widget choices. Every field is optional so widgets saved before options existed still load. */
+export interface WidgetOpts {
+  /** Which face, for widgets that have several (the clock). */
+  style?: string
+  /** Size multiplier on the catalog size. */
+  scale?: number
+  hour24?: boolean
+  seconds?: boolean
+  /** A CSS colour that replaces the system accent inside this widget. */
+  accent?: string
+}
+
 export interface PlacedWidget {
   id: string
   kind: WidgetKind
   x: number
   y: number
+  opts?: WidgetOpts
+}
+
+export const WIDGET_SIZES = [
+  { value: 0.8, label: 'Small' },
+  { value: 1, label: 'Default' },
+  { value: 1.3, label: 'Large' },
+  { value: 1.6, label: 'Extra large' },
+] as const
+
+export const WIDGET_ACCENTS = [
+  { value: '', label: 'System accent' },
+  { value: '#0a84ff', label: 'Blue' },
+  { value: '#30d158', label: 'Green' },
+  { value: '#ff9f0a', label: 'Orange' },
+  { value: '#ff375f', label: 'Pink' },
+  { value: '#bf5af2', label: 'Purple' },
+  { value: '#f5f5f7', label: 'White' },
+] as const
+
+/** What a widget is drawn at: its catalog size times the person's size choice. */
+export function widgetSize(w: PlacedWidget): { w: number; h: number } {
+  const base = WIDGET_CATALOG[w.kind]
+  const k = Math.min(2, Math.max(0.6, w.opts?.scale ?? 1))
+  return { w: Math.round(base.w * k), h: Math.round(base.h * k) }
+}
+
+/** Which customisations make sense for a kind. */
+export function widgetOptionSupport(kind: WidgetKind) {
+  return {
+    style: kind === 'clock',
+    hour24: kind === 'clock' || kind === 'time-date',
+    seconds: kind === 'clock' || kind === 'time-date',
+    accent: kind === 'clock' || kind === 'time-date' || kind === 'focus-timer',
+  }
+}
+
+/** The right-click menu entries that customise one widget. Shared by the desktop and Settings. */
+export function widgetOptionMenu(w: PlacedWidget, update: (opts: WidgetOpts) => void): import('@/os/ui/useShellMenu').ShellMenuItemDef[] {
+  const support = widgetOptionSupport(w.kind)
+  const o = w.opts ?? {}
+  const style = CLOCK_STYLES.find((c) => c.id === o.style)?.id ?? 'classic'
+  const items: import('@/os/ui/useShellMenu').ShellMenuItemDef[] = []
+  if (support.style) {
+    items.push({ label: 'Clock style', items: CLOCK_STYLES.map((c) => ({ label: c.name, checked: style === c.id, onSelect: () => update({ ...o, style: c.id }) })) })
+  }
+  items.push({ label: 'Size', items: WIDGET_SIZES.map((s) => ({ label: s.label, checked: (o.scale ?? 1) === s.value, onSelect: () => update({ ...o, scale: s.value }) })) })
+  if (support.accent) {
+    items.push({ label: 'Colour', items: WIDGET_ACCENTS.map((c) => ({ label: c.label, checked: (o.accent ?? '') === c.value, onSelect: () => update({ ...o, accent: c.value || undefined }) })) })
+  }
+  const analog = w.kind === 'clock' && ANALOG_STYLES.includes(style as never)
+  if (support.hour24 && !analog) items.push({ label: '24-hour time', checked: !!o.hour24, onSelect: () => update({ ...o, hour24: !o.hour24 }) })
+  if (support.seconds && w.kind === 'clock' && style !== 'words') items.push({ label: 'Show seconds', checked: o.seconds ?? analog, onSelect: () => update({ ...o, seconds: !(o.seconds ?? analog) }) })
+  if (w.kind === 'time-date') items.push({ label: 'Show seconds', checked: o.seconds ?? true, onSelect: () => update({ ...o, seconds: !(o.seconds ?? true) }) })
+  return items
 }
 
 /** Widget sizes follow the macOS grid: small squares and medium double-width tiles. */
 export const WIDGET_CATALOG: Record<WidgetKind, { name: string; description: string; w: number; h: number }> = {
-  clock: { name: 'Clock', description: 'An analogue clock with the date.', w: 170, h: 170 },
+  clock: { name: 'Clock', description: 'Eight faces: classic, minimal, bold, rings, orbit, digital, flip and words.', w: 170, h: 170 },
   'sweep-clock': { name: 'Sweep Clock', description: 'A dark glass analogue clock with a smooth sweeping hand.', w: 220, h: 220 },
   'time-date': { name: 'Time & Date', description: 'Large time, the date, and how far through the day you are.', w: 356, h: 170 },
   'focus-timer': { name: 'Focus Timer', description: 'A countdown ring for focused work sessions.', w: 170, h: 170 },
@@ -88,7 +156,7 @@ export function useWidgets() {
 }
 
 /** Adds a widget in the first free slot down the right-hand side of the screen. */
-export async function addWidget(kind: WidgetKind) {
+export async function addWidget(kind: WidgetKind, opts?: WidgetOpts) {
   const key = widgetsKey(await loadProfile())
   const list = parseWidgets(await getPref(key))
   const { w, h } = WIDGET_CATALOG[kind]
@@ -97,7 +165,7 @@ export async function addWidget(kind: WidgetKind) {
   let y = 64
   const overlaps = (x: number, yy: number) =>
     list.some((o) => {
-      const s = WIDGET_CATALOG[o.kind]
+      const s = widgetSize(o)
       return x < o.x + s.w + gap && x + w + gap > o.x && yy < o.y + s.h + gap && yy + h + gap > o.y
     })
   let x = right - w
@@ -108,7 +176,7 @@ export async function addWidget(kind: WidgetKind) {
       x -= 356 + gap
     }
   }
-  await setPref(key, JSON.stringify([...list, { id: `${kind}-${Date.now().toString(36)}`, kind, x, y }]))
+  await setPref(key, JSON.stringify([...list, { id: `${kind}-${Date.now().toString(36)}`, kind, x, y, ...(opts ? { opts } : null) }]))
 }
 
 /**
@@ -138,35 +206,6 @@ function useNow(everyMs: number) {
   const [now, setNow] = useState(() => new Date())
   usePoll(() => setNow(new Date()), everyMs)
   return now
-}
-
-function ClockWidget() {
-  const now = useNow(1000)
-  const s = now.getSeconds()
-  const m = now.getMinutes() + s / 60
-  const h = (now.getHours() % 12) + m / 60
-  const hand = (deg: number, len: number, width: number, color: string) => (
-    <line x1="50" y1="50" x2={50 + len * Math.sin((deg * Math.PI) / 180)} y2={50 - len * Math.cos((deg * Math.PI) / 180)} stroke={color} strokeWidth={width} strokeLinecap="round" />
-  )
-  return (
-    <Tile className="flex items-center justify-center !p-3">
-      <svg viewBox="0 0 100 100" className="h-full w-full">
-        <circle cx="50" cy="50" r="47" fill="rgb(14 14 17 / 0.55)" stroke="rgb(255 255 255 / 0.16)" strokeWidth="0.6" />
-        {Array.from({ length: 12 }, (_, i) => (
-          <text key={i} x={50 + 36 * Math.sin((i + 1) * (Math.PI / 6))} y={50 - 36 * Math.cos((i + 1) * (Math.PI / 6)) + 3.6} textAnchor="middle" fontSize="8.5" fontWeight="500" fill="rgb(250 248 244 / 0.9)">
-            {i + 1}
-          </text>
-        ))}
-        <text x="50" y="68" textAnchor="middle" fontSize="6.5" fill="#8e8e93" fontWeight="600">
-          {now.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()} {now.getDate()}
-        </text>
-        {hand(h * 30, 22, 3.2, '#faf8f4')}
-        {hand(m * 6, 33, 2.2, '#faf8f4')}
-        {hand(s * 6, 36, 0.9, '#3072f0')}
-        <circle cx="50" cy="50" r="2" fill="#3072f0" />
-      </svg>
-    </Tile>
-  )
 }
 
 function CalendarWidget() {
@@ -501,32 +540,38 @@ function isoWeek(d: Date): number {
   return Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86_400_000 + 1) / 7)
 }
 
-function TimeDateWidget() {
-  const now = useNow(1000)
+function TimeDateWidget({ opts }: { opts?: WidgetOpts }) {
+  const showSeconds = opts?.seconds ?? true
+  const hour24 = opts?.hour24 ?? false
+  const now = useNow(showSeconds ? 1000 : 15_000)
   const hours = now.getHours()
-  const hh = String(hours % 12 || 12).padStart(2, '0')
+  const hh = hour24 ? String(hours).padStart(2, '0') : String(hours % 12 || 12).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
   const ss = String(now.getSeconds()).padStart(2, '0')
   const day = (hours * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86_400
   return (
-    <Tile className="flex flex-col justify-between !p-5 !bg-gradient-to-br from-[rgb(30_34_52/0.82)] to-[rgb(12_14_22/0.82)]">
-      <div className="flex items-baseline gap-2.5">
-        <span className="text-[64px] font-extralight leading-none tracking-tight tabular-nums">
-          {hh}
-          <span className="text-white/45">:{mm}</span>
-        </span>
-        <span className="text-[13px] font-medium tabular-nums text-white/55">
-          {ss}s · {hours >= 12 ? 'PM' : 'AM'}
-        </span>
-      </div>
-      <div>
-        <p className="text-[13px] font-medium text-white/80">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${day * 100}%` }} />
+    <Tile className="!p-0">
+      <div className="flex h-full w-full flex-col justify-between" style={{ containerType: 'size', padding: '5%' }}>
+        <div className="flex items-baseline" style={{ gap: '2.5cqh' }}>
+          <span className="font-extralight leading-none tracking-tight tabular-nums" style={{ fontSize: '38cqh' }}>
+            {hh}
+            <span style={{ color: 'var(--w-accent, var(--u-ink-3))' }}>:</span>
+            {mm}
+          </span>
+          <span className="font-medium tabular-nums" style={{ fontSize: '8cqh', color: 'var(--u-ink-3)' }}>
+            {showSeconds ? `${ss}s` : ''}
+            {!hour24 ? `${showSeconds ? ' · ' : ''}${hours >= 12 ? 'PM' : 'AM'}` : ''}
+          </span>
         </div>
-        <p className="mt-1 text-[10.5px] text-white/45">
-          {Math.round(day * 100)}% of the day · week {isoWeek(now)}
-        </p>
+        <div>
+          <p className="font-medium" style={{ fontSize: '8cqh' }}>{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <div className="h-[3px] w-full overflow-hidden rounded-full bg-(--u-wash-on)" style={{ marginTop: '4cqh' }}>
+            <div className="h-full rounded-full" style={{ width: `${day * 100}%`, background: 'var(--w-accent, var(--color-accent))' }} />
+          </div>
+          <p style={{ marginTop: '2.5cqh', fontSize: '6.2cqh', color: 'var(--u-ink-3)' }}>
+            {Math.round(day * 100)}% of the day · week {isoWeek(now)}
+          </p>
+        </div>
       </div>
     </Tile>
   )
@@ -646,7 +691,7 @@ function ProgressWidget() {
   )
 }
 
-export const WIDGET_VIEWS: Record<WidgetKind, () => ReactNode> = {
+export const WIDGET_VIEWS: Record<WidgetKind, (props: { opts?: WidgetOpts }) => ReactNode> = {
   'sweep-clock': SweepClockWidget,
   'time-date': TimeDateWidget,
   'focus-timer': FocusTimerWidget,

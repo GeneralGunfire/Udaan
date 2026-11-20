@@ -422,6 +422,54 @@ const DRAWINGS: Record<AppId, Drawing> = {
     </Plate>
   ),
 
+  calculator: (c) => (
+    <Plate c={c} from="#5a606b" to="#1c1f25" rim="#a9b2c2">
+      <defs>
+        <linearGradient id={c.id('screen')} x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#d7dde7" />
+        </linearGradient>
+      </defs>
+      <g style={{ filter: liftHeavy }}>
+        {/* The read-out, then a 3 by 3 keypad with the equals key in the accent. */}
+        <rect x="24" y="20" width="52" height="17" rx="5" fill={`url(#${c.id('screen')})`} />
+        <path d="M58 28.5h11" stroke="#2b303b" strokeWidth="3.6" strokeLinecap="round" />
+        <g fill="#e3e8f0">
+          <rect x="24" y="43" width="14" height="11" rx="3.5" />
+          <rect x="43" y="43" width="14" height="11" rx="3.5" />
+          <rect x="24" y="59" width="14" height="11" rx="3.5" />
+          <rect x="43" y="59" width="14" height="11" rx="3.5" />
+          <rect x="24" y="75" width="33" height="7" rx="3.5" />
+        </g>
+        <rect x="62" y="43" width="14" height="27" rx="3.5" fill="#f2a33a" />
+        <rect x="62" y="75" width="14" height="7" rx="3.5" fill="#3072f0" />
+      </g>
+    </Plate>
+  ),
+
+  clock: (c) => (
+    <Plate c={c} from="#4a505c" to="#15181d" rim="#9aa4b8">
+      <defs>
+        <radialGradient id={c.id('face')} cx="0.38" cy="0.3" r="0.8">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#d9dfe8" />
+        </radialGradient>
+      </defs>
+      <g style={{ filter: liftHeavy }}>
+        <circle cx="50" cy="50" r="30" fill={`url(#${c.id('face')})`} />
+        <g stroke="#9aa4b4" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M50 24v4M50 72v4M24 50h4M72 50h4" />
+        </g>
+        <g stroke="#2b303b" strokeLinecap="round">
+          <path d="M50 50V35" strokeWidth="4.2" />
+          <path d="M50 50l11 7" strokeWidth="3.4" />
+        </g>
+        <path d="M50 50l-9 15" stroke="#3072f0" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="50" cy="50" r="3.2" fill="#3072f0" />
+      </g>
+    </Plate>
+  ),
+
   tv: (c) => (
     <Plate c={c} from="#555b69" to="#101319" rim="#9aa4b8">
       <defs>

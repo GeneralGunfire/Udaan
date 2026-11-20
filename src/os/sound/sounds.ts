@@ -45,7 +45,8 @@
  *   shimmer   high partials that decay fast, giving "sparkle"
  *   space     a short reverb tail, so sounds sit in a room
  */
-import { getPref } from '@/os/kernel/prefs'
+import { getPref, onPrefChanged } from '@/os/kernel/prefs'
+import { notifyPackVoices, uiPackVoices } from './soundPacks'
 import { createEqualizer } from './equalizer'
 
 export type SoundId =
@@ -330,15 +331,46 @@ function noise(ctx: AudioContext): AudioBuffer {
 /** Tracks repeated plays so a fast sequence detunes instead of stuttering. */
 const lastPlayed = new Map<SoundId, { at: number; n: number }>()
 
-export async function playSound(id: SoundId) {
+/** The chosen sound packs (Settings, Sound). Kept in step with the saved choice from every window. */
+let uiPackCache: string | null = null
+let notifyPackCache: string | null = null
+let watching = false
+function watchPrefs() {
+  if (watching) return
+  watching = true
+  try {
+    void onPrefChanged((k, v) => {
+      if (k === 'sound.uiPack') uiPackCache = String(v)
+      else if (k === 'sound.notifyPack') notifyPackCache = String(v)
+      else if (k === 'sounds.enabled') enabledCache = Boolean(v)
+    }).catch(() => {})
+  } catch {
+    // Outside the desktop there is nothing to listen to; the cached choice simply stays.
+  }
+}
+
+/**
+ * Plays one interface sound. `opts` previews a pack without saving it (Settings uses this).
+ * The notification sound follows the notification pack; every other sound follows the interaction pack.
+ */
+export async function playSound(id: SoundId, opts?: { ui?: string; notify?: string }) {
+  watchPrefs()
   enabledCache ??= await getPref('sounds.enabled')
   if (!enabledCache) return
+
+  const isNotify = id === 'notify'
+  let pack: string
+  if (isNotify) pack = opts?.notify ?? (notifyPackCache ??= await getPref('sound.notifyPack'))
+  else pack = opts?.ui ?? (uiPackCache ??= await getPref('sound.uiPack'))
+  if (pack === 'off') return
+
+  // A pack the engine does not know (or the default pack) falls back to the built-in sound, never to silence.
+  const voices: Voice[] | undefined = (isNotify ? notifyPackVoices(pack) : uiPackVoices(pack, id)) ?? SOUNDS[id]
+  if (!voices || voices.length === 0) return
 
   const e = audio()
   startKeepAlive(e)
   const ctx = e.ctx
-  const voices = SOUNDS[id]
-  if (!voices) return
 
   // Repeated taps within 300ms step up in pitch slightly, so a burst of
   // clicks reads as a sequence of distinct events rather than one sound
