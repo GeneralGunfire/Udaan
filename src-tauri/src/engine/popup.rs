@@ -309,6 +309,27 @@ pub fn engine_window_round(window: tauri::WebviewWindow, radius: i32) -> Result<
   Ok(())
 }
 
+/// Strips every caption and frame bit from a shell window (desktop, dock, menu bar, popups, banners).
+/// These windows are declared frameless, but some keep the window manager's caption style, and a window
+/// that still has one can show the classic title bar (the app's own name, with buttons) when the pointer
+/// reaches the top edge of the screen. Safe to call again at any time: it does nothing once they are gone.
+#[tauri::command]
+pub fn engine_window_unframe(window: tauri::WebviewWindow) -> Result<(), String> {
+  use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
+  };
+  let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+  unsafe {
+    let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+    let strip = WS_CAPTION.0 | WS_BORDER.0 | WS_DLGFRAME.0 | WS_THICKFRAME.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0;
+    if style & strip != 0 {
+      SetWindowLongW(hwnd, GWL_STYLE, (style & !strip) as i32);
+      let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+  }
+  Ok(())
+}
+
 /// Shows the calling popup window and brings it to the front, with the system call (see the note in
 /// `engine_popup_open` about why not the window library's `show()`).
 #[tauri::command]

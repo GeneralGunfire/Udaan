@@ -7,6 +7,7 @@ import { inTauri } from './shell'
 export interface Prefs {
   'dock.autoHide': boolean
   'dock.enabled': boolean
+  'dock.showTrash': boolean
   'menubar.enabled': boolean
   'shell.winKey': boolean
   'windows.autoMaximize': boolean
@@ -116,6 +117,7 @@ export const CORNER_KEYS = ['corners.tl', 'corners.tr', 'corners.bl', 'corners.b
 export const PREF_DEFAULTS: Prefs = {
   'dock.autoHide': true,
   'dock.enabled': true,
+  'dock.showTrash': true,
   'menubar.enabled': true,
   'shell.winKey': true,
   'windows.autoMaximize': false,

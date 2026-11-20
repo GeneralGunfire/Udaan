@@ -94,6 +94,7 @@ const dockMenuItems: ShellMenuItemDef[] = [
   { label: 'Next wallpaper', icon: 'refresh', onSelect: () => void invoke('wallpaper_step', { forward: true }) },
   { label: undefined },
   { label: 'Auto-hide the dock', icon: 'eye', onSelect: () => void getPref('dock.autoHide').then((v) => setPref('dock.autoHide', !v)) },
+  { label: 'Show the Recycle Bin', icon: 'trash', onSelect: () => void getPref('dock.showTrash').then((v) => setPref('dock.showTrash', !v)) },
   { label: 'Dock and glass settings…', icon: 'sliders', onSelect: () => void openApp('settings', { section: 'personalization' }) },
   { label: undefined },
   { label: 'Task Manager', icon: 'terminal', onSelect: () => void openSystemUtility('taskManager') },
@@ -246,6 +247,7 @@ function DockGlyph({ item }: { item: DockItem }) {
 export function DockWindow() {
   const [autoHide] = usePref('dock.autoHide')
   const [dockEnabled] = usePref('dock.enabled')
+  const [showTrash] = usePref('dock.showTrash')
   const { items, pins, pinnedCount } = useDockItems()
   const itemMenu = useCallback((item: DockItem) => itemMenuItems(item, pins), [pins])
   const foreground = useShell((s) => s.foreground)
@@ -578,33 +580,37 @@ export function DockWindow() {
           return i === pinnedCount && pinnedCount > 0 ? [<Divider key="div-running" />, icon] : [icon]
         })}
 
-        <Divider />
-        <button
-          type="button"
-          aria-label={binCount ? `Recycle Bin, ${binCount} items` : 'Recycle Bin, empty'}
-          onClick={() => void launchApp('shell:RecycleBinFolder')}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            openMenu(e, [
-              { label: 'Open', onSelect: () => void launchApp('shell:RecycleBinFolder') },
-              {
-                label: 'Empty Recycle Bin',
-                disabled: binCount === 0,
-                onSelect: () => {
-                  if (window.confirm('Permanently delete everything in the Recycle Bin?')) void shell.emptyRecycleBin().then(() => setBinCount(0))
-                },
-              },
-            ])
-          }}
-          className="u-dock__item"
-          style={{ width: METRICS.slot, height: METRICS.slot }}
-        >
-          <DockLabel text={binCount ? `Recycle Bin · ${binCount}` : 'Recycle Bin'} count={0} />
-          <span className="u-dock__glyph relative">
-            <TrashGlyph size={METRICS.iconSize} full={binCount > 0} />
-          </span>
-        </button>
+        {showTrash && (
+          <>
+            <Divider />
+            <button
+              type="button"
+              aria-label={binCount ? `Recycle Bin, ${binCount} items` : 'Recycle Bin, empty'}
+              onClick={() => void launchApp('shell:RecycleBinFolder')}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                openMenu(e, [
+                  { label: 'Open', onSelect: () => void launchApp('shell:RecycleBinFolder') },
+                  {
+                    label: 'Empty Recycle Bin',
+                    disabled: binCount === 0,
+                    onSelect: () => {
+                      if (window.confirm('Permanently delete everything in the Recycle Bin?')) void shell.emptyRecycleBin().then(() => setBinCount(0))
+                    },
+                  },
+                ])
+              }}
+              className="u-dock__item"
+              style={{ width: METRICS.slot, height: METRICS.slot }}
+            >
+              <DockLabel text={binCount ? `Recycle Bin · ${binCount}` : 'Recycle Bin'} count={0} />
+              <span className="u-dock__glyph relative">
+                <TrashGlyph size={METRICS.iconSize} full={binCount > 0} />
+              </span>
+            </button>
+          </>
+        )}
         <Divider />
         <DockClock />
       </div>

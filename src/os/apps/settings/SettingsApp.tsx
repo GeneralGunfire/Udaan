@@ -23,6 +23,7 @@ import { ANALOG_STYLES, CLOCK_STYLES } from '@/os/widgets/clocks'
 import { QuickstartsSection } from './QuickstartsSection'
 import { LiquidGlassSettings } from './LiquidSection'
 import { ProfileGroup, WorkProfileGroup } from './ProfileGroup'
+import { DockApps } from './DockApps'
 import { UpdatesGroup } from './UpdatesGroup'
 import { AnimationsSettings } from './AnimationsSection'
 import { SwitcherSettings } from './SwitcherSection'
@@ -79,6 +80,7 @@ const SEARCH_INDEX: { title: string; section: Section; keywords?: string }[] = [
   { title: 'Screensaver delay', section: 'dock', keywords: 'screensaver idle timeout inactive start after seconds minutes 30 seconds 1 minute 5 minutes 10 minutes' },
   { title: 'Lock after the screensaver', section: 'dock', keywords: 'pin password screensaver' },
   { title: 'App palette', section: 'personalization', keywords: 'colours tones theme dark black graphite midnight ocean forest plum ember amoled preset' },
+  { title: 'Dock apps', section: 'dock', keywords: 'pin unpin remove add programs vscode visual studio code explorer reorder' },
   { title: 'Interface sounds', section: 'sound', keywords: 'audio effects clicks' },
   { title: 'Notification sound', section: 'sound', keywords: 'sound pack chime marimba bell alert tone' },
   { title: 'Interaction sounds', section: 'sound', keywords: 'sound pack clicks switcher 3d off mute soft glass mechanical' },
@@ -218,8 +220,10 @@ function DockSection() {
             }
           }}
         />
+        <PrefToggleRow title="Show the Recycle Bin in the dock" description="The Recycle Bin at the right end of the dock. Turn off to hide it." pref="dock.showTrash" />
         <PrefToggleRow title="Automatically hide the dock" description="The dock slides away and returns when you move the pointer to the bottom edge." pref="dock.autoHide" />
       </Group>
+      <DockApps />
       <Group title="Menu Bar">
         <PrefToggleRow title="Use the Udaan top bar" description="Turn off to hide the top bar and give its space back to your windows." pref="menubar.enabled" />
         <PrefToggleRow title="24-hour clock" description="Show the time as 14:30 instead of 2:30 PM." pref="menubar.clock24" />

@@ -146,6 +146,7 @@ pub fn run() {
       engine::popup::engine_popup_close,
       engine::popup::engine_popup_watch,
       engine::popup::engine_window_round,
+      engine::popup::engine_window_unframe,
       engine::popup::engine_popup_present,
       engine::popup::engine_popup_dismiss,
       engine::wallpaper_packs::wallpaper_library,

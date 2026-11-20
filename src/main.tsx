@@ -72,6 +72,15 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+// Shell windows are frameless, but some keep the window manager's caption style, which can show a title bar
+// (the app's own name) when the pointer reaches the top edge of the screen. Strip it. Idempotent, so it is
+// repeated a few times in case the window library restores the style when it shows the window.
+if (kind !== 'app' && '__TAURI_INTERNALS__' in window) {
+  const unframe = () => void import('@tauri-apps/api/core').then(({ invoke }) => invoke('engine_window_unframe')).catch(() => {})
+  unframe()
+  for (const ms of [800, 3000, 10000]) window.setTimeout(unframe, ms)
+}
+
 // The desktop is declared hidden in tauri.conf.json so no blank frame
 // shows before React paints; reveal it after the first real frame. Other
 // windows control their own visibility. The timer is a second, independent

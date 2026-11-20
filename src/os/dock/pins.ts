@@ -2,7 +2,7 @@ import { emit, listen } from '@tauri-apps/api/event'
 import { getTaskbarPref, listPinnedApps, setPinnedApps, setTaskbarPref, type PinnedApp } from '@/integrations/taskbar-prefs/client'
 import { APP_DEFS, isAppId, type AppId } from '@/os/kernel/registry'
 import { getPref, setPref } from '@/os/kernel/prefs'
-import { currentProfile, loadProfile, WORK_DOCK_PROGRAMS } from '@/os/kernel/profile'
+import { loadProfile, WORK_DOCK_PROGRAMS } from '@/os/kernel/profile'
 
 /**
  * A dock pin: one of Udaan's apps, or a program. Programs are matched to
@@ -30,8 +30,11 @@ const DEFAULT_PINS: Pin[] = [
 /** Uninstalled programs that were once permanent pins and must not linger. */
 const RETIRED_KEYS = new Set([exeKey('NortonBrowser.exe'), exeKey('claude.exe')])
 
-/** The programs that can't be unpinned. */
-export const isPermanent = (key: string) => currentProfile() === 'personal' && DEFAULT_PINS.some((d) => d.key === key)
+/** Nothing is permanent any more: every pin, including the ones a fresh dock starts with, can be removed. */
+export const isPermanent = (_key: string) => false
+
+/** The pins a fresh dock starts with, for "Reset dock". */
+export const defaultPins = (): Pin[] => DEFAULT_PINS.map((p) => ({ ...p }))
 
 /** Work's dock: its own list, kept in a pref so it never touches the Personal pins. Nothing is permanent there. */
 const WORK_PINS: Pin[] = [
@@ -84,16 +87,9 @@ export async function loadPins(): Promise<Pin[]> {
     .filter((p): p is Pin => p !== null)
   const retired = pins.some((p) => RETIRED_KEYS.has(p.key))
   if (retired) pins = pins.filter((p) => !RETIRED_KEYS.has(p.key))
-  // File Explorer and VS Code are always pinned: any that went
-  // missing come back in their usual place.
-  const missing = DEFAULT_PINS.filter((d) => !pins.some((p) => p.key === d.key))
-  if (!missing.length) {
-    if (retired) await setPinnedApps(pins.map(toRow))
-    return pins
-  }
-  const fixed = [...DEFAULT_PINS.map((d) => pins.find((p) => p.key === d.key) ?? d), ...pins.filter((p) => !isPermanent(p.key))]
-  await setPinnedApps(fixed.map(toRow))
-  return fixed
+  // The starting pins are seeded once, above. They are not put back if the person removes them.
+  if (retired) await setPinnedApps(pins.map(toRow))
+  return pins
 }
 
 export async function savePins(pins: Pin[]): Promise<void> {
