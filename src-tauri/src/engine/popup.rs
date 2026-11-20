@@ -309,6 +309,29 @@ pub fn engine_window_round(window: tauri::WebviewWindow, radius: i32) -> Result<
   Ok(())
 }
 
+/// Marks the window procedure hook that keeps a shell window from ever painting a title area.
+const NOFRAME_SUBCLASS_ID: usize = 0x4E_46_52; // "NFR"
+
+/// Windows repaints a window's title area whenever it becomes active or inactive (or its title changes), even
+/// when the window is frameless and sits over the screen's top edge: that is the strip with the app's own name
+/// that appears over the menu bar. Answering these two messages ourselves means nothing is ever drawn.
+unsafe extern "system" fn no_frame_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id: usize, _data: usize) -> LRESULT {
+  const WM_NCPAINT: u32 = 0x0085;
+  const WM_NCACTIVATE: u32 = 0x0086;
+  const WM_NCDESTROY: u32 = 0x0082;
+  match msg {
+    // Nothing to paint outside the client area.
+    WM_NCPAINT => LRESULT(0),
+    // lParam = -1 tells the default handler to update the active state but not to repaint the frame.
+    WM_NCACTIVATE => DefSubclassProc(hwnd, msg, wp, LPARAM(-1)),
+    WM_NCDESTROY => {
+      let _ = RemoveWindowSubclass(hwnd, Some(no_frame_proc), NOFRAME_SUBCLASS_ID);
+      DefSubclassProc(hwnd, msg, wp, lp)
+    }
+    _ => DefSubclassProc(hwnd, msg, wp, lp),
+  }
+}
+
 /// Strips every caption and frame bit from a shell window (desktop, dock, menu bar, popups, banners).
 /// These windows are declared frameless, but some keep the window manager's caption style, and a window
 /// that still has one can show the classic title bar (the app's own name, with buttons) when the pointer
@@ -325,6 +348,17 @@ pub fn engine_window_unframe(window: tauri::WebviewWindow) -> Result<(), String>
     if style & strip != 0 {
       SetWindowLongW(hwnd, GWL_STYLE, (style & !strip) as i32);
       let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    // Idempotent: attaching again only replaces the same hook.
+    let _ = SetWindowSubclass(hwnd, Some(no_frame_proc), NOFRAME_SUBCLASS_ID, 0);
+
+    // Windows 11 (and later) can also draw a title bar and a border colour through the compositor. Tell it
+    // there is none: DWMWA_BORDER_COLOR (34) and DWMWA_CAPTION_COLOR (35) = DWMWA_COLOR_NONE. Older Windows
+    // does not know these attributes and simply refuses, which is fine.
+    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWINDOWATTRIBUTE};
+    let none: u32 = 0xFFFF_FFFE;
+    for attr in [34, 35] {
+      let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(attr), &none as *const u32 as *const core::ffi::c_void, std::mem::size_of::<u32>() as u32);
     }
   }
   Ok(())
