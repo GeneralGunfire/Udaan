@@ -1,19 +1,36 @@
 {
-  "version": "0.1.0",
-  "date": "2026-11-19",
+  "version": "0.1.1",
+  "date": "2026-11-20",
   "installers": {
     "10": {
-      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.0/Udaan_0.1.0_win10_x64-setup.exe",
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.1/Udaan_0.1.1_win10_x64-setup.exe",
       "size": "219 MB",
-      "sha256": "f560c88c0a532529c6c5389d435125e44c9f24b61193a9a83d4c228f2fbc83f4"
+      "sha256": "97e4b2b4feab171d67002a3f932bf64f263aaa3273602782deed281b7c706e62"
     },
     "11": {
-      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.0/Udaan_0.1.0_win11_x64-setup.exe",
+      "url": "https://github.com/GeneralGunfire/Udaan/releases/download/v0.1.1/Udaan_0.1.1_win11_x64-setup.exe",
       "size": "219 MB",
-      "sha256": "f09f3c0c43eb0cb64fb06d8e9d1e160ba28bff75fc47c478e73da73c47105f03"
+      "sha256": "3a70fa5346087778824f9892794640bc338ed30fd875ba2d61dda2c81a004117"
     }
   },
   "updates": [
+    {
+      "date": "2026-11-20",
+      "kind": "release",
+      "version": "0.1.1",
+      "title": "Udaan 0.1.1",
+      "notes": [
+        "A new Calculator app: Standard, Scientific, Programmer and unit Converter, with history and full keyboard use.",
+        "A new Clock app: World Clock, Alarms, Stopwatch, Timers and a Focus timer. Alarms and timers ring even when the app is closed.",
+        "Eight clock faces for the desktop widget: classic, minimal, bold, rings, orbit, digital, flip and words. Right-click any widget to change its style, size and colour.",
+        "App palettes in Settings: pick the tones every app stands on, or keep the original Udaan look.",
+        "More sounds: nine notification sounds and five interaction sound packs, each with a preview, and either can be switched off.",
+        "A new loading screen, in black and white, that stays until you click Skip.",
+        "A full guided tutorial replaces the old tips.",
+        "The dock and the top bar now have separate switches. With the dock off, the Windows taskbar, Start menu and Windows key work exactly as before.",
+        "Auto-hide for the dock now works as soon as you turn it on, with a smooth slide, and the dock keeps the same position."
+      ]
+    },
     {
       "date": "2026-11-19",
       "kind": "news",
